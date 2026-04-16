@@ -1,3 +1,5 @@
+![Vessal-text](https://private-user-images.githubusercontent.com/251321079/579297227-2cfe5b37-4c3e-4e1a-aac9-de5ac859a5c2.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzYzNTA0NTcsIm5iZiI6MTc3NjM1MDE1NywicGF0aCI6Ii8yNTEzMjEwNzkvNTc5Mjk3MjI3LTJjZmU1YjM3LTRjM2UtNGUxYS1hYWM5LWRlNWFjODU5YTVjMi5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwNDE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDQxNlQxNDM1NTdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0zM2RjNTE4N2Y5ODQ0YmRjNjk2ZDA1OTQzMTVkMzZiYjkzNWFiNjUzNTU1MDQ0OThjYTBhZDNmZDA2YTEyMmRmJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZyZXNwb25zZS1jb250ZW50LXR5cGU9aW1hZ2UlMkZwbmcifQ.h7xyR8lot5LUSIQbjxKQYqvJC_SF9RZ5uam-AEIyncY)
+
 # Vessal — Vessel for AI
 
 **Turing-complete · Embodied · Efficient · Evolving**
@@ -8,7 +10,7 @@ An agent runtime where Python is the only way to act.
 
 [Whitepaper](references/whitepaper/)
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Skills](#skills) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment) · [HTTP API](#http-api)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Skills](#skills) · [SkillHub](#skillhub) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment) · [HTTP API](#http-api)
 
 
 ## The Problem
@@ -26,13 +28,24 @@ Every major agent framework gives the LLM a menu of functions and lets it pick. 
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - An API key from any OpenAI-compatible provider (OpenAI, Anthropic via proxy, DeepSeek, local models, etc.)
 
+### Install globally (once)
+
+```bash
+# Recommended
+uv tool install vessal
+
+# Or with pipx
+pipx install vessal
+```
+
 ### Create a new agent
 
 ```bash
-uv add vessal
-vs init my-agent
+vessal init my-agent
 cd my-agent
 ```
+
+`vessal init` automatically creates a `.venv` and installs dependencies. Pass `--no-venv` to skip this step.
 
 > **Tip:** `vs` is a shorthand for `vessal`. All commands work with either name — `vs start`, `vs stop`, `vs skill init`, etc.
 
@@ -163,19 +176,74 @@ Enable a Skill by adding it to `hull.toml`:
 skills = ["tasks", "pin", "chat", "heartbeat", "memory", "search"]
 ```
 
+### Skill Directory Layout
+
+Each agent project uses a three-directory layout:
+
+```
+skills/
+  bundled/   — preinstalled Skills (copied from Vessal at init time)
+  hub/       — Skills downloaded from SkillHub
+  local/     — Skills you develop yourself
+```
+
+### SkillHub
+
+SkillHub is the curated Skill registry at [vessal-ai/vessal-skills](https://github.com/vessal-ai/vessal-skills).
+
+```bash
+# Search for skills
+vessal skill search web
+
+# Install a skill from SkillHub
+vessal skill install browser
+
+# Install from a Git URL (unverified)
+vessal skill install https://github.com/someone/my-skill.git
+
+# Update all hub-installed skills
+vessal skill update
+
+# List installed skills
+vessal skill list --installed
+
+# Uninstall a hub skill
+vessal skill uninstall browser
+```
+
+The agent can also search and install Skills at runtime via `skills.search_hub('keyword')` and `skills.download_skill('name')`.
+
 ### Creating a Skill
 
 ```bash
 vessal skill init my-skill
 ```
 
-This creates a scaffold:
+This creates a scaffold in `skills/local/my-skill/`:
 
 ```
-skills/my-skill/
+skills/local/my-skill/
     __init__.py     Skill class (tools + signals)
-    SKILL.md        Usage guide for the LLM
+    SKILL.md        Usage guide for the LLM (v1 frontmatter)
 ```
+
+The generated `SKILL.md` uses the v1 frontmatter format:
+
+```yaml
+---
+name: my-skill
+version: "0.1.0"
+description: "(functional description, ≤15 words)"
+author: ""
+license: "Apache-2.0"
+requires:
+  skills: []
+---
+```
+
+Run `vessal skill check <path>` to validate a Skill before publishing. Add `--test` to also run its test suite.
+
+To publish to SkillHub: `vessal skill publish <path>`
 
 The agent can also create Skills for itself at runtime using the `skill_creator` Skill. See [Chapter 3 of the whitepaper](references/whitepaper/03-skills.md) for the full Skill model.
 
@@ -194,8 +262,19 @@ The agent can also create Skills for itself at runtime using the `skill_creator`
 
 | Command | Description |
 |---------|-------------|
-| `vessal skill init <name>` | Create a Skill scaffold directory |
+| `vessal skill init <name>` | Create a Skill scaffold in `skills/local/` |
 | `vessal skill check <path>` | Validate Skill structure; add `--test` to run tests |
+| `vessal skill publish <path>` | Validate and guide submitting a PR to SkillHub |
+
+### SkillHub
+
+| Command | Description |
+|---------|-------------|
+| `vessal skill search <keyword>` | Search the SkillHub registry |
+| `vessal skill list` | List Skills grouped by bundled/hub/local; add `--installed` for hub only |
+| `vessal skill install <name\|url>` | Install from SkillHub or a Git URL; add `-g` for global install |
+| `vessal skill uninstall <name>` | Remove a hub-installed Skill |
+| `vessal skill update [name]` | Re-fetch from original source; omit name to update all |
 
 ### Container Deployment
 
@@ -243,7 +322,7 @@ max_tokens = 4096
 
 [hull]
 skills = ["tasks", "pin", "chat", "heartbeat"]
-skill_paths = ["skills/"]
+skill_paths = ["skills/bundled", "skills/hub", "skills/local"]
 # compress_threshold = 50     # Context pressure signal threshold (%)
 
 [gates]
