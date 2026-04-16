@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vessal Frame Log Viewer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0f1117;
+  color: #c9d1d9;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Header */
+#header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+#header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e6edf3;
+  white-space: nowrap;
+}
+
+#stats {
+  font-size: 12px;
+  color: #8b949e;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stat-badge {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.stat-badge.error { border-color: #da3633; color: #f85149; }
+
+#view-toggle {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+#view-toggle button {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+#view-toggle button.active {
+  background: #1f6feb;
+  border-color: #1f6feb;
+  color: #fff;
+}
+
+#mode-badge {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+#file-picker-area {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+#file-picker-area label {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #c9d1d9;
+}
+
+#file-picker-area label:hover { border-color: #58a6ff; }
+
+#file-input { display: none; }
+
+/* Main layout */
+#main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+#sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: #161b22;
+  border-right: 1px solid #30363d;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#sidebar-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+}
+
+#frame-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.frame-item {
+  padding: 7px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #21262d;
+  transition: background 0.1s;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.frame-item:hover { background: #21262d; }
+.frame-item.active { background: #1c2128; border-left: 2px solid #1f6feb; }
+.frame-item.has-error { border-left: 2px solid #da3633; }
+
+.frame-num {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b949e;
+  min-width: 28px;
+}
+
+.frame-summary {
+  font-size: 11px;
+  color: #c9d1d9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.frame-summary.error { color: #f85149; }
+
+/* Detail panel */
+#detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+#empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #8b949e;
+  font-size: 14px;
+}
+
+/* Section styles */
+.section {
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-title .tag {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.section-title .tag.error-tag { border-color: #da3633; color: #f85149; }
+.section-title .tag.ok-tag { border-color: #238636; color: #3fb950; }
+
+details summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+details summary::before {
+  content: "▶";
+  font-size: 9px;
+  transition: transform 0.15s;
+  color: #8b949e;
+}
+
+details[open] summary::before { transform: rotate(90deg); }
+#export-dropdown > summary::before { content: none; }
+#export-dropdown > summary { list-style: none; }
+#export-dropdown > summary::-webkit-details-marker { display: none; }
+
+/* Code blocks */
+pre, code {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 12px;
+}
+
+.code-block {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  color: #e6edf3;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.code-block.think { color: #8b949e; font-style: italic; }
+.code-block.error-block { background: #1c1010; border-color: #da3633; color: #f85149; }
+
+/* Diff coloring */
+.diff-plus { color: #3fb950; }
+.diff-minus { color: #f85149; }
+
+/* Verdict */
+.verdict-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.verdict-bar.pass { background: #0d1117; border: 1px solid #238636; color: #3fb950; }
+.verdict-bar.fail { background: #0d1117; border: 1px solid #da3633; color: #f85149; }
+
+.verdict-failures { margin-top: 6px; }
+
+.verdict-failure-item {
+  background: #1c1010;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.verdict-failure-item .assertion { font-family: monospace; color: #f0883e; }
+.verdict-failure-item .message { color: #8b949e; margin-top: 2px; }
+
+/* Frame header */
+.frame-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #21262d;
+}
+
+.frame-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.frame-header .schema-badge {
+  font-size: 10px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  padding: 2px 6px;
+  color: #8b949e;
+}
+
+/* Tailing indicator */
+#tail-indicator {
+  position: fixed;
+  bottom: 16px;
+  right: 20px;
+  background: #1f6feb;
+  color: #fff;
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 11px;
+  display: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>Vessal Frame Log</h1>
+  <div id="stats">
+    <span class="stat-badge" id="stat-frames">0 frames</span>
+    <span class="stat-badge error" id="stat-errors" style="display:none">0 errors</span>
+  </div>
+  <div id="view-toggle">
+    <button id="btn-debug" class="active" onclick="setView('debug')">Debug View</button>
+    <button id="btn-action" onclick="setView('action')">Action View</button>
+  </div>
+  <details id="export-dropdown" style="position:relative;margin-left:8px">
+    <summary style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer;list-style:none;user-select:none">Export ▾</summary>
+    <div style="position:absolute;top:100%;right:0;margin-top:4px;background:#161b22;border:1px solid #30363d;border-radius:6px;overflow:hidden;z-index:100;min-width:140px">
+      <div onclick="exportAs('md')" style="padding:6px 12px;font-size:12px;color:#c9d1d9;cursor:pointer;border-bottom:1px solid #21262d" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">Markdown (.md)</div>
+      <div onclick="exportAs('json')" style="padding:6px 12px;font-size:12px;color:#c9d1d9;cursor:pointer" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">JSON (.json)</div>
+    </div>
+  </details>
+  <span id="mode-badge"></span>
+  <div id="file-picker-area">
+    <label for="file-input">Open JSONL File</label>
+    <input type="file" id="file-input" accept=".jsonl,.json">
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div id="sidebar-header">Frame List</div>
+    <div id="frame-list"></div>
+  </div>
+  <div id="detail">
+    <div id="empty-state">Select a frame on the left to view details</div>
+    <div id="frame-detail" style="display:none"></div>
+  </div>
+</div>
+
+<div id="tail-indicator">● Live Tailing</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+
+let frames = [];
+let selectedIndex = null;
+let currentView = 'debug';
+let isServedMode = false;
+let pollLineOffset = 0;
+let pollTimer = null;
+let isTailing = true;
+
+// ─── Mode detection ───────────────────────────────────────────────────────────
+
+function detectMode() {
+  isServedMode = window.location.protocol !== 'file:';
+  const modeBadge = document.getElementById('mode-badge');
+  const pickerArea = document.getElementById('file-picker-area');
+
+  if (isServedMode) {
+    modeBadge.textContent = 'Live Mode';
+    startPolling();
+    document.getElementById('tail-indicator').style.display = 'block';
+  } else {
+    modeBadge.textContent = 'Standalone Mode';
+    pickerArea.style.display = 'flex';
+    document.getElementById('tail-indicator').style.display = 'none';
+  }
+}
+
+// ─── File picker (standalone mode) ───────────────────────────────────────────
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    frames = [];
+    selectedIndex = null;
+    parseJSONL(ev.target.result);
+    renderSidebar();
+    if (frames.length > 0) selectFrame(frames.length - 1);
+  };
+  reader.readAsText(file);
+});
+
+// ─── JSONL parsing ────────────────────────────────────────────────────────────
+
+function parseJSONL(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  for (const line of lines) {
+    try {
+      const obj = JSON.parse(line);
+      frames.push(obj);
+    } catch (_) {}
+  }
+  updateStats();
+}
+
+function parseJSONLLines(text) {
+  // Returns count of newly added frames
+  let added = 0;
+  const lines = text.split('\n').filter(l => l.trim());
+  for (const line of lines) {
+    try {
+      const obj = JSON.parse(line);
+      frames.push(obj);
+      added++;
+    } catch (_) {}
+  }
+  if (added > 0) updateStats();
+  return added;
+}
+
+// ─── Polling (served mode) ────────────────────────────────────────────────────
+
+function startPolling() {
+  fetchNewLines();
+  pollTimer = setInterval(fetchNewLines, 2000);
+}
+
+async function fetchNewLines() {
+  try {
+    const url = `/logs/raw?after=${pollLineOffset}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return;
+    const text = await resp.text();
+    if (!text.trim()) return;
+
+    const prevCount = frames.length;
+    const added = parseJSONLLines(text);
+    if (added > 0) {
+      // Count lines returned (= added to offset)
+      pollLineOffset += text.split('\n').filter(l => l.trim()).length;
+      renderSidebar();
+      if (isTailing) {
+        selectFrame(frames.length - 1);
+        scrollSidebarToBottom();
+      }
+    }
+  } catch (_) {}
+}
+
+function scrollSidebarToBottom() {
+  const list = document.getElementById('frame-list');
+  list.scrollTop = list.scrollHeight;
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+function updateStats() {
+  const errorCount = frames.filter(f => f.observation && f.observation.error).length;
+  document.getElementById('stat-frames').textContent = `${frames.length} frames`;
+
+  const errBadge = document.getElementById('stat-errors');
+  if (errorCount > 0) {
+    errBadge.textContent = `${errorCount} errors`;
+    errBadge.style.display = 'inline';
+  } else {
+    errBadge.style.display = 'none';
+  }
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
+function renderSidebar() {
+  const list = document.getElementById('frame-list');
+  // Append only new items
+  const existingCount = list.children.length;
+  for (let i = existingCount; i < frames.length; i++) {
+    const f = frames[i];
+    const item = document.createElement('div');
+    item.className = 'frame-item' + (f.observation && f.observation.error ? ' has-error' : '');
+    item.dataset.index = i;
+    item.onclick = () => {
+      isTailing = false;
+      selectFrame(i);
+    };
+
+    const num = document.createElement('span');
+    num.className = 'frame-num';
+    num.textContent = `#${f.number || i+1}`;
+
+    const summary = document.createElement('span');
+    const hasError = f.observation && f.observation.error;
+    summary.className = 'frame-summary' + (hasError ? ' error' : '');
+    summary.textContent = hasError
+      ? '[ERR] ' + (f.observation.error.split('\n')[0] || '').slice(0, 40)
+      : getOpSummary(f);
+
+    item.appendChild(num);
+    item.appendChild(summary);
+    list.appendChild(item);
+  }
+  // Update active state
+  updateSidebarActive();
+}
+
+function getOpSummary(f) {
+  const op = (f.pong && f.pong.action && f.pong.action.operation) || '';
+  const firstLine = op.split('\n')[0] || '(empty)';
+  return firstLine.slice(0, 45);
+}
+
+function updateSidebarActive() {
+  const items = document.querySelectorAll('.frame-item');
+  items.forEach(item => {
+    item.classList.toggle('active', parseInt(item.dataset.index) === selectedIndex);
+  });
+}
+
+// ─── View switching ───────────────────────────────────────────────────────────
+
+function setView(view) {
+  currentView = view;
+  document.getElementById('btn-debug').classList.toggle('active', view === 'debug');
+  document.getElementById('btn-action').classList.toggle('active', view === 'action');
+  if (selectedIndex !== null) renderDetail(selectedIndex);
+}
+
+// ─── Frame selection ──────────────────────────────────────────────────────────
+
+function selectFrame(index) {
+  selectedIndex = index;
+  updateSidebarActive();
+  renderDetail(index);
+}
+
+// ─── Detail rendering ─────────────────────────────────────────────────────────
+
+function renderDetail(index) {
+  const f = frames[index];
+  const container = document.getElementById('frame-detail');
+  const empty = document.getElementById('empty-state');
+  container.style.display = 'block';
+  empty.style.display = 'none';
+
+  const version = f.schema_version || '?';
+  const hasV6Ping = f.ping != null;
+
+  let html = '';
+
+  // Frame header
+  html += `<div class="frame-header">
+    <h2>Frame ${f.number || index+1}</h2>
+    <span class="schema-badge">schema v${version}</span>
+  </div>`;
+
+  if (currentView === 'debug') {
+    // ── Ping (v6 only) ──
+    if (hasV6Ping) {
+      html += renderPingSection(f.ping);
+    }
+    // ── Pong ──
+    html += renderPongSection(f.pong);
+    // ── Observation ──
+    html += renderObservationSection(f.observation);
+  } else {
+    // Action view: Action + State + Observation (no system_prompt, no think)
+    html += renderActionViewSection(f);
+  }
+
+  container.innerHTML = html;
+}
+
+function renderPingSection(ping) {
+  if (!ping) return '';
+  const systemPrompt = ping.system_prompt || '';
+  const state = ping.state || {};
+  const frameStream = state.frame_stream || '';
+  const signals = state.signals || '';
+
+  let html = '<div class="section">';
+  html += '<div class="section-title">Ping <span class="tag">Model Input</span></div>';
+
+  // System prompt — collapsed by default
+  if (systemPrompt.trim()) {
+    html += `<details style="margin-bottom:6px">
+      <summary class="section-title" style="font-size:11px;color:#8b949e">System Prompt</summary>
+      <div class="code-block" style="margin-top:6px">${escHtml(systemPrompt)}</div>
+    </details>`;
+  }
+
+  if (frameStream.trim()) {
+    html += `<div style="margin-bottom:6px">
+      <div class="section-title" style="font-size:10px;color:#8b949e">Frame Stream</div>
+      <div class="code-block">${escHtml(frameStream)}</div>
+    </div>`;
+  }
+
+  if (signals.trim()) {
+    html += `<div>
+      <div class="section-title" style="font-size:10px;color:#8b949e">Signals</div>
+      <div class="code-block">${escHtml(signals)}</div>
+    </div>`;
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderPongSection(pong) {
+  if (!pong) return '';
+  const think = pong.think || '';
+  const action = pong.action || {};
+  const operation = action.operation || '';
+  const expect = action.expect || '';
+
+  let html = '<div class="section">';
+  html += '<div class="section-title">Pong <span class="tag">Model Output</span></div>';
+
+  if (think.trim()) {
+    html += `<details style="margin-bottom:6px">
+      <summary class="section-title" style="font-size:11px;color:#8b949e">Think</summary>
+      <div class="code-block think" style="margin-top:6px">${escHtml(think)}</div>
+    </details>`;
+  }
+
+  html += `<div style="margin-bottom:6px">
+    <div class="section-title" style="font-size:10px;color:#8b949e">Operation</div>
+    <div class="code-block">${escHtml(operation) || '<span style="color:#8b949e">(empty)</span>'}</div>
+  </div>`;
+
+  if (expect.trim()) {
+    html += `<div>
+      <div class="section-title" style="font-size:10px;color:#8b949e">Expect</div>
+      <div class="code-block">${escHtml(expect)}</div>
+    </div>`;
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderObservationSection(obs) {
+  if (!obs) return '';
+  const stdout = obs.stdout || '';
+  const diff = obs.diff || '';
+  const error = obs.error || null;
+  const verdict = obs.verdict || null;
+
+  let html = '<div class="section">';
+  html += '<div class="section-title">Observation <span class="tag">Execution Result</span></div>';
+
+  if (stdout.trim()) {
+    html += `<div style="margin-bottom:6px">
+      <div class="section-title" style="font-size:10px;color:#8b949e">Stdout</div>
+      <div class="code-block">${escHtml(stdout)}</div>
+    </div>`;
+  }
+
+  if (diff.trim()) {
+    html += `<div style="margin-bottom:6px">
+      <div class="section-title" style="font-size:10px;color:#8b949e">Diff</div>
+      <div class="code-block">${renderDiff(diff)}</div>
+    </div>`;
+  }
+
+  if (error) {
+    html += `<div style="margin-bottom:6px">
+      <div class="section-title" style="font-size:10px;color:#f85149">Error <span class="tag error-tag">Exception</span></div>
+      <div class="code-block error-block">${escHtml(error)}</div>
+    </div>`;
+  }
+
+  if (verdict) {
+    html += renderVerdictBlock(verdict);
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderActionViewSection(f) {
+  const action = (f.pong && f.pong.action) || {};
+  const obs = f.observation || {};
+  const state = (f.ping && f.ping.state) || {};
+
+  let html = '';
+
+  // Action
+  html += '<div class="section">';
+  html += '<div class="section-title">Action</div>';
+  html += `<div class="code-block">${escHtml(action.operation || '') || '<span style="color:#8b949e">(empty)</span>'}</div>`;
+  html += '</div>';
+
+  // State signals
+  if (state.signals && state.signals.trim()) {
+    html += '<div class="section">';
+    html += '<div class="section-title">State Signals</div>';
+    html += `<div class="code-block">${escHtml(state.signals)}</div>`;
+    html += '</div>';
+  }
+
+  // Observation
+  html += renderObservationSection(obs);
+
+  return html;
+}
+
+function renderVerdictBlock(verdict) {
+  const total = verdict.total || 0;
+  const passed = verdict.passed || 0;
+  const failures = verdict.failures || [];
+  const isPass = passed === total;
+
+  let html = `<div class="verdict-bar ${isPass ? 'pass' : 'fail'}">
+    ${isPass ? '✓' : '✗'} Assertions ${passed}/${total} passed
+  </div>`;
+
+  if (failures.length > 0) {
+    html += '<div class="verdict-failures">';
+    for (const f of failures) {
+      html += `<div class="verdict-failure-item">
+        <div class="assertion">${escHtml(f.assertion || '')}</div>
+        <div class="message">${escHtml(f.message || '')}</div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+function renderDiff(diff) {
+  return diff.split('\n').map(line => {
+    if (line.startsWith('+')) return `<span class="diff-plus">${escHtml(line)}</span>`;
+    if (line.startsWith('-')) return `<span class="diff-minus">${escHtml(line)}</span>`;
+    return escHtml(line);
+  }).join('\n');
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+function getExportableFrames() {
+  // Future: when filtering is added, return filtered subset here
+  return frames;
+}
+
+function formatAsMarkdown(exportFrames) {
+  const lines = [];
+  lines.push('# Vessal Frame Log Export\n');
+  lines.push(`Export time: ${new Date().toISOString()}`);
+  lines.push(`Frame count: ${exportFrames.length}\n`);
+
+  for (const f of exportFrames) {
+    const num = f.number || (exportFrames.indexOf(f) + 1);
+    lines.push(`## Frame ${num}\n`);
+
+    // Operation
+    const op = (f.pong && f.pong.action && f.pong.action.operation) || '';
+    if (op.trim()) {
+      lines.push('### Operation\n');
+      lines.push('```');
+      lines.push(op);
+      lines.push('```\n');
+    }
+
+    // Expect
+    const expect = (f.pong && f.pong.action && f.pong.action.expect) || '';
+    if (expect.trim()) {
+      lines.push('### Expect\n');
+      lines.push('```');
+      lines.push(expect);
+      lines.push('```\n');
+    }
+
+    // Stdout
+    const stdout = (f.observation && f.observation.stdout) || '';
+    if (stdout.trim()) {
+      lines.push('### Stdout\n');
+      lines.push('```');
+      lines.push(stdout);
+      lines.push('```\n');
+    }
+
+    // Diff
+    const diff = (f.observation && f.observation.diff) || '';
+    if (diff.trim()) {
+      lines.push('### Diff\n');
+      lines.push('```diff');
+      lines.push(diff);
+      lines.push('```\n');
+    }
+
+    // Error
+    const error = (f.observation && f.observation.error) || '';
+    if (error.trim()) {
+      lines.push('### Error\n');
+      lines.push('```');
+      lines.push(error);
+      lines.push('```\n');
+    }
+
+    // Verdict
+    const verdict = (f.observation && f.observation.verdict) || null;
+    if (verdict) {
+      const total = verdict.total || 0;
+      const passed = verdict.passed || 0;
+      lines.push(`### Assertions: ${passed}/${total} passed\n`);
+      if (verdict.failures && verdict.failures.length > 0) {
+        for (const fail of verdict.failures) {
+          lines.push(`- **${fail.assertion || ''}**: ${fail.message || ''}`);
+        }
+        lines.push('');
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function formatAsJSON(exportFrames) {
+  return JSON.stringify(exportFrames, null, 2);
+}
+
+function triggerDownload(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportAs(format) {
+  const exportFrames = getExportableFrames();
+  if (exportFrames.length === 0) return;
+
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  if (format === 'md') {
+    const content = formatAsMarkdown(exportFrames);
+    triggerDownload(content, `vessal-frames-${ts}.md`, 'text/markdown;charset=utf-8');
+  } else {
+    const content = formatAsJSON(exportFrames);
+    triggerDownload(content, `vessal-frames-${ts}.json`, 'application/json;charset=utf-8');
+  }
+
+  // Close the dropdown after export
+  const details = document.getElementById('export-dropdown');
+  if (details) details.removeAttribute('open');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+detectMode();
+</script>
+</body>
+</html>

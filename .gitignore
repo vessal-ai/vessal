@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Environment and secrets
+.env
+
+# OS files
+.DS_Store
+
+# Test cache
+.pytest_cache/
+
+# Logs
+logs/

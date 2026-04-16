@@ -1,0 +1,509 @@
+# 6. Cache Coordination
+
+The previous chapters answered how an Agent thinks and acts. This chapter answers a question the entire industry has overlooked: how much of the computation behind that thinking is simply wasted?
+
+The answer is unsettling. The computation that current Agent frameworks trigger on inference engines far exceeds what the task itself requires — not because models are too large or contexts too long, but because a structural fracture exists between Agent frameworks and inference engines. The two have evolved independently, with no information channel between them. The KV Cache that inference engines carefully maintain gets systematically destroyed by the way Agent frameworks construct their contexts.
+
+This chapter begins from that fracture, derives Vessal's cache-aware context construction principles, and lays out a complete roadmap from near-term optimizations to long-term vision.
+
+
+## 6.1 The Hidden Tax
+
+In the Agent era, the core resource is not tokens — it is computation.
+
+Every token entering a Transformer triggers Key and Value matrix computations at every layer, then attends to all preceding tokens. A 100K-token context on a 70B-parameter model involves hundreds of billions of floating-point operations during prefill.
+
+But most of that computation is redundant. In a 200-frame session, the Frame 200 Ping and the Frame 199 Ping may share 95% of their content — the same system prompt, the same first 198 frame records, with only the final frame newly added. The inference engine is fully capable of reusing the computed results for the first 95%, performing real computation only for the new 5%.
+
+This capability is called **Prefix Cache**.
+
+**KV Cache** is an optimization within a single inference pass. When generating the (N+1)th token, the Key/Value tensors for the preceding N tokens have already been computed and cached, eliminating redundant work. This reduces generation-time computation from O(n²) to O(n). Every modern inference engine implements KV Cache — it is the basic infrastructure of Transformer decoding.
+
+**Prefix Cache** is a cross-request optimization. If request B shares its first M tokens exactly with a prior request A, then the first M positions of A's KV Cache can be handed directly to B. B's prefill only needs to begin at token M+1. This reduces prefill cost from O(M) to O(1) — provided the prefix matches exactly.
+
+The "exact match" requirement is extraordinarily strict: **byte-level identity**. Not semantic similarity, not approximate equivalence — every single token must match precisely. The reason is physical: in a Transformer's Attention mechanism, the KV value at position k is a function of all tokens at positions 0 through k. Change a single character at position 1000 and every KV value from position 1001 onward must be recomputed, even if the text after 1001 is identical to the previous request.
+
+```mermaid
+graph LR
+    subgraph "Frame N Ping (100K tokens)"
+        A1["system_prompt<br/>5K tokens"] --> A2["frame_stream 1..199<br/>90K tokens"] --> A3["new frame + signals<br/>5K tokens"]
+    end
+    
+    subgraph "Frame N-1 Ping (95K tokens)"
+        B1["system_prompt<br/>5K tokens"] --> B2["frame_stream 1..198<br/>85K tokens"] --> B3["frame 199 + signals<br/>5K tokens"]
+    end
+    
+    A1 -.->|"identical"| B1
+    A2 -.->|"first 85K identical"| B2
+    
+    style A1 fill:#c8e6c9
+    style B1 fill:#c8e6c9
+    style A2 fill:#c8e6c9
+    style B2 fill:#c8e6c9
+    style A3 fill:#fff3e0
+    style B3 fill:#fff3e0
+```
+
+Ideally, the Frame N request would hit the 95K-token prefix left by Frame N-1, performing prefill only for the 5K new tokens. In practice?
+
+SGLang developers who measured cache hit rates across mainstream Agent frameworks on a local serving engine described the numbers as "dismal." Claude Code's resume functionality causes KV Cache misses entirely. The session's context construction approach, they concluded, "was never seriously designed for cache reuse from the start."
+
+This is the hidden tax. Users pay for 100K tokens; the inference engine runs prefill on 100K tokens. But if the cache hit rate is 80%, the engine only needs to prefill 20K tokens. The remaining 80K in computation is wasted — users overpay, engines overburn, and neither side knows.
+
+Global compute growth can no longer keep pace with the token demand that Agents generate. The real solution is not cheaper tokens — it is ensuring that the same tokens trigger less computation. Raising Prefix Cache hit rate from 5% to 80% leaves the token count the user pays for unchanged while reducing the engine's actual computation by an order of magnitude.
+
+The question is: why are hit rates so low?
+
+
+## 6.2 Five Destruction Patterns
+
+The root cause is a structural mismatch.
+
+**The Agent framework's worldview**: the LLM API is a stateless function, `response = llm(full_context)`. Each call passes the complete context so the model has maximum information for optimal decisions. How that context is organized — what goes in it — is the framework's business, driven by task requirements.
+
+**The inference engine's worldview**: I maintain an expensive KV Cache. Whenever your request's prefix matches what I have cached, I can skip enormous amounts of computation. But this requires one thing — the prefix must be byte-level identical. Please do not casually modify the front of the context.
+
+The two worldviews are incompatible. The Agent framework does not know what the engine has cached; the engine does not understand the Agent's session semantics. This is not a bug in any particular framework — it is an architectural blind spot across the entire Agent ecosystem.
+
+There are five concrete destruction patterns.
+
+**Pattern 1: Resume rebuild.** When a session is interrupted and then resumed, the framework reconstructs the context from persistent storage. The reconstructed result is semantically equivalent, but the token sequence may differ entirely — field ordering changed, timestamps updated, certain intermediate states lost. The inference engine performs prefix matching and finds nothing. The entire KV Cache is invalidated. This is the specific scenario SGLang developers singled out when criticizing Claude Code.
+
+**Pattern 2: Dynamic system prompt.** Per-frame injections of skill prompts, status markers, and dynamic configuration embedded inside the system prompt. Since the system prompt is the very front of the Ping, any change at any interior point invalidates the Prefix Cache for everything that follows — including the entire frame history.
+
+**Pattern 3: Tool call insertion.** A conventional dialogue-style Agent's context follows the pattern `[system, user, assistant, user, assistant, ...]`. Each tool call inserts a chunk of tool output into the middle of the conversation, shifting the position of every subsequent message. Positions shift, KV values change, caches are invalidated.
+
+**Pattern 4: Forward compression.** When context exceeds the window budget, the traditional approach is to compress the oldest content — replacing the beginning of the conversation history with a summary. This directly alters the context prefix. Every cached KV entry fails to match from the very first token.
+
+**Pattern 5: Density bloat.** Repeatedly transmitting already-processed context, re-parsing already-confirmed tool call results, maintaining a conversation history that balloons in size but collapses in information density. This does not directly destroy the cache, but it wastes computation and cache capacity all the same.
+
+```mermaid
+graph TD
+    ROOT["structural mismatch<br/>framework treats API as stateless<br/>engine maintains stateful cache"] --> M1["resume rebuild<br/>reconstructed sequence ≠ original sequence"]
+    ROOT --> M2["dynamic system prompt<br/>prefix mutates internally"]
+    ROOT --> M3["tool call insertion<br/>conversation structure shifts"]
+    ROOT --> M4["forward compression<br/>prefix is replaced"]
+    ROOT --> M5["density bloat<br/>low-value tokens fill cache capacity"]
+    
+    M1 --> RESULT["cache hit rate < 10%"]
+    M2 --> RESULT
+    M3 --> RESULT
+    M4 --> RESULT
+    M5 --> WASTE["compute wasted<br/>cache capacity consumed<br/>(no direct cache invalidation)"]
+```
+
+Of these five patterns, Vessal's frame architecture naturally avoids Pattern 3 (the frame loop does not use dialogue-style context — there is no tool call insertion). It avoids the *problem* described by Pattern 5 — low information density — through the frame protocol's structured FrameRecord format, which enforces a determinate per-frame structure and prevents the unbounded growth of low-value content. Pattern 5 does not destroy the KV Cache directly; it wastes compute and cache capacity by filling the context with redundant, low-density tokens. Vessal avoids this problem structurally, not by preserving cache entries that would otherwise be invalidated. Patterns 1, 2, and 4 — the three patterns that cause direct cache destruction — remain to be addressed.
+
+More importantly, these patterns reveal a symmetric information gap.
+
+Agent frameworks hold the information engines need: which context segments are invariant within a session, which are appended frame by frame, which are rewritten each frame. This information is sufficient for the engine to make optimal cache decisions.
+
+Inference engines hold the information frameworks need: what is currently cached, how much cache capacity remains, which entries are approaching eviction. This information is sufficient for the framework to construct cache-friendly requests.
+
+Neither side's information has ever crossed the boundary. That is the ultimate cause of wasted computation.
+
+
+## 6.3 Deriving Principles from Constraints
+
+The byte-level consistency requirement of Prefix Cache is a physical constraint, not a software limitation. It is rooted in the Transformer's Attention mechanism: the KV value at position k is a function of tokens 0 through k. Change any preceding token and every KV value that follows must be recomputed.
+
+This constraint will not disappear through algorithmic improvements or hardware upgrades. As long as the fundamental computation pattern of Attention holds, the constraint holds.
+
+From this single constraint, five context construction principles can be derived. They are not a collection of best practices — they are logical consequences of the constraint. Violating any one of them necessarily degrades cache efficiency.
+
+**P1: Prefix Monotonicity**
+
+> The token sequence prefix of a Ping must remain byte-level consistent across frames. Any content that changes between frames must be placed after all content that does not.
+
+Derivation: if Frame N's Ping prefix differs from Frame N-1's, the engine cannot perform prefix matching and KV Cache is invalidated from the point of divergence. Therefore all invariant content must come first, all variable content last. This is not a preference — it is a necessary condition for cache hits.
+
+**P2: Stability Layering**
+
+> Context is ordered by increasing change frequency: session-invariant (protocol, identity) → frame-appended (frame history) → frame-rewritten (signals). Cache breakpoints are set at layer boundaries.
+
+Derivation: P1 requires stable first, volatile last. Going further, if the variable content itself has different rates of change, it should be ordered from lowest to highest frequency. Frame history grows by appending (low change frequency — only the tail grows); signals are rewritten every frame (high change frequency). Therefore frame history comes before signals. The boundary between layers is the natural location for a cache breakpoint.
+
+**P3: Signals Tail**
+
+> All frame-level rewritten content (signals, dynamic state) must be placed at the tail of the Ping and must not be embedded inside any stable segment.
+
+Derivation: a direct corollary of P1 and P2. If rewritten content is embedded inside a stable segment, even a single changed character invalidates every KV Cache from that position to the end of the Ping — including all the stable frame history that follows. Signals tail is not a layout preference; it is the only means of preventing cascading cache invalidation.
+
+**P4: Append over Rewrite**
+
+> Prefer append-based context growth mechanisms; avoid rewriting existing content.
+
+Derivation: an append adds new tokens to the end of the existing sequence without changing the position or content of any existing token. All existing KV Cache remains valid. A rewrite modifies existing tokens; everything from the modification point onward is invalidated. Accordingly, the state segment of a Ping should grow by appending wherever possible. The frame stream (frame_stream) appends one frame record per frame, satisfying P4 naturally.
+
+**P5: Compress at Tail**
+
+> When context exceeds budget and compression is required, compress from the tail (newest content) and protect the integrity of the prefix region.
+
+Derivation: the traditional approach compresses the oldest content — deleting or summarizing the beginning of the conversation history. This directly alters the Ping prefix, invalidating all KV Cache. Compressing from the newest content instead leaves the original text of older frames intact, keeping their corresponding KV Cache valid. Newly added frames have not yet been cached, so compressing them incurs no cache loss. P5 is a specialization of P1 for the compression scenario: compression is not a special-case operation — it too must honor prefix immutability.
+
+```mermaid
+graph TD
+    CONSTRAINT["physical constraint<br/>KV at position k depends on tokens 0..k<br/>byte-level consistency"] --> P1["P1: prefix monotonicity<br/>stable first, volatile last"]
+    CONSTRAINT --> P4["P4: append over rewrite<br/>append preserves prefix, rewrite destroys cache"]
+    P1 --> P2["P2: stability layering<br/>order by change frequency"]
+    P1 --> P3["P3: signals tail<br/>rewritten content at the end"]
+    P1 --> P5["P5: compress at tail<br/>compress from the tail"]
+    
+    style CONSTRAINT fill:#e8eaf6
+    style P1 fill:#c8e6c9
+    style P2 fill:#c8e6c9
+    style P3 fill:#c8e6c9
+    style P4 fill:#c8e6c9
+    style P5 fill:#c8e6c9
+```
+
+The five principles have clear derivation relationships. P1 and P4 follow directly from the physical constraint. P2, P3, and P5 are corollaries of P1 applied to specific scenarios — layering, signal placement, and compression strategy. The entire system flows from one constraint, with no ad hoc assumptions and no empirical rules.
+
+
+## 6.4 Vessal's Design Response
+
+Chapter 4 defined the structure of a Ping: `system_prompt + state(frame_stream + signals)`. Now examine that structure through the lens of cache efficiency.
+
+```
+Ping
+├── system_prompt (quasi-static)
+│   ├── kernel_protocol (system.md)     — fixed within session
+│   ├── SOUL (_soul)                     — fixed within session
+│   └── skill protocol (_prompt() return value) — depends on skill implementation
+└── state (dynamic)
+    ├── frame_stream                     — one record appended per frame
+    └── signals (_signal() return value) — rewritten each frame
+```
+
+Mapping each segment against the five principles:
+
+| Segment | Change frequency | Principles satisfied | Issue |
+|---------|-----------------|---------------------|-------|
+| kernel_protocol | fixed within session | P1 ✓ P2 ✓ | none |
+| SOUL | fixed within session | P1 ✓ P2 ✓ | none |
+| skill protocol `_prompt()` | depends on implementation | P1 ✗ P3 ✗ | **embedded inside system_prompt — any dynamic change destroys the prefix** |
+| frame_stream | appended per frame | P1 ✓ P4 ✓ | none; append-based growth is naturally cache-friendly |
+| signals | rewritten per frame | P2 ✓ P3 ✓ | none; already at the tail of the Ping |
+
+```mermaid
+block-beta
+    columns 1
+    block:frameN1["Frame N-1 Ping"]:1
+        columns 3
+        sp1["system_prompt"]
+        fs1["frame 1..98"]
+        tail1["frame 99 + signals"]
+    end
+    block:frameN["Frame N Ping"]:1
+        columns 3
+        sp2["system_prompt"]
+        fs2["frame 1..98"]
+        tail2["frame 99 + frame 100 + signals"]
+    end
+
+    style sp1 fill:#c8e6c9,stroke:#388e3c,color:#1b5e20
+    style fs1 fill:#c8e6c9,stroke:#388e3c,color:#1b5e20
+    style sp2 fill:#c8e6c9,stroke:#388e3c,color:#1b5e20
+    style fs2 fill:#c8e6c9,stroke:#388e3c,color:#1b5e20
+    style tail1 fill:#ffe0b2,stroke:#e65100,color:#bf360c
+    style tail2 fill:#ffe0b2,stroke:#e65100,color:#bf360c
+```
+
+> Green = cache hit (prefix is byte-level identical); orange = new computation (appended frame + signals). Frame N's Ping hits the KV Cache left by Frame N-1, performing prefill only for the newly added tail content.
+
+Vessal's frame architecture has three natural advantages.
+
+First, **linear append of the frame stream**. Frame stream appends one FrameRecord to the tail each frame without modifying existing content. This keeps the prefix — from system_prompt through every frame record up to the previous frame — byte-level consistent across frames. P1 and P4 are satisfied naturally. This is decisively superior to dialogue-style Agent contexts, where each tool call inserts content in the middle.
+
+Second, **signals already at the tail**. Signals sit at the very end of the Ping; rewriting them each frame leaves every preceding segment's cache untouched. P3 is satisfied naturally.
+
+Third, **structured frame records**. FrameRecords have a determinate format (frame number, action, observation), which avoids the density bloat problem endemic to dialogue-style Agents — low-value tokens do not accumulate, so cache capacity is not consumed by redundant content.
+
+There is, however, one structural weakness: the return value of `_prompt()` is embedded inside system_prompt. If any Skill's `_prompt()` introduces dynamic content, then from that position onward — through the rest of system_prompt, the entire frame_stream, and all signals — every KV Cache entry is invalidated. system_prompt sits at the very front of the Ping; a single change point destroys everything.
+
+Two solutions exist. The conservative approach: constrain `_prompt()` at the protocol level to return only fixed strings. The radical approach: remove `_prompt()` from system_prompt entirely.
+
+Vessal takes the radical approach.
+
+
+### 6.4.1 System Prompt Purification
+
+Design decision: **system_prompt retains only absolutely invariant content**.
+
+Concrete measures:
+
+First, the `_prompt()` mechanism moves from system_prompt to the signals region. Skill behavioral guidance no longer injects into system_prompt; instead it travels through the `_signal()` channel, landing at the tail of the Ping. This eliminates every source of change from inside system_prompt.
+
+Second, commonly used Skills are promoted to system builtins. Their protocol text no longer flows through `_prompt()` or `_signal()`; it is hardcoded directly into system_prompt as static content at the same level as kernel_protocol and SOUL.
+
+Third, loading non-builtin Skills does not affect system_prompt. Their guidance travels through signals; their runtime state is surfaced through signals. system_prompt is entirely unaffected by Skill loading and unloading.
+
+The purified Ping structure:
+
+```
+Ping
+├── system_prompt (completely invariant within session)
+│   ├── kernel_protocol (system.md)
+│   ├── SOUL (_soul)
+│   └── builtin skill protocols (hardcoded text)
+└── state
+    ├── frame_stream (appended per frame)
+    └── signals (rewritten per frame)
+        ├── _signal() output for each skill
+        └── behavioral guidance for non-builtin skills
+```
+
+Under this structure, system_prompt does not change at any point during the session's lifetime. It is the absolute anchor of Prefix Cache — every frame's Ping prefix matches exactly from the very start of system_prompt. Combined with the append-based growth of frame_stream, the valid cache region extends from system_prompt all the way through the last frame record of the previous frame.
+
+To borrow CPU cache terminology: system_prompt is the hot data that permanently resides in L1 Cache and is never evicted. frame_stream is the data in L2 Cache growing linearly along a timeline, cold only at the tail. signals are register-level ephemeral data that miss on every access. Ordered from highest to lowest cache affinity, this is a precise implementation of P2 (Stability Layering).
+
+
+### 6.4.2 Reverse Compression: The Three-Segment Model
+
+The frame stream grows without bound and will eventually exceed the context window budget. Compression is inevitable — the question is how.
+
+The traditional approach: compress from the oldest frames.
+
+```
+Before:  [F1][F2][F3]...[F98][F99][F100]
+After:   [Summary_1-30][F31]...[F98][F99][F100]
+→ prefix changes from [F1] to [Summary_1-30]
+→ Prefix Cache fully invalidated
+```
+
+This violates P5. The oldest frames are part of the Ping prefix; their KV Cache is the most valuable in the session — every frame's request opens with them, and every frame hits their cache. Compressing the oldest frames is equivalent to destroying the entire cache foundation.
+
+Vessal reverses the compression direction: **compress from the newest frames**.
+
+```
+Before:  [F1][F2][F3]...[F98][F99][F100]
+After:   [F1][F2][F3]...[F70][Summary_71-100]
+→ prefix [F1]..[F70] unchanged
+→ cache hit through F70
+```
+
+The core insight: old frames are part of the prefix — keeping old frames means keeping cache. New frames were just added; the engine has not yet built cache entries for them, so compressing them incurs no cache loss.
+
+But the newest frames are the Agent's working memory. Unconditionally compressing the newest frames may degrade the Agent's understanding of recent events. The solution is a three-segment structure:
+
+```
+[oldest — original text | middle — compressed summary | latest N frames — original text]
+ └── preserve prefix      └── save token budget         └── preserve working memory
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> latest: new frame written
+
+    latest --> middle: after accumulating frames\ntrigger compression
+    note right of latest
+        retain original text
+        working memory
+    end note
+
+    middle --> middle: continuously receives\ncompressed frames
+    note right of middle
+        compress to summary\nsave token budget
+    end note
+
+    middle --> oldest: oldest segment\nexhausts budget, freezes
+    note right of oldest
+        permanently retain original\nnever modify\ncache anchor
+    end note
+
+    oldest --> [*]: session ends
+```
+
+**oldest segment**: the oldest frames are kept as original text, unchanged. This is the highest-value cache region in the entire Ping — every frame's request opens with these frames, and every frame hits their cache. Never compress.
+
+**middle segment**: intermediate frames are compressed into summaries. These frames are no longer in the Agent's recent working memory, and they no longer sit at the prefix position (because the oldest segment is already long enough). Compressing them recovers token budget; the information loss has limited impact on current decisions.
+
+**latest segment**: the most recent N frames are kept as original text. This is the working memory the Agent is actively using. The value of N requires empirical tuning — too small and recent context is lost, too large and there is insufficient compression headroom.
+
+Execution: use a compression Skill to guide the Agent through compression itself. Starting from the newest frames, the Agent judges whether recent frames can be condensed into a more compact description. If so, a multi-frame summary is placed into the frame record. The FrameRecord data structure is extended to support both single-frame and multi-frame aggregation — one record can carry either the raw content of a single frame or a compressed summary spanning multiple frames.
+
+This design has an unexpected positive effect: the summary produced by compressing recent frames may have higher information density than the original scattered frame records. The Agent has just processed those frames; forcing a summary is a mandatory information integration pass that can actually improve decision-making about recent events.
+
+```mermaid
+graph LR
+    subgraph "traditional compression"
+        direction LR
+        T1["Summary"] --> T2["F31..F100"]
+        T1 -.->|"prefix changed"| X["entire cache invalidated ✗"]
+    end
+    
+    subgraph "three-segment reverse compression"
+        direction LR
+        R1["F1..F50<br/>oldest original"] --> R2["Summary<br/>middle compressed"] --> R3["F90..F100<br/>latest original"]
+        R1 -.->|"prefix unchanged"| Y["cache hit through F50 ✓"]
+    end
+```
+
+
+### 6.4.3 Adapter Pattern
+
+Different inference engines implement cache optimization differently:
+
+- **Anthropic** uses explicit cache breakpoints — the framework marks `cache_control` in the request, and the engine performs hash matching at those breakpoints
+- **SGLang (RadixAttention)** uses radix tree automatic prefix matching — no explicit marking by the framework; the engine automatically finds the longest matching prefix
+- **Prompt Cache (Yale/MLSys)** uses module registration — predefined Prompt Modules, not required to be prefixes; the engine reuses Attention State per module
+
+If the Ping structure were specialized for each engine, Vessal's core would become bound to a specific engine's cache semantics, violating the architectural layering principle.
+
+The solution: **Ping maintains a unified internal representation; the API adapter layer handles engine-specific cache annotation**.
+
+The renderer is responsible for semantic correctness — constructing a structurally complete Ping from the namespace, honoring P1–P5.
+
+The adapter is responsible for cache friendliness — reading the Ping's structural information (which segment is system_prompt, which is frame_stream, which is signals) and adding the appropriate cache annotations for the target engine.
+
+For the Anthropic API: place the first cache breakpoint at the end of system_prompt (invariant within session), the second breakpoint just before the newest frame in frame_stream (append-based growth), and no breakpoint in signals (rewritten each frame).
+
+For RadixAttention: no annotation needed at all. The Ping prefix is already guaranteed to be stable across frames by P1–P5; RadixAttention's radix tree will automatically find the longest matching prefix. Vessal's cache principles and RadixAttention's automatic matching are a perfect complement.
+
+For Prompt Cache: register system.md, SOUL, and the builtin skill protocols as the engine's Prompt Modules, precomputing their Attention State. These modules are shared across sessions — different sessions use the same system protocol, and the Attention State is computed only once. Vessal's context is naturally structured in modules, which makes Prompt Cache especially advantageous for Vessal.
+
+```mermaid
+graph TD
+    RENDER["renderer<br/>namespace → Ping<br/>honors P1-P5"] --> PING["unified Ping structure"]
+    PING --> A1["Anthropic Adapter<br/>adds cache breakpoints"]
+    PING --> A2["RadixAttention Adapter<br/>no additional annotation (auto-match)"]
+    PING --> A3["Prompt Cache Adapter<br/>registers module schema"]
+    
+    A1 --> E1["Anthropic API"]
+    A2 --> E2["SGLang / vLLM"]
+    A3 --> E3["engines supporting Prompt Cache"]
+```
+
+
+## 6.5 Roadmap
+
+### Four-Layer Optimization Strategy
+
+Organized by how much control the Agent framework has, cache optimization falls into four layers. Each layer builds on the previous, delivering incremental gains.
+
+**Layer 1: Prefix stabilization.** Framework-independent — zero external dependencies. The core is applying P1–P5: guaranteeing cross-frame Ping prefix consistency, purifying system_prompt, and placing signals at the tail. The benefit at this layer is entirely determined by the quality of the framework's own context construction. Vessal acts on this immediately.
+
+**Layer 2: API-level cache coordination.** Leverages inference engine provider Cache APIs (such as Anthropic's `cache_control`) to actively mark stable regions. This requires knowledge of the specific provider's cache mechanism, but does not require any change to the Ping's core structure — the adapter layer handles it. Vessal acts on this in the near term.
+
+**Layer 3: Modular cache registration.** Register system.md, SOUL, and similar content as reusable Prompt Modules with the engine, enabling Attention State sharing across sessions. This requires inference engine support for module-based APIs in the style of Prompt Cache. Vessal tracks technical maturity and integrates when engine-side support matures.
+
+**Layer 4: Non-prefix KV reuse.** CacheBlend-style mechanisms — load precomputed KV Cache even when the reusable text is not at a prefix position, then apply selective recomputation to correct cross-attention quality. This is the most flexible approach, breaking the "must be a prefix" constraint entirely. But it requires deep engine support, and the quality loss from selective recomputation must be evaluated. Vessal tracks research progress.
+
+```mermaid
+graph TD
+    L1["Layer 1: prefix stabilization<br/>framework-independent<br/>P1-P5 + system_prompt purification<br/>→ immediate"] --> L2["Layer 2: API cache coordination<br/>adapter adds cache breakpoints<br/>leverages Anthropic/OpenAI Cache API<br/>→ near-term"]
+    L2 --> L3["Layer 3: modular cache registration<br/>system.md / SOUL registered as Prompt Modules<br/>cross-session Attention State sharing<br/>→ track"]
+    L3 --> L4["Layer 4: non-prefix KV reuse<br/>CacheBlend-style segmented loading + selective recomputation<br/>breaks prefix requirement<br/>→ track"]
+    
+    style L1 fill:#c8e6c9
+    style L2 fill:#e8f5e9
+    style L3 fill:#fff3e0
+    style L4 fill:#ffebee
+```
+
+From Layer 1 to Layer 4, framework control decreases and engine dependency increases. But each layer's gains are independent — even doing only Layer 1, the prefill computation of a 200-frame session drops substantially.
+
+
+### Metrics: Cache Hit Rate Monitoring
+
+Without measurement there is no optimization.
+
+The Anthropic API response includes three key fields:
+- `cache_creation_input_tokens`: tokens written to cache by this request
+- `cache_read_input_tokens`: tokens that hit the cache in this request
+- `input_tokens`: input tokens actually computed by this request
+
+Cache hit rate = `cache_read / (cache_read + cache_creation + input)`.
+
+Vessal records per-frame cache metrics in the frame log, establishing a quantitative feedback loop: adjust context construction strategy → observe hit rate change → iterate. The implementation cost is minimal — extract the fields from the API response and write them to the frame log.
+
+Over time, this data can also drive: runtime adaptive compression (trigger strategy adjustments when hit rate drops), frame-type analysis (compare cache behavior of work frames versus compression frames), and session health monitoring (hit rate trend as a proxy indicator of session quality).
+
+
+### The Ultimate Path: Protocol into Parameters
+
+Cache optimization solves "transmitted but computed less" — tokens still occupy the context, but the inference engine skips redundant computation through KV Cache reuse.
+
+There is a more fundamental path: "not transmitted at all."
+
+Vessal's system_prompt contains large amounts of stable content: the SORA loop protocol, frame execution specifications, Skill behavioral constraints, safety rules. These do not change between sessions or between users — they are the "operating manual" for Vessal as an Agent runtime. Every frame transmits this manual. Even at 100% cache hit rate, these tokens still occupy context window space, squeezing out the token budget available for the actual task.
+
+If these protocols could be trained into model parameters through fine-tuning or prefix tuning, the effect would be equivalent to the model "natively knowing" how to operate within the Vessal framework. The token count in system_prompt would drop from thousands to hundreds or fewer. This saves not just tokens but cache space, freeing up context window for frame_stream and signals — the Agent's actual working content.
+
+The prerequisite is a sufficiently stable Agent framework and protocol. Vessal's SORA loop and frame protocol are converging toward that stability. When capabilities like computer use can be trained into the model rather than constrained by thousands of tokens of prompting, Agent efficiency will undergo a qualitative shift.
+
+Near-term, Vessal addresses "transmitted but computed less" through P1–P5 and the four-layer strategy. Mid-term, it explores prefix tuning or distillation experiments for core protocols. Long-term, when model fine-tuning APIs mature and framework protocols solidify, protocol into parameters will become the ultimate form of Agent framework optimization.
+
+```mermaid
+graph LR
+    subgraph "current"
+        NOW["transmit 5K token protocol per frame<br/>+ rely on cache to compute less"]
+    end
+    
+    subgraph "mid-term"
+        MID["core protocol prefix tuning<br/>system_prompt reduced to 1K"]
+    end
+    
+    subgraph "long-term"
+        FUTURE["protocol baked into weights<br/>system_prompt holds only SOUL<br/>model natively knows the protocol"]
+    end
+    
+    NOW -->|"P1-P5 + four-layer strategy"| MID
+    MID -->|"fine-tuning API matures"| FUTURE
+```
+
+
+### Three Evolution Paths
+
+Zooming out, the relationship between Agent frameworks and inference engines is evolving along three trajectories.
+
+**Vertical integration (Apple model).** Anthropic controls the model, controls the Agent framework (Claude Code), and optimizes the inference stack end-to-end. Full internal control enables closed-loop cache optimization. The cost is the low ceiling of a closed ecosystem — third-party frameworks have no leverage under this model and can only passively adapt to API changes.
+
+**Layered decoupling (Android model).** Agent frameworks are independent of the model layer; users freely choose their backend. Ecosystem diversity is high and competition is vigorous. The cost is that cross-layer optimization is blocked — the framework cannot see the engine's cache state, and the engine does not understand the framework's session semantics. Solving this requires a standardized coordination interface between layers. P1–P5 is the Agent framework's contribution to that standardization: regardless of the underlying engine, contexts constructed in accordance with these principles are cache-friendly.
+
+**Usage-based billing (power grid model).** Regardless of which framework is used, billing is based on actual computation consumed. Price signals force framework developers to optimize token efficiency. This path does not directly solve the technical problem, but it creates the economic incentive that causes the technical problem to get solved.
+
+```mermaid
+quadrantChart
+    title Trade-offs of Three Paths
+    x-axis "Ecosystem Openness" --> "High"
+    y-axis "End-to-End Optimization Potential" --> "High"
+    "Apple Model (Anthropic)": [0.2, 0.85]
+    "Android Model (open ecosystem)": [0.85, 0.3]
+    "Power Grid Model (Usage-Based)": [0.7, 0.5]
+    "Vessal's Target": [0.75, 0.75]
+```
+
+Vessal's position: a cache-aware framework within an open ecosystem. It does not depend on any specific engine's optimizations (the adapter pattern guarantees engine neutrality), yet through P1–P5 and the four-layer strategy it maximizes cache efficiency at the framework level. This is the balance struck between the openness of the Android model and the optimization potential of the Apple model.
+
+If a standardized Agent-Engine coordination interface is eventually established — frameworks declaring which segments are stable, engines feeding back which content is cached — Vessal's Ping structure is already prepared for it. Stability layering is the foundation for those declarations; cache hit rate monitoring is the receiving end of that feedback.
+
+
+## 6.6 Technical Foundations
+
+The principles and strategies in this chapter are not designed from thin air. They are grounded in the frontier research on KV Cache reuse. Six technologies form the evidence base for Vessal's design decisions.
+
+**RadixAttention (SGLang, MLSys 2024).** Manages KV Cache with a radix tree, performing automatic longest-prefix matching with LRU eviction. Throughput gains up to 5×. Takeaway: engines already have the capability for efficient prefix matching. What Agent frameworks need to do is construct stable prefixes that give the engine something to match against. P1 is the formal statement of that requirement.
+
+**Prompt Cache (Yale, MLSys 2024).** Defines Prompt Modules — predeclared reusable text segments with precomputed Attention States that are cached. Key breakthrough: not required to be a prefix. GPU inference TTFT reduced by 8×, CPU inference by 60×. Takeaway: Vessal's system.md, SOUL, and builtin skill protocols are natural Prompt Modules. Vessal's context is inherently structured as modules — a fundamental advantage over dialogue-style Agents.
+
+**CacheBlend (LMCache, 2024).** Addresses KV reuse at non-prefix positions — loads precomputed KV Cache and selectively recomputes a small fraction of tokens to correct cross-attention quality. TTFT reduced by 2.2–3.3×. Takeaway: even when strict P1–P5 compliance is occasionally broken (e.g., a hot reload changes system_prompt), CacheBlend provides a repair path. This is the technical foundation for Layer 4.
+
+**Anthropic Prompt Caching (API layer, 2024).** The closest commercial realization of Agent-Engine coordination. Explicit cache breakpoints + 20-block lookback + 0.1× cache-hit pricing + 5-minute TTL auto-refresh. Takeaway: this demonstrates the value of an information channel between Agent and engine — marking just a few breakpoints in a request can raise cache hit rates to a meaningful level. Vessal's Anthropic adapter directly leverages this mechanism.
+
+**LESS (arXiv 2024).** Layers a recurrence cache on top of KV Cache compression, keeping evicted token information queryable. Takeaway: when the frame stream grows to the point of needing truncation, early frames need not be discarded outright — a low-rank representation can be retained. This requires model-level support and belongs to a mid-to-long-term direction.
+
+**Infinite-LLM (arXiv 2024).** Separates the Attention layer into an independently schedulable resource unit and uses a cluster-level GPU memory pool to manage KV Cache, supporting 2000K-token contexts. Takeaway: represents the direction inference engines are heading — KV Cache moving from single-machine to distributed. Vessal's Ping structure design should not become an obstacle to integrating with distributed cache in the future.
+
+These six technologies span the full spectrum from engine-side automatic optimization (RadixAttention) to API coordination (Anthropic) to modular registration (Prompt Cache) to non-prefix reuse (CacheBlend) to distributed architecture (Infinite-LLM). P1–P5 are favorable across every one of these directions. A context that honors prefix stability and structured layering extracts the maximum benefit from any cache mechanism the underlying engine employs.
+
+
+## 6.7 Conclusion
+
+Context construction is not only an information management problem — it is a problem of computational economics. Every token sequence an Agent framework produces directly determines the inference engine's computational load. In the Agent era, a framework that cannot write cache-friendly contexts is like a programmer who cannot write cache-friendly code: the waste falls not on its own resources but on the compute of the entire ecosystem.
+
+Vessal found a structural advantage for computational efficiency inside the frame architecture itself — a linearly appending frame stream is a natural carrier for Prefix Cache. Building on that foundation, P1–P5 elevates this advantage from "accidental property" to "design guarantee." System prompt purification eliminates the last remaining source of cache destruction. Three-segment reverse compression preserves the cache foundation when the context window approaches its limit. The adapter pattern ensures that optimizations remain engine-agnostic.
+
+All of this is Layer 1 and Layer 2 work — achievable independently at the framework level or with only API-layer cooperation. As inference engine cache mechanisms continue to evolve — Prompt Cache's modularization, CacheBlend's non-prefix reuse — Vessal's structured Ping is already positioned to integrate with deeper optimizations. When model fine-tuning capabilities mature, the core protocols in system_prompt can be trained into parameters, moving from "transmitted but computed less" to "not transmitted at all."
+
+Ultimately, the information channel between Agent frameworks and inference engines will be opened. Frameworks will declare the stability structure of their context; engines will feed back the state of the cache. The two will no longer be strangers to each other, but partners in coordinated optimization. Vessal's P1–P5 principles and stability layering are the framework side's first step on that path.

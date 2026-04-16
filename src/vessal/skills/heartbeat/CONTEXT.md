@@ -1,0 +1,61 @@
+# Heartbeat
+
+Periodic timer wake-up Skill. Calls hull.wake("heartbeat") from a background thread at a configurable interval, preventing Agent from sleeping indefinitely when there are no external events.
+
+Responsible for:
+- Starting the background timer thread (server.py start())
+- Periodically calling hull_api.wake("heartbeat")
+- Cleanly stopping the timer thread (server.py stop())
+
+Not responsible for:
+- Executing any Agent logic (only wakes, does not execute)
+- Managing Agent behavior after wake-up (handled by Hull/Cell)
+- Configuration persistence (interval is passed in by Hull from hull.toml)
+
+## Constraints
+
+1. Background thread must be set as daemon=True to ensure it does not block the main process from exiting
+2. stop() must join the thread (timeout=5s); cannot directly kill it
+3. Default interval is 1800 seconds (30 minutes), overridable via hull.toml [hull].heartbeat
+4. If an instance already exists when start() is called, the old instance must be stop()ped first before creating a new one
+5. Use instance pattern (_HeartbeatServer class); module-level mutable global state is forbidden (except the _instance pointer)
+
+## Design
+
+Heartbeat solves the "deadlock" scenario in Agent's event-driven model: Hull only wakes Agent when events arrive, but if there are no external events at all (user silence, all tasks blocked), Agent sleeps indefinitely, unable to perform proactive work (polling, periodic checks, maintenance tasks). Heartbeat serves as a time-driven fallback mechanism ensuring Agent is woken up at least once every N seconds.
+
+Shape choice: server.py pattern (rather than embedded logic in skill.py). Heartbeat's core logic is a timer; it doesn't need SkillBase's frame signal mechanism, only a start/stop lifecycle. This is consistent with the Human Skill's server.py companion pattern; Hull automatically discovers and manages the lifecycle.
+
+```mermaid
+stateDiagram-v2
+    [*] --> stopped : initial
+
+    stopped : stopped (no background thread)
+    running : running (_HeartbeatServer instance exists)
+    sleeping : sleeping (waiting N seconds interval)
+    waking : waking (calling hull_api.wake)
+
+    stopped --> running : start(hull_api, heartbeat=N)
+    running --> sleeping : thread starts, begins timing
+    sleeping --> waking : interval expires
+    waking --> sleeping : wake() completes, retimes
+    running --> stopped : stop() (join thread, timeout=5s)
+    sleeping --> stopped : stop() signal
+```
+
+Using instance pattern rather than module-level thread objects ensures safe test isolation: each start() creates a new _HeartbeatServer instance; stop() destroys the old instance; no state leaks across tests.
+
+The interval is passed in via the `[hull].heartbeat` config key in hull.toml, not hardcoded or from environment variables, keeping configuration centralized in one place. The default of 1800 seconds is based on the judgment that "Agent should not go more than 30 minutes without any proactive action".
+
+Relationship with Hull: Hull calls server.start(hull_api), passing the hull_api reference; the heartbeat thread holds this reference and periodically calls wake(). Hull is responsible for routing heartbeat events to Cell for frame execution.
+
+## Status
+
+### TODO
+- [ ] 2026-04-09: Write initial heartbeat Skill tests
+
+### Known Issues
+None.
+
+### Active
+None.

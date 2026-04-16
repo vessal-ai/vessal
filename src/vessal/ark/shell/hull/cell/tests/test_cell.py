@@ -1,0 +1,695 @@
+# test_cell.py — Cell module tests (v4 Protocol)
+#
+# Strategy: mock cell._core.run (avoid real API calls); Kernel uses a real instance.
+# Cell.step() returns StepResult(protocol_error=str|None).
+# _core.run accepts a Ping (system perception) and returns Pong(think=str, action=Action(...)).
+# _frame_log stores frame dicts (not FrameRecord instances).
+
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from vessal.ark.shell.hull.cell import Cell
+from vessal.ark.shell.hull.cell.protocol import (
+    Action, Ping, Pong, State, StepResult,
+)
+from vessal.ark.shell.hull.cell.core.parser import parse_response
+
+
+# ============================================================
+# Helper functions
+# ============================================================
+
+
+def _make_cell(**kwargs) -> Cell:
+    """Create a Cell; remaining args are passed through."""
+    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+        return Cell(**kwargs)
+
+
+def _make_pong(raw_text: str) -> Pong:
+    """Construct a Pong from raw_text using the real parse_response (LLM response)."""
+    return parse_response(raw_text)
+
+
+def _set_responses(cell: Cell, raw_texts: list) -> None:
+    """Configure _core.run to return (Pong, None, None) or raise exceptions in sequence.
+
+    If a list element is an Exception instance, it is raised directly.
+    If it is a str, parsing is attempted: success returns (Pong, None, None), failure raises ParseError.
+    """
+    from vessal.ark.shell.hull.cell.core.parser import ParseError as _ParseError
+
+    def _build(item):
+        if isinstance(item, Exception):
+            return item  # Exception: will be raised by side_effect
+        try:
+            return (_make_pong(item), None, None)  # tuple: Core.run() return format
+        except _ParseError as e:
+            return e  # ParseError: will be raised by side_effect
+
+    side_effects = [_build(t) for t in raw_texts]
+
+    def _side_effect(*args, **kwargs):
+        val = side_effects.pop(0)
+        if isinstance(val, Exception):
+            raise val
+        return val  # returns (Pong, None, None) tuple
+
+    cell._core.run = MagicMock(side_effect=_side_effect)
+
+
+def _action(code: str) -> str:
+    """Generate LLM response text containing an <action> tag."""
+    return f"<action>{code}</action>"
+
+
+def _action_with_expect(code: str, expect: str) -> str:
+    """Generate LLM response text containing <action> and <expect> tags."""
+    return f"<action>{code}</action><expect>{expect}</expect>"
+
+
+# ============================================================
+# Constructor tests
+# ============================================================
+
+
+class TestConstructor:
+    """Constructor: default parameters, parameter pass-through, snapshot path."""
+
+    def test_default_parameters(self):
+        """Default parameter values are correct."""
+        cell = _make_cell()
+        assert cell.action_gate == "auto"
+        assert cell.state_gate == "auto"
+
+    def test_no_run_method(self):
+        """Cell no longer has a run() method."""
+        cell = _make_cell()
+        assert not hasattr(cell, "run")
+
+    def test_api_params_forwarded_to_core(self):
+        """api_params are forwarded to Core."""
+        cell = _make_cell(api_params={"temperature": 0.3, "max_tokens": 2048})
+        assert cell._core._api_params["temperature"] == 0.3
+        assert cell._core._api_params["max_tokens"] == 2048
+
+    def test_default_api_params(self):
+        """Default api_params include temperature and max_tokens."""
+        cell = _make_cell()
+        assert cell._core._api_params["temperature"] == 0.7
+        assert cell._core._api_params["max_tokens"] == 4096
+
+    def test_snapshot_path_forwarded(self, tmp_path):
+        """snapshot_path is forwarded to Kernel — namespace is consistent when restored from snapshot."""
+        cell1 = _make_cell()
+        cell1.ns["saved_var"] = 999
+        snap = str(tmp_path / "snap.pkl")
+        cell1.snapshot(snap)
+
+        cell2 = _make_cell(snapshot_path=snap)
+        assert cell2.ns["saved_var"] == 999
+
+    def test_ns_is_dict(self):
+        """ns property exposes the namespace dict."""
+        cell = _make_cell()
+        assert isinstance(cell.ns, dict)
+
+    def test_ns_is_kernel_ns_reference(self):
+        """ns property returns the same reference as Kernel namespace, not a copy."""
+        cell = _make_cell()
+        cell.ns["injected"] = "hello"
+        assert cell._kernel.ns["injected"] == "hello"
+
+
+# ============================================================
+# step() basic behavior
+# ============================================================
+
+
+class TestStepBasic:
+    """step() basic behavior: return type, StepResult fields."""
+
+    def test_step_returns_step_result(self):
+        """step() returns a StepResult instance."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        result = cell.step()
+        assert isinstance(result, StepResult)
+
+    def test_successful_step_has_no_protocol_error(self):
+        """Successful step: protocol_error is None and _frame_log contains one frame."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        result = cell.step()
+        assert result.protocol_error is None
+        assert len(cell.ns["_frame_log"]) == 1
+
+    def test_step_calls_core(self):
+        """step() calls Core.run()."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        cell.step()
+        assert cell._core.run.called
+
+    def test_step_executes_action(self):
+        """step() executes the code returned by Core — new variable appears in namespace."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("step_result = 42")])
+        cell.step()
+        assert cell.ns.get("step_result") == 42
+
+    def test_step_does_not_modify_lifecycle_vars(self):
+        """step() does not modify _sleeping/_wake/_next_wake."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        cell.ns["_sleeping"] = False
+        cell.ns["_wake"] = "test_wake"
+        cell.ns["_next_wake"] = None
+        cell.step()
+        assert cell.ns["_sleeping"] is False
+        assert cell.ns["_wake"] == "test_wake"
+        assert cell.ns["_next_wake"] is None
+
+    def test_step_accepts_tracer_none(self):
+        """step(tracer=None) runs normally without error."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        cell.step(tracer=None)
+        assert cell.ns.get("x") == 1
+
+    def test_step_accepts_tracer_mock(self):
+        """step(tracer=mock_tracer) runs without error and tracer.start/end are called."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        mock_tracer = MagicMock()
+        cell.step(tracer=mock_tracer)
+        assert mock_tracer.start.called
+        assert mock_tracer.end.called
+
+
+# ============================================================
+# Frame number increment
+# ============================================================
+
+
+class TestFrameNumber:
+    """Frame number increment behavior."""
+
+    def test_frame_increments_on_success(self):
+        """Frame number increments after a valid action."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        before = cell.ns["_frame"]
+        cell.step()
+        assert cell.ns["_frame"] == before + 1
+
+    def test_frame_number_in_frame_dict(self):
+        """The number in the frame dict equals the _frame value after execution."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        before = cell.ns["_frame"]
+        cell.step()
+        frame = cell.ns["_frame_log"][-1]
+        assert frame is not None
+        assert frame["number"] == before + 1
+
+    def test_frame_increments_correctly_multiple_steps(self):
+        """Multi-frame increment: frame number increases by 1 per successful step."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1"), _action("y = 2")])
+        start = cell.ns["_frame"]
+        cell.step()
+        cell.step()
+        assert cell.ns["_frame"] == start + 2
+
+    def test_parse_error_no_frame_increment(self):
+        """Parse failure (missing <action> tag): frame number does not increment."""
+        cell = _make_cell()
+        _set_responses(cell, ["no action tag here"])
+        before = cell.ns["_frame"]
+        cell.step()
+        assert cell.ns["_frame"] == before
+
+
+# ============================================================
+# Protocol error paths
+# ============================================================
+
+
+class TestProtocolErrors:
+    """Protocol error paths: parse failure, gate block, Core exception."""
+
+    def test_missing_action_tag_no_frame_committed(self):
+        """Missing <action> tag → _frame_log does not grow, protocol_error is not None."""
+        cell = _make_cell()
+        before_len = len(cell.ns["_frame_log"])
+        _set_responses(cell, ["no action tag here"])
+        result = cell.step()
+        assert len(cell.ns["_frame_log"]) == before_len
+        assert result.protocol_error is not None
+
+    def test_missing_action_tag_sets_error(self):
+        """Missing <action> tag → ns["_error"] is set."""
+        cell = _make_cell()
+        _set_responses(cell, ["no action tag here"])
+        cell.step()
+        assert cell.ns.get("_error") is not None
+
+    def test_core_exception_no_frame_committed(self):
+        """Core raises exception → _frame_log does not grow, protocol_error is not None."""
+        cell = _make_cell()
+        before_len = len(cell.ns["_frame_log"])
+        _set_responses(cell, [Exception("API error")])
+        result = cell.step()
+        assert len(cell.ns["_frame_log"]) == before_len
+        assert result.protocol_error is not None
+
+    def test_core_exception_sets_error(self):
+        """Core raises exception → ns["_error"] contains the error message."""
+        cell = _make_cell()
+        _set_responses(cell, [Exception("API error")])
+        cell.step()
+        assert cell.ns.get("_error") is not None
+        assert "Core error" in cell.ns["_error"]
+
+    def test_core_exception_no_frame_increment(self):
+        """Core raises exception → frame number does not increment."""
+        cell = _make_cell()
+        _set_responses(cell, [Exception("API error")])
+        before = cell.ns["_frame"]
+        cell.step()
+        assert cell.ns["_frame"] == before
+
+    def test_action_gate_blocked_no_frame_committed(self):
+        """action gate block → _frame_log does not grow, ns["_error"] is set."""
+        cell = _make_cell(action_gate="safe")
+        # Inject a custom rule that always blocks
+        cell._action_gate.add_rule("block_all", lambda a: "blocked for test")
+        before_len = len(cell.ns["_frame_log"])
+        _set_responses(cell, [_action("x = 1")])
+        result = cell.step()
+        assert len(cell.ns["_frame_log"]) == before_len
+        assert cell.ns.get("_error") is not None
+
+    def test_action_gate_blocked_no_frame_increment(self):
+        """action gate block → frame number does not increment."""
+        cell = _make_cell(action_gate="safe")
+        cell._action_gate.add_rule("block_all", lambda a: "blocked for test")
+        _set_responses(cell, [_action("x = 1")])
+        before = cell.ns["_frame"]
+        cell.step()
+        assert cell.ns["_frame"] == before
+
+
+# ============================================================
+# Execution result recording
+# ============================================================
+
+
+class TestObservation:
+    """Observation data: exec error and verdict written to FrameRecord."""
+
+    def test_exec_error_recorded_in_frame(self):
+        """Execution error is recorded in the frame dict's observation.error field."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("raise ValueError('test error')")])
+        cell.step()
+        frame = cell.ns["_frame_log"][-1]
+        assert frame is not None
+        assert frame["observation"]["error"] is not None
+        assert "ValueError" in frame["observation"]["error"]
+
+    def test_expect_passed_verdict_in_frame(self):
+        """All <expect> assertions pass: verdict.passed == verdict.total, frame is still committed."""
+        cell = _make_cell()
+        _set_responses(cell, [_action_with_expect("x = 42", "assert x == 42")])
+        cell.step()
+        frame = cell.ns["_frame_log"][-1]
+        assert frame is not None
+        verdict = frame["observation"]["verdict"]
+        assert verdict is not None
+        assert verdict["total"] == 1
+        assert verdict["passed"] == 1
+
+    def test_expect_failed_verdict_in_frame(self):
+        """<expect> assertion fails: verdict.failures is non-empty, frame is still committed."""
+        cell = _make_cell()
+        _set_responses(cell, [_action_with_expect("x = 1", "assert x == 99")])
+        cell.step()
+        frame = cell.ns["_frame_log"][-1]
+        assert frame is not None
+        verdict = frame["observation"]["verdict"]
+        assert verdict is not None
+        assert len(verdict["failures"]) > 0
+
+    def test_no_expect_verdict_is_none(self):
+        """No <expect> tag: observation.verdict in the frame dict is None."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        cell.step()
+        frame = cell.ns["_frame_log"][-1]
+        assert frame is not None
+        assert frame["observation"]["verdict"] is None
+
+    def test_exec_error_skips_expect_evaluation(self):
+        """When execution errors, expect evaluation is skipped: verdict is None."""
+        cell = _make_cell()
+        _set_responses(cell, [_action_with_expect("raise ValueError('err')", "assert x == 1")])
+        cell.step()
+        frame = cell.ns["_frame_log"][-1]
+        assert frame is not None
+        assert frame["observation"]["verdict"] is None
+
+
+# ============================================================
+# _commit_frame writes to _frame_log
+# ============================================================
+
+
+class TestCommitFrame:
+    """_commit_frame: _frame_log append and mirror variable write."""
+
+    def test_commit_writes_to_frame_log(self):
+        """After a successful step, one entry is appended to _frame_log."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        cell.step()
+        assert len(cell.ns["_frame_log"]) == 1
+
+    def test_frame_log_entries_are_dicts(self):
+        """Entries in _frame_log are dicts (not FrameRecord instances)."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        cell.step()
+        assert isinstance(cell.ns["_frame_log"][0], dict)
+
+    def test_multiple_steps_append_to_frame_log(self):
+        """_frame_log grows after multiple steps."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1"), _action("y = 2")])
+        cell.step()
+        cell.step()
+        assert len(cell.ns["_frame_log"]) == 2
+
+    def test_verdict_mirror_variable_updated(self):
+        """After a successful step, ns["_verdict"] is updated (mirror variable)."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        cell.step()
+        # _verdict should be written (value may be None, but key exists and was written)
+        assert "_verdict" in cell.ns
+
+    def test_verdict_mirror_set_after_expect(self):
+        """After expect passes, ns["_verdict"] is a Verdict object."""
+        cell = _make_cell()
+        _set_responses(cell, [_action_with_expect("x = 5", "assert x == 5")])
+        cell.step()
+        from vessal.ark.shell.hull.cell.protocol import Verdict
+        assert isinstance(cell.ns["_verdict"], Verdict)
+
+    def test_protocol_error_does_not_write_frame_log(self):
+        """On protocol error (parse failure), _frame_log does not grow."""
+        cell = _make_cell()
+        _set_responses(cell, ["no action tag here"])
+        before_len = len(cell.ns["_frame_log"])
+        cell.step()
+        assert len(cell.ns["_frame_log"]) == before_len
+
+
+# ============================================================
+# _update_runtime_vars
+# ============================================================
+
+
+# ============================================================
+# Gate tests
+# ============================================================
+
+
+class TestGates:
+    """Gates: default values, auto mode passthrough."""
+
+    def test_state_gate_default_is_auto(self):
+        """state_gate default value is 'auto'."""
+        cell = _make_cell()
+        assert cell.state_gate == "auto"
+
+    def test_action_gate_default_is_auto(self):
+        """action_gate default value is 'auto'."""
+        cell = _make_cell()
+        assert cell.action_gate == "auto"
+
+    def test_state_gate_auto_passthrough(self):
+        """auto mode: state is not blocked, step completes normally."""
+        cell = _make_cell()
+        cell.state_gate = "auto"
+        _set_responses(cell, [_action("x = 1")])
+        cell.step()
+        assert cell.ns.get("x") == 1
+
+    def test_action_gate_auto_passthrough(self):
+        """auto mode: action is not blocked, step completes normally."""
+        cell = _make_cell()
+        cell.action_gate = "auto"
+        _set_responses(cell, [_action("x = 1")])
+        cell.step()
+        assert cell.ns.get("x") == 1
+
+    def test_step_applies_state_gate(self):
+        """step() passes through state_gate internally (auto mode allows all)."""
+        cell = _make_cell()
+        _set_responses(cell, [_action('sleep()')])
+        cell.state_gate = "auto"
+        cell.step()
+        assert cell.ns["_sleeping"] is True
+
+    def test_step_applies_action_gate(self):
+        """step() passes through action_gate internally (auto mode allows all)."""
+        cell = _make_cell()
+        _set_responses(cell, [_action('sleep()')])
+        cell.action_gate = "auto"
+        cell.step()
+        assert cell.ns["_sleeping"] is True
+
+
+# ============================================================
+# Snapshot and restore tests
+# ============================================================
+
+
+class TestSnapshotRestore:
+    """snapshot/restore: state serialization and deserialization."""
+
+    def test_snapshot_creates_file(self, tmp_path):
+        """snapshot(path) creates a file at the specified path."""
+        cell = _make_cell()
+        cell.ns["data"] = [1, 2, 3]
+        path = str(tmp_path / "snap.pkl")
+        cell.snapshot(path)
+        assert Path(path).exists()
+
+    def test_restore_recovers_state(self, tmp_path):
+        """restore(path) recovers namespace from snapshot."""
+        cell1 = _make_cell()
+        cell1.ns["data"] = [1, 2, 3]
+        path = str(tmp_path / "snap.pkl")
+        cell1.snapshot(path)
+
+        cell2 = _make_cell()
+        cell2.restore(path)
+        assert cell2.ns["data"] == [1, 2, 3]
+
+    def test_snapshot_via_snapshot_path(self, tmp_path):
+        """snapshot_path constructor parameter is equivalent to restore() — namespace is recovered."""
+        cell1 = _make_cell()
+        _set_responses(cell1, [_action("saved_var = 999")])
+        cell1.step()
+
+        snap = str(tmp_path / "test_snap.pkl")
+        cell1.snapshot(snap)
+
+        cell2 = _make_cell(snapshot_path=snap)
+        assert cell2.ns["saved_var"] == 999
+
+
+# ============================================================
+# v5 Protocol: ping/pong properties
+# ============================================================
+
+
+class TestPingPongProperties:
+    """v5 ping/pong cached properties."""
+
+    def test_cell_pong_property_initially_none(self):
+        """Before first step(), cell.pong is None."""
+        cell = _make_cell()
+        assert cell.pong is None
+
+    def test_cell_pong_property_after_step(self):
+        """After step(), cell.pong is a Pong."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        result = cell.step()
+        if result.protocol_error is None:
+            assert cell.pong is not None
+            assert isinstance(cell.pong, Pong)
+
+    def test_cell_ping_property_initially_none(self):
+        """Before first step(), cell.ping is None."""
+        cell = _make_cell()
+        assert cell.ping is None
+
+    def test_cell_ping_property_after_step(self):
+        """After step(), cell.ping is a Ping."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        result = cell.step()
+        if result.protocol_error is None:
+            assert cell.ping is not None
+            assert isinstance(cell.ping, Ping)
+
+    def test_step_result_has_only_protocol_error(self):
+        """StepResult has protocol_error only, not frame or state."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        result = cell.step()
+        assert hasattr(result, "protocol_error")
+        assert not hasattr(result, "state")
+        assert not hasattr(result, "frame")
+
+    def test_frame_log_stores_dicts(self):
+        """_frame_log stores dicts, not FrameRecord objects."""
+        cell = _make_cell()
+        _set_responses(cell, [_action("x = 1")])
+        result = cell.step()
+        if result.protocol_error is None:
+            frame_log = cell.ns["_frame_log"]
+            assert len(frame_log) > 0
+            assert isinstance(frame_log[0], dict)
+            assert "pong" in frame_log[0]
+            assert "observation" in frame_log[0]
+
+    def test_error_path_pong_unchanged(self):
+        """When Core raises, cell.pong retains previous value."""
+        cell = _make_cell()
+        # First step succeeds
+        _set_responses(cell, [_action("x = 1")])
+        result1 = cell.step()
+        pong_after_success = cell.pong
+        # Second step fails (mock raises)
+        _set_responses(cell, [Exception("API error")])
+        result2 = cell.step()
+        assert result2.protocol_error is not None
+        assert cell.pong is pong_after_success  # unchanged
+
+
+# ============================================================
+# Fresh Ping per frame
+# ============================================================
+
+
+class TestFreshPingPerFrame:
+    """Every step() must produce a fresh Ping via prepare(), not reuse a cached one."""
+
+    def test_signal_injected_between_frames_is_visible(self):
+        """A signal source added to namespace between step() calls appears in the next Ping.
+
+        This verifies that step() calls prepare() every frame, not just the first.
+        If Ping were cached from the previous frame, this new signal would be invisible.
+        """
+        cell = _make_cell()
+
+        # First step — establish baseline
+        _set_responses(cell, [_action("x = 1"), _action("y = 2")])
+        result1 = cell.step()
+        assert result1.protocol_error is None
+
+        # Inject a signal source into namespace BETWEEN frames
+        class _TestSignal:
+            def _signal(self):
+                return ("test_signal", "signal_was_seen")
+
+        cell.ns["_test_signal_source"] = _TestSignal()
+
+        # Second step — the fresh prepare() must pick up the new signal
+        result2 = cell.step()
+        assert result2.protocol_error is None
+
+        # Verify the Ping used for the second step contained the new signal
+        # cell.ping is set at the start of step() by prepare()
+        assert cell.ping is not None
+        assert "signal_was_seen" in cell.ping.state.signals
+
+
+# ============================================================
+# Real token data written to namespace
+# ============================================================
+
+
+class TestRealTokenPassthrough:
+    """Cell.step() writes real token data returned by Core to namespace."""
+
+    def test_actual_tokens_written_to_ns(self):
+        cell = _make_cell()
+        pong = _make_pong(_action("x = 1"))
+        cell._core.run = MagicMock(return_value=(pong, 5000, 200))
+        cell.step()
+        assert cell.ns["_actual_tokens_in"] == 5000
+        assert cell.ns["_actual_tokens_out"] == 200
+
+    def test_context_pct_overwritten_by_real_data(self):
+        cell = _make_cell()
+        # Set context_budget and max_tokens so renderer computes budget_total = 100000
+        cell.ns["_context_budget"] = 104096
+        cell.ns["_max_tokens"] = 4096
+        pong = _make_pong(_action("x = 1"))
+        cell._core.run = MagicMock(return_value=(pong, 50000, 200))
+        cell.step()
+        # renderer sets budget_total = 104096 - 4096 = 100000
+        # our token write logic: round(50000 / 100000 * 100) = 50
+        budget_total = cell.ns["_budget_total"]
+        assert budget_total == 100000
+        assert cell.ns["_context_pct"] == round(50000 / 100000 * 100)
+
+    def test_no_usage_leaves_estimated_context_pct(self):
+        cell = _make_cell()
+        cell.ns["_budget_total"] = 100000
+        pong = _make_pong(_action("x = 1"))
+        cell._core.run = MagicMock(return_value=(pong, None, None))
+        cell.step()
+        assert cell.ns["_actual_tokens_in"] is None
+
+
+# ============================================================
+# ErrorRecord written to _errors
+# ============================================================
+
+
+class TestErrorRecord:
+    """Cell.step() writes protocol errors to _errors."""
+
+    def test_protocol_error_recorded(self):
+        from vessal.ark.shell.hull.cell.protocol import ErrorRecord
+        cell = _make_cell()
+        cell.ns["_errors"] = []
+        cell._core.run = MagicMock(side_effect=Exception("BadRequest"))
+        cell.step()
+        errors = cell.ns["_errors"]
+        assert len(errors) == 1
+        assert isinstance(errors[0], ErrorRecord)
+        assert errors[0].type == "protocol"
+        assert "BadRequest" in errors[0].message
+
+    def test_errors_capped_at_50(self):
+        from vessal.ark.shell.hull.cell.protocol import ErrorRecord
+        cell = _make_cell()
+        cell.ns["_errors"] = [
+            ErrorRecord("runtime", f"err{i}", i, 0.0)
+            for i in range(50)
+        ]
+        cell._core.run = MagicMock(side_effect=Exception("overflow"))
+        cell.step()
+        assert len(cell.ns["_errors"]) == 50
+        assert cell.ns["_errors"][-1].type == "protocol"

@@ -1,0 +1,80 @@
+# ARK
+
+Agent Runtime Kit. Mechanism base for the three-layer concentric architecture (Shell → Hull → Cell); provides execution environment without business policy.
+
+Responsible for:
+- Exporting core types (Cell, Core, Hull) for use by the top level
+- Defining and enforcing the three-layer dependency direction
+- Providing shared utilities (Util) to all layers
+
+Not responsible for:
+- HTTP protocol details (→ `shell/`)
+- Agent orchestration and frame scheduling (→ `shell/hull/`)
+- Single-frame LLM inference computation (→ `shell/hull/cell/`)
+- Specific Skill implementations (→ `src/vessal/skills/`)
+
+## Constraints
+
+1. Dependency direction is strictly one-way: Shell → Hull → Cell; any reverse import is a violation → `tests/architecture/test_dependency_direction.py`
+2. `__init__.py` only re-exports; contains no logic
+3. Util may be imported by all layers, but Util itself does not import Shell / Hull / Cell
+
+## Design
+
+ARK exists because the three concerns of an Agent runtime (HTTP boundary, orchestration scheduling, single-frame computation) differ significantly in complexity and rate of change, and must be physically isolated. If the three layers were mixed together, any change in one layer would ripple to the others, and dependency relationships could not be mechanically verified.
+
+The choice of a three-layer concentric structure comes from an analysis of responsibilities. Shell handles the uncertainty of the external world (HTTP, process signals, filesystem) and needs frequent adaptation; Hull manages the Agent's lifecycle and Skill registration at a medium rate of change; Cell is a pure computation engine with the most stable interface. The concentric structure ensures that inner layers know nothing about outer layers — Cell does not know Hull exists, Hull does not know Shell exists. This property makes it possible to test and replace each layer independently.
+
+At the OS level, a process boundary exists between Shell and Hull: Shell runs in the main process (HTTP gateway + guardian), Hull + Cell + Kernel run in a subprocess (started using the agent's `.venv/bin/python`). This boundary provides crash isolation — native fatal errors in LLM-generated code only kill the subprocess; Shell restarts automatically. See whitepaper 02-architecture.md section 2.7 for details.
+
+```mermaid
+graph LR
+    subgraph MainProcess["Main Process (Shell)"]
+        ShellHTTP["HTTP server\nlistening on user port"]
+        Monitor["Guardian thread\ncrash detection + auto-restart"]
+    end
+
+    subgraph SubProcess["Subprocess (Hull + Cell + Kernel)"]
+        HullHTTP["Hull internal HTTP\nlistening on random port"]
+        HullCore["Hull — Agent orchestration"]
+        CellCore["Cell — single-frame execution"]
+        KernelCore["Kernel — namespace + exec"]
+    end
+
+    Util["util/ — shared utilities (importable by both processes)"]
+
+    ShellHTTP -->|"reverse proxy"| HullHTTP
+    Monitor -->|"subprocess.Popen\nhull_runner.py"| SubProcess
+    HullCore --> CellCore --> KernelCore
+    MainProcess -.-> Util
+    SubProcess -.-> Util
+```
+
+The alternative of a flat module layout (shell.py + hull.py + cell.py) was rejected. A flat structure cannot prevent circular dependencies and cannot express the layered relationship. Directory structure is architecture documentation — seeing the nesting of `ark/shell/hull/cell/` makes the dependency direction immediately clear.
+
+```mermaid
+graph TD
+    Shell["ark/shell/"] --> Hull["ark/shell/hull/"]
+    Hull --> Cell["ark/shell/hull/cell/"]
+    Cell --> Kernel["ark/shell/hull/cell/kernel/"]
+    Util["ark/util/"] -.->|"cross-cutting, imported by all layers"| Shell
+    Util -.-> Hull
+    Util -.-> Cell
+```
+
+Key decision: Util as a cross-cutting concern is shared by all layers but does not depend on any layer. This avoids reimplementing common utilities such as logging, serialization, and type tools in each layer, while not breaking the dependency direction.
+
+Invariants: The physical directory structure `shell/hull/cell/` encodes the dependency direction — Shell contains Hull, Hull contains Cell; outer layers may not reverse-depend on inner layers. Architecture tests automatically verify this invariant on every CI run.
+
+Relationship with the upper layer: `vessal/__init__.py` re-exports Cell, Core, Hull through this layer's `__init__.py`, forming the user-visible public API. The directory nesting inside ARK is transparent to the top level.
+
+## Status
+
+### TODO
+- [ ] 2026-04-09: Create independent CONTEXT.md for each sub-layer (Shell, Hull, Cell, Util)
+
+### Known Issues
+None.
+
+### Active
+None.
