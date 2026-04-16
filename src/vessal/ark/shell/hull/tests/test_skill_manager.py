@@ -82,3 +82,83 @@ def test_loaded_names_tracks_loaded(tmp_skill):
     assert "dummy" in sm.loaded_names
     sm.unload("dummy")
     assert sm.loaded_names == []
+
+
+# ---------------------------------------------------------------------------
+# _parse_skill_md unit tests
+# ---------------------------------------------------------------------------
+from vessal.ark.shell.hull.skill_manager import _parse_skill_md  # noqa: E402
+
+
+def test_parse_v0_format(tmp_path: Path):
+    """Existing v0 format still works."""
+    md = tmp_path / "SKILL.md"
+    md.write_text(
+        "---\nname: tasks\ndescription: Hierarchical task management\n---\n\n# tasks\n\nBody text."
+    )
+    meta, body = _parse_skill_md(md)
+    assert meta["name"] == "tasks"
+    assert meta["description"] == "Hierarchical task management"
+    assert "Body text." in body
+
+
+def test_parse_v1_format(tmp_path: Path):
+    """v1 format with version, author, license, requires."""
+    md = tmp_path / "SKILL.md"
+    md.write_text(
+        '---\n'
+        'name: browser\n'
+        'version: "1.0.0"\n'
+        'description: "web page browsing"\n'
+        'author: "vessal-ai"\n'
+        'license: "Apache-2.0"\n'
+        'requires:\n'
+        '  skills: [tasks, memory]\n'
+        '  python: ">=3.12"\n'
+        '---\n'
+        '\n'
+        '# browser\n'
+        '\nBrowse the web.'
+    )
+    meta, body = _parse_skill_md(md)
+    assert meta["name"] == "browser"
+    assert meta["version"] == "1.0.0"
+    assert meta["author"] == "vessal-ai"
+    assert meta["license"] == "Apache-2.0"
+    assert meta["requires"] == {"skills": ["tasks", "memory"], "python": ">=3.12"}
+    assert "Browse the web." in body
+
+
+def test_parse_v1_empty_requires(tmp_path: Path):
+    """v1 format with empty requires.skills list."""
+    md = tmp_path / "SKILL.md"
+    md.write_text(
+        '---\n'
+        'name: pin\n'
+        'version: "1.0.0"\n'
+        'description: "pin variables"\n'
+        'requires:\n'
+        '  skills: []\n'
+        '---\n'
+        '\n'
+        'Body.'
+    )
+    meta, body = _parse_skill_md(md)
+    assert meta["requires"] == {"skills": []}
+    assert "Body." in body
+
+
+def test_parse_missing_file(tmp_path: Path):
+    """Non-existent file returns empty."""
+    meta, body = _parse_skill_md(tmp_path / "nope.md")
+    assert meta == {}
+    assert body == ""
+
+
+def test_parse_no_frontmatter(tmp_path: Path):
+    """File without frontmatter returns body only."""
+    md = tmp_path / "SKILL.md"
+    md.write_text("# Just a guide\n\nNo frontmatter here.")
+    meta, body = _parse_skill_md(md)
+    assert meta == {}
+    assert "No frontmatter here." in body
