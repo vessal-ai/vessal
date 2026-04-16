@@ -2,11 +2,8 @@
 """SkillHub registry: fetch, search, and resolve skill names."""
 from __future__ import annotations
 
-import logging
 import tomllib
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 REGISTRY_URL = (
     "https://raw.githubusercontent.com/vessal-ai/vessal-skills/main/registry.toml"
@@ -52,6 +49,8 @@ class Registry:
 
     def list_paged(self, page: int = 1, per_page: int = 20) -> list[dict]:
         """List entries with pagination."""
+        if page < 1:
+            raise ValueError(f"page must be >= 1, got {page}")
         all_entries = self.list_all()
         start = (page - 1) * per_page
         return all_entries[start : start + per_page]
@@ -64,7 +63,7 @@ class Registry:
             haystack = (
                 name.lower()
                 + " " + info.get("description", "").lower()
-                + " " + " ".join(info.get("tags", []))
+                + " " + " ".join(t.lower() for t in info.get("tags", []))
             )
             if keyword_lower in haystack:
                 results.append({

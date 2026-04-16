@@ -80,3 +80,15 @@ def test_resolve_known_name(registry: Registry):
 
 def test_resolve_unknown_name(registry: Registry):
     assert registry.resolve("unknown") is None
+
+
+def test_search_by_tag_case_insensitive(registry: Registry):
+    # browser has tags = ["web", "scraping"] — test uppercase query
+    results = registry.search("WEB")
+    assert len(results) == 1
+    assert results[0]["name"] == "browser"
+
+
+def test_list_paged_invalid_page(registry: Registry):
+    with pytest.raises(ValueError, match="page must be >= 1"):
+        registry.list_paged(page=0)
