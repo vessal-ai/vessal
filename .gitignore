@@ -21,3 +21,6 @@ wheels/
 
 # Logs
 logs/
+
+# Git worktrees
+.worktrees/
