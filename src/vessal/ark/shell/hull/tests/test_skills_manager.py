@@ -132,6 +132,45 @@ def test_tools_uses_new_names():
     assert "query_guide" not in SkillsManager.tools
 
 
+def test_search_hub_returns_results():
+    from vessal.ark.shell.hull.skills_manager import SkillsManager
+
+    hull = MagicMock()
+    sm = SkillsManager(hull)
+
+    with patch("vessal.ark.shell.hull.skills_manager.Registry") as MockReg:
+        mock_instance = MockReg.fetch.return_value
+        mock_instance.search.return_value = [
+            {"name": "browser", "description": "web browsing", "source": "x", "tags": ["web"]}
+        ]
+        result = sm.search_hub("web")
+
+    assert "browser" in result
+    assert "web browsing" in result
+
+
+def test_list_hub_returns_paged():
+    from vessal.ark.shell.hull.skills_manager import SkillsManager
+
+    hull = MagicMock()
+    sm = SkillsManager(hull)
+
+    with patch("vessal.ark.shell.hull.skills_manager.Registry") as MockReg:
+        mock_instance = MockReg.fetch.return_value
+        mock_instance.list_paged.return_value = [
+            {"name": "a", "description": "desc a", "source": "x", "tags": []},
+            {"name": "b", "description": "desc b", "source": "y", "tags": []},
+        ]
+        mock_instance.list_all.return_value = [
+            {"name": "a", "description": "desc a", "source": "x", "tags": []},
+            {"name": "b", "description": "desc b", "source": "y", "tags": []},
+        ]
+        result = sm.list_hub(page=1)
+
+    assert "a" in result
+    assert "b" in result
+
+
 def test_skills_manager_prompt(mock_hull):
     """SkillsManager._prompt() returns a valid cognitive protocol."""
     from vessal.ark.shell.hull.skills_manager import SkillsManager

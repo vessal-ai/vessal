@@ -98,6 +98,34 @@ def main() -> None:
     skill_check_parser.add_argument("path", type=str, help="Path to Skill directory")
     skill_check_parser.add_argument("--test", action="store_true", help="Run tests")
 
+    # vessal skill install
+    skill_install_parser = skill_sub.add_parser("install", help="Install a Skill from SkillHub or URL")
+    skill_install_parser.add_argument("source", type=str, help="Skill name (SkillHub) or Git URL")
+    skill_install_parser.add_argument("-g", "--global", dest="global_install", action="store_true",
+                                      help="Install to user-level (~/.vessal/skills/)")
+
+    # vessal skill uninstall
+    skill_uninstall_parser = skill_sub.add_parser("uninstall", help="Uninstall a hub-installed Skill")
+    skill_uninstall_parser.add_argument("name", type=str, help="Skill name to uninstall")
+    skill_uninstall_parser.add_argument("-g", "--global", dest="global_install", action="store_true",
+                                         help="Uninstall from user-level (~/.vessal/skills/)")
+
+    # vessal skill update
+    skill_update_parser = skill_sub.add_parser("update", help="Update hub-installed Skills")
+    skill_update_parser.add_argument("name", nargs="?", default=None, help="Skill name (omit to update all)")
+
+    # vessal skill search
+    skill_search_parser = skill_sub.add_parser("search", help="Search SkillHub registry")
+    skill_search_parser.add_argument("keyword", type=str, help="Search keyword")
+
+    # vessal skill list
+    skill_list_parser = skill_sub.add_parser("list", help="List available Skills")
+    skill_list_parser.add_argument("--installed", action="store_true", help="Only show hub-installed Skills")
+
+    # vessal skill publish
+    skill_publish_parser = skill_sub.add_parser("publish", help="Submit Skill to SkillHub")
+    skill_publish_parser.add_argument("path", type=str, help="Path to Skill directory")
+
     args = parser.parse_args()
 
     if args.command == "start":
@@ -123,6 +151,18 @@ def main() -> None:
             _cmd_skill_init(args)
         elif args.skill_command == "check":
             _cmd_skill_check(args)
+        elif args.skill_command == "install":
+            _cmd_skill_install(args)
+        elif args.skill_command == "uninstall":
+            _cmd_skill_uninstall(args)
+        elif args.skill_command == "update":
+            _cmd_skill_update(args)
+        elif args.skill_command == "search":
+            _cmd_skill_search(args)
+        elif args.skill_command == "list":
+            _cmd_skill_list(args)
+        elif args.skill_command == "publish":
+            _cmd_skill_publish(args)
         else:
             skill_parser.print_help()
             sys.exit(1)
@@ -228,3 +268,33 @@ def _cmd_skill_init(args: argparse.Namespace) -> None:
 def _cmd_skill_check(args: argparse.Namespace) -> None:
     from vessal.ark.shell.cli import _cmd_skill_check as shell_skill_check
     shell_skill_check(args)
+
+
+def _cmd_skill_install(args: argparse.Namespace) -> None:
+    from vessal.ark.shell.cli import _cmd_skill_install as shell_skill_install
+    shell_skill_install(args)
+
+
+def _cmd_skill_uninstall(args: argparse.Namespace) -> None:
+    from vessal.ark.shell.cli import _cmd_skill_uninstall as shell_skill_uninstall
+    shell_skill_uninstall(args)
+
+
+def _cmd_skill_update(args: argparse.Namespace) -> None:
+    from vessal.ark.shell.cli import _cmd_skill_update as shell_skill_update
+    shell_skill_update(args)
+
+
+def _cmd_skill_search(args: argparse.Namespace) -> None:
+    from vessal.ark.shell.cli import _cmd_skill_search as shell_skill_search
+    shell_skill_search(args)
+
+
+def _cmd_skill_list(args: argparse.Namespace) -> None:
+    from vessal.ark.shell.cli import _cmd_skill_list as shell_skill_list
+    shell_skill_list(args)
+
+
+def _cmd_skill_publish(args: argparse.Namespace) -> None:
+    from vessal.ark.shell.cli import _cmd_skill_publish as shell_skill_publish
+    shell_skill_publish(args)

@@ -18,9 +18,10 @@ def _install_packages(packages: list[str]) -> None:
 
 
 def _parse_skill_md(path: Path) -> tuple[dict, str]:
-    """Parse frontmatter (name, description) and body from SKILL.md.
+    """Parse frontmatter and body from SKILL.md.
 
-    Only supports the simplest format: key: value lines delimited by ---.
+    Supports v0 (flat key: value) and v1 (with nested requires block).
+    Nested blocks are detected by indentation (2+ spaces).
     """
     if not path.exists():
         return {}, ""
@@ -32,14 +33,48 @@ def _parse_skill_md(path: Path) -> tuple[dict, str]:
     if len(parts) < 3:
         return {}, text.strip()
 
-    meta = {}
+    meta: dict = {}
+    current_block: str | None = None
+    block_dict: dict = {}
+
     for line in parts[1].strip().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
             continue
-        if ":" in line:
-            key, _, val = line.partition(":")
-            meta[key.strip()] = val.strip()
+
+        # Indented line → belongs to current_block
+        if line.startswith("  ") and current_block is not None:
+            if ":" in stripped:
+                key, _, val = stripped.partition(":")
+                val = val.strip()
+                # Parse inline list: [a, b, c]
+                if val.startswith("[") and val.endswith("]"):
+                    items = [v.strip().strip('"').strip("'") for v in val[1:-1].split(",") if v.strip()]
+                    block_dict[key.strip()] = items
+                else:
+                    block_dict[key.strip()] = val.strip('"').strip("'")
+            continue
+
+        # Flush previous block
+        if current_block is not None:
+            meta[current_block] = block_dict
+            current_block = None
+            block_dict = {}
+
+        # Top-level line
+        if ":" in stripped:
+            key, _, val = stripped.partition(":")
+            val = val.strip()
+            if val:
+                meta[key.strip()] = val.strip('"').strip("'")
+            else:
+                # Start of a nested block
+                current_block = key.strip()
+                block_dict = {}
+
+    # Flush final block
+    if current_block is not None:
+        meta[current_block] = block_dict
 
     body = parts[2].strip()
     return meta, body
@@ -151,6 +186,20 @@ class SkillManager:
             skill_dir = Path(spec.origin).parent  # .../vessal/skills/chat/
             is_package_skill = True
 
+        # Check requires.skills dependencies before loading
+        skill_md_path = skill_dir / "SKILL.md"
+        meta, body = _parse_skill_md(skill_md_path)
+        requires = meta.get("requires", {})
+        if isinstance(requires, dict):
+            required_skills = requires.get("skills", [])
+            if isinstance(required_skills, list):
+                for dep in required_skills:
+                    if dep not in self._loaded:
+                        raise RuntimeError(
+                            f"Skill '{name}' requires skill '{dep}', but '{dep}' is not loaded. "
+                            f"Load '{dep}' first."
+                        )
+
         # Unload old version
         if name in self._loaded:
             self.unload(name)
@@ -202,8 +251,6 @@ class SkillManager:
             )
 
         # Set guide from SKILL.md body (Agent queries via print(name.guide))
-        skill_md_path = skill_dir / "SKILL.md"
-        _, body = _parse_skill_md(skill_md_path)
         if body:
             skill_cls.guide = body
 
