@@ -86,6 +86,34 @@ def main() -> None:
     skill_check_parser.add_argument("path", type=str, help="Skill directory path")
     skill_check_parser.add_argument("--test", action="store_true", help="Run tests")
 
+    # vessal skill install
+    skill_install_parser = skill_sub.add_parser("install", help="Install a Skill from SkillHub or URL")
+    skill_install_parser.add_argument("source", type=str, help="Skill name (SkillHub) or Git URL")
+    skill_install_parser.add_argument("-g", "--global", dest="global_install", action="store_true",
+                                      help="Install to user-level (~/.vessal/skills/)")
+
+    # vessal skill uninstall
+    skill_uninstall_parser = skill_sub.add_parser("uninstall", help="Uninstall a hub-installed Skill")
+    skill_uninstall_parser.add_argument("name", type=str, help="Skill name to uninstall")
+    skill_uninstall_parser.add_argument("-g", "--global", dest="global_install", action="store_true",
+                                         help="Uninstall from user-level (~/.vessal/skills/)")
+
+    # vessal skill update
+    skill_update_parser = skill_sub.add_parser("update", help="Update hub-installed Skills")
+    skill_update_parser.add_argument("name", nargs="?", default=None, help="Skill name (omit to update all)")
+
+    # vessal skill search
+    skill_search_parser = skill_sub.add_parser("search", help="Search SkillHub registry")
+    skill_search_parser.add_argument("keyword", type=str, help="Search keyword")
+
+    # vessal skill list
+    skill_list_parser = skill_sub.add_parser("list", help="List available Skills")
+    skill_list_parser.add_argument("--installed", action="store_true", help="Only show hub-installed Skills")
+
+    # vessal skill publish
+    skill_publish_parser = skill_sub.add_parser("publish", help="Submit Skill to SkillHub")
+    skill_publish_parser.add_argument("path", type=str, help="Path to Skill directory")
+
     args = parser.parse_args()
 
     if args.command == "start":
@@ -105,6 +133,18 @@ def main() -> None:
             _cmd_skill_init(args)
         elif args.skill_command == "check":
             _cmd_skill_check(args)
+        elif args.skill_command == "install":
+            _cmd_skill_install(args)
+        elif args.skill_command == "uninstall":
+            _cmd_skill_uninstall(args)
+        elif args.skill_command == "update":
+            _cmd_skill_update(args)
+        elif args.skill_command == "search":
+            _cmd_skill_search(args)
+        elif args.skill_command == "list":
+            _cmd_skill_list(args)
+        elif args.skill_command == "publish":
+            _cmd_skill_publish(args)
         else:
             skill_parser.print_help()
             sys.exit(1)
@@ -897,6 +937,236 @@ def _cmd_skill_check(args: argparse.Namespace) -> None:
 
     if errors:
         sys.exit(1)
+
+
+def _cmd_skill_install(args: argparse.Namespace) -> None:
+    """Install a Skill from SkillHub (by name) or from a Git URL."""
+    from vessal.ark.shell.hub.resolver import resolve
+    from vessal.ark.shell.hub.installer import install
+
+    source = args.source
+    global_install = getattr(args, "global_install", False)
+
+    if global_install:
+        target_dir = Path.home() / ".vessal" / "skills"
+    else:
+        target_dir = Path.cwd() / "skills" / "hub"
+
+    try:
+        resolved = resolve(source)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        result = install(resolved, target_dir)
+        print(f"\n  {result}")
+        if resolved.verified:
+            print(f"  Source: SkillHub ({resolved.original})")
+        else:
+            print(f"  Source: {resolved.original} (unverified)")
+        print(f"  Location: {target_dir}")
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _cmd_skill_uninstall(args: argparse.Namespace) -> None:
+    """Uninstall a hub-installed Skill by removing its directory."""
+    import shutil
+
+    name = args.name
+    global_install = getattr(args, "global_install", False)
+
+    if global_install:
+        skill_dir = Path.home() / ".vessal" / "skills" / name
+    else:
+        skill_dir = Path.cwd() / "skills" / "hub" / name
+
+    if not skill_dir.is_dir():
+        print(f"Error: Skill '{name}' not found at {skill_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    from vessal.ark.shell.hub.metadata import is_hub_installed
+    if not is_hub_installed(skill_dir) and not global_install:
+        print(f"Error: '{name}' is not a hub-installed skill (no .installed.toml)", file=sys.stderr)
+        sys.exit(1)
+
+    shutil.rmtree(skill_dir)
+    print(f"Uninstalled {name}")
+
+
+def _cmd_skill_update(args: argparse.Namespace) -> None:
+    """Update hub-installed Skills by re-fetching from their original source."""
+    from vessal.ark.shell.hub.metadata import read_installed
+    from vessal.ark.shell.hub.resolver import resolve
+    from vessal.ark.shell.hub.installer import install
+    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+
+    hub_dir = Path.cwd() / "skills" / "hub"
+    if not hub_dir.is_dir():
+        print("No hub-installed skills found.", file=sys.stderr)
+        sys.exit(1)
+
+    targets = []
+    if args.name:
+        skill_dir = hub_dir / args.name
+        if not skill_dir.is_dir():
+            print(f"Error: Skill '{args.name}' not found in {hub_dir}", file=sys.stderr)
+            sys.exit(1)
+        targets.append(skill_dir)
+    else:
+        for child in sorted(hub_dir.iterdir()):
+            if child.is_dir() and (child / ".installed.toml").exists():
+                targets.append(child)
+
+    if not targets:
+        print("No hub-installed skills to update.")
+        return
+
+    for skill_dir in targets:
+        meta_installed = read_installed(skill_dir)
+        if meta_installed is None:
+            continue
+
+        source = meta_installed["source"]
+        local_version = meta_installed.get("version", "0.0.0")
+        name = skill_dir.name
+
+        try:
+            resolved = resolve(source)
+            result = install(resolved, hub_dir)
+            new_meta, _ = _parse_skill_md(skill_dir / "SKILL.md")
+            new_version = new_meta.get("version", "0.0.0")
+            if new_version != local_version:
+                print(f"  Updated {name}: {local_version} -> {new_version}")
+            else:
+                print(f"  {name} already at latest ({local_version})")
+        except Exception as e:
+            print(f"  Failed to update {name}: {e}", file=sys.stderr)
+
+
+def _cmd_skill_search(args: argparse.Namespace) -> None:
+    """Search the SkillHub registry by keyword."""
+    from vessal.ark.shell.hub.registry import Registry
+
+    try:
+        registry = Registry.fetch()
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    results = registry.search(args.keyword)
+    if not results:
+        print(f"No skills found matching '{args.keyword}'")
+        return
+
+    print(f"Found {len(results)} skill(s):\n")
+    for entry in results:
+        tags = ", ".join(entry.get("tags", []))
+        print(f"  {entry['name']}")
+        print(f"    {entry.get('description', '')}")
+        if tags:
+            print(f"    tags: {tags}")
+        print(f"    install: vessal skill install {entry['name']}")
+        print()
+
+
+def _cmd_skill_list(args: argparse.Namespace) -> None:
+    """List available Skills, grouped by source directory."""
+    from vessal.ark.shell.hub.metadata import read_installed
+    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+
+    cwd = Path.cwd()
+    sections = []
+
+    if args.installed:
+        hub_dir = cwd / "skills" / "hub"
+        global_dir = Path.home() / ".vessal" / "skills"
+        for label, base in [("Project (skills/hub)", hub_dir), ("Global (~/.vessal/skills)", global_dir)]:
+            if not base.is_dir():
+                continue
+            skills = []
+            for child in sorted(base.iterdir()):
+                if not child.is_dir():
+                    continue
+                meta = read_installed(child)
+                if meta is None:
+                    continue
+                skills.append((child.name, meta.get("version", "?"), meta.get("source", "?"),
+                              "verified" if meta.get("verified") else "unverified"))
+            if skills:
+                sections.append((label, skills))
+    else:
+        for label, dirname in [("Bundled", "skills/bundled"), ("Hub", "skills/hub"), ("Local", "skills/local")]:
+            base = cwd / dirname
+            if not base.is_dir():
+                continue
+            skills = []
+            for child in sorted(base.iterdir()):
+                if not child.is_dir() or child.name.startswith("_"):
+                    continue
+                md = child / "SKILL.md"
+                if md.exists():
+                    meta, _ = _parse_skill_md(md)
+                    skills.append((meta.get("name", child.name), meta.get("version", "?"),
+                                  meta.get("description", "")))
+                else:
+                    skills.append((child.name, "?", "(no SKILL.md)"))
+            if skills:
+                sections.append((label, skills))
+
+    if not sections:
+        print("No skills found.")
+        return
+
+    for label, skills in sections:
+        print(f"\n  {label}:")
+        for skill_info in skills:
+            if len(skill_info) == 4:
+                name, version, source, verified = skill_info
+                print(f"    {name} v{version} ({verified}) from {source}")
+            else:
+                name, version, desc = skill_info
+                print(f"    {name} v{version} — {desc}")
+    print()
+
+
+def _cmd_skill_publish(args: argparse.Namespace) -> None:
+    """Guide user to submit a Skill to the SkillHub curated registry."""
+    import webbrowser
+
+    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+
+    skill_dir = Path(args.path).resolve()
+    skill_md = skill_dir / "SKILL.md"
+
+    if not skill_md.exists():
+        print(f"Error: SKILL.md not found in {skill_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    meta, _ = _parse_skill_md(skill_md)
+    name = meta.get("name", skill_dir.name)
+
+    print(f"Running compliance check on '{name}'...")
+    _cmd_skill_check(argparse.Namespace(path=str(skill_dir), test=False))
+
+    print(f"\n  To publish '{name}' to SkillHub:")
+    print(f"  1. Push your skill to a public Git repository")
+    print(f"  2. Open a PR to vessal-ai/vessal-skills adding an entry to registry.toml:")
+    print(f"")
+    print(f'     [{name}]')
+    print(f'     source = "your-username/your-repo"')
+    print(f'     description = "{meta.get("description", "")}"')
+    print(f'     tags = []')
+    print(f"")
+
+    url = "https://github.com/vessal-ai/vessal-skills/edit/main/registry.toml"
+    print(f"  Opening: {url}")
+    try:
+        webbrowser.open(url)
+    except Exception:
+        print(f"  (Could not open browser. Visit the URL manually.)")
 
 
 # ── flock process lock helpers ──────────────────────────
