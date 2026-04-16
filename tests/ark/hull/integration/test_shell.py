@@ -395,7 +395,7 @@ class TestSkillInit:
         assert "from .skill import MyCoolSkill as Skill" in init_content
 
     def test_skill_init_skill_md_has_frontmatter(self, tmp_path, monkeypatch):
-        """Generated SKILL.md contains YAML frontmatter and the Skill name."""
+        """Generated SKILL.md contains v1 YAML frontmatter with required fields."""
         monkeypatch.chdir(tmp_path)
         with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
             main()
@@ -404,8 +404,11 @@ class TestSkillInit:
         assert "---" in content  # frontmatter delimiter
         assert "name: my_skill" in content
         assert "description:" in content
-        # new format: no version/tags/category in frontmatter
-        assert "version:" not in content
+        assert 'version: "0.1.0"' in content
+        assert 'author: ""' in content
+        assert 'license: "Apache-2.0"' in content
+        assert "requires:" in content
+        assert "skills: []" in content
         assert "tags:" not in content
         assert "category:" not in content
 
@@ -467,7 +470,7 @@ class TestSkillCheck:
             encoding="utf-8",
         )
         (skill_dir / "SKILL.md").write_text(
-            f'---\nname: {name}\ndescription: "test Skill"\n---\n# {name}\n',
+            f'---\nname: {name}\nversion: "0.1.0"\ndescription: "test Skill"\nauthor: "test"\nlicense: "Apache-2.0"\nrequires:\n  skills: []\n---\n# {name}\n',
             encoding="utf-8",
         )
         return skill_dir

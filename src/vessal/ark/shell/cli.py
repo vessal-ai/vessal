@@ -717,7 +717,12 @@ def _cmd_skill_init(args: argparse.Namespace) -> None:
         # frontmatter for skills.list() discovery; body is the guide attribute (Agent reads via print(name.guide))
         f'---\n'
         f'name: {skill_name}\n'
+        f'version: "0.1.0"\n'
         f'description: "(functional description, ≤15 words)"\n'
+        f'author: ""\n'
+        f'license: "Apache-2.0"\n'
+        f'requires:\n'
+        f'  skills: []\n'
         f'---\n'
         f'\n'
         f'# {skill_name}\n'
@@ -804,6 +809,23 @@ def _cmd_skill_check(args: argparse.Namespace) -> None:
                 ok(f"  SKILL.md[{field}]: {val}")
             else:
                 warn(f"SKILL.md missing {field} field")
+
+        # v1 field checks
+        for field in ("version", "author", "license"):
+            val = meta.get(field, "")
+            if val:
+                ok(f"  SKILL.md[{field}]: {val}")
+            else:
+                warn(f"SKILL.md missing {field} field (recommended for distribution)")
+
+        # requires.skills check
+        requires = meta.get("requires", {})
+        if isinstance(requires, dict):
+            req_skills = requires.get("skills", [])
+            if isinstance(req_skills, list):
+                ok(f"  requires.skills: {req_skills}")
+            else:
+                warn("SKILL.md requires.skills should be a list")
     else:
         warn("SKILL.md not found (recommended)")
 

@@ -145,7 +145,12 @@ class SkillCreator(SkillBase):
         (base / "SKILL.md").write_text(
             f"---\n"
             f"name: {name}\n"
+            f'version: "0.1.0"\n'
             f'description: "{description}"\n'
+            f'author: ""\n'
+            f'license: "Apache-2.0"\n'
+            f"requires:\n"
+            f"  skills: []\n"
             f"---\n"
             f"\n"
             f"# {name}\n"
