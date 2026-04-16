@@ -411,16 +411,22 @@ def _cmd_init(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     project_dir.mkdir(parents=True)
-    skills_dir = project_dir / "skills"
 
-    # Copy built-in skills to user project (human/ has been removed from source, no longer copied)
+    # Three-directory skill layout: bundled (preinstalled), hub (SkillHub downloads), local (user-developed)
     import shutil
+    bundled_dir = project_dir / "skills" / "bundled"
+    hub_dir = project_dir / "skills" / "hub"
+    local_dir = project_dir / "skills" / "local"
+
     builtin_skills_src = Path(__file__).resolve().parent.parent.parent / "skills"
-    if builtin_skills_src.exists() and not skills_dir.exists():
-        shutil.copytree(str(builtin_skills_src), str(skills_dir),
+    if builtin_skills_src.exists():
+        shutil.copytree(str(builtin_skills_src), str(bundled_dir),
                         ignore=shutil.ignore_patterns("__pycache__"))
     else:
-        skills_dir.mkdir()
+        bundled_dir.mkdir(parents=True)
+
+    hub_dir.mkdir(parents=True, exist_ok=True)
+    local_dir.mkdir(parents=True, exist_ok=True)
 
     # hull.toml
     (project_dir / "hull.toml").write_text(
@@ -447,7 +453,7 @@ max_tokens = 4096
 
 [hull]
 skills = ["tasks", "pin", "chat", "heartbeat"]
-skill_paths = ["skills/"]
+skill_paths = ["skills/bundled", "skills/hub", "skills/local"]
 # compress_threshold = 50  # Context pressure signal threshold (default 50%, read by Memory skill)
 
 [gates]
@@ -510,9 +516,9 @@ __pycache__/
         encoding="utf-8",
     )
 
-    # skills/example/ — example Skill package
+    # skills/local/example/ — example Skill package
     # Demonstrates Skill development conventions: module docstrings, __all__, function docstrings, type annotations
-    example_dir = skills_dir / "example"
+    example_dir = local_dir / "example"
     example_dir.mkdir()
 
     (example_dir / "__init__.py").write_text(

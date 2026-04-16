@@ -70,13 +70,13 @@ class TestInit:
         assert "logs/" in content
 
     def test_init_creates_skills_example(self, tmp_path, monkeypatch):
-        """Generates skills/example/ Skill package (with __init__.py and requirements.txt)."""
+        """Generates skills/local/example/ Skill package (with __init__.py and requirements.txt)."""
         monkeypatch.chdir(tmp_path)
         with patch("sys.argv", ["vessal", "init", "my-agent"]), \
              patch("subprocess.run"):
             main()
 
-        example_dir = tmp_path / "my-agent" / "skills" / "example"
+        example_dir = tmp_path / "my-agent" / "skills" / "local" / "example"
         assert example_dir.is_dir()
         assert (example_dir / "__init__.py").exists()
         assert (example_dir / "requirements.txt").exists()
@@ -88,7 +88,7 @@ class TestInit:
              patch("subprocess.run"):
             main()
 
-        init_file = tmp_path / "my-agent" / "skills" / "example" / "__init__.py"
+        init_file = tmp_path / "my-agent" / "skills" / "local" / "example" / "__init__.py"
         content = init_file.read_text(encoding="utf-8")
         assert '"""' in content          # has module docstring
         assert "__all__" in content       # has public API declaration
@@ -247,7 +247,7 @@ class TestInit:
              patch("subprocess.run"):
             main()
 
-        skill_md = tmp_path / "my-agent" / "skills" / "example" / "SKILL.md"
+        skill_md = tmp_path / "my-agent" / "skills" / "local" / "example" / "SKILL.md"
         content = skill_md.read_text(encoding="utf-8")
         assert "---" in content  # frontmatter delimiter
         assert "name: example" in content
@@ -257,17 +257,17 @@ class TestInit:
         assert "category:" in content
 
     def test_init_copies_builtin_skills(self, tmp_path, monkeypatch):
-        """vessal init copies built-in Skills to the project's skills/ directory (human is deprecated, not copied)."""
+        """vessal init copies built-in Skills to skills/bundled/ (human is deprecated, not copied)."""
         monkeypatch.chdir(tmp_path)
         with patch("sys.argv", ["vessal", "init", "my-agent"]), \
              patch("subprocess.run"):
             main()
 
-        skills_dir = tmp_path / "my-agent" / "skills"
-        assert (skills_dir / "chat" / "skill.py").exists()
-        assert (skills_dir / "tasks" / "skill.py").exists()
-        assert (skills_dir / "pin" / "skill.py").exists()
-        assert not (skills_dir / "human").exists()
+        bundled_dir = tmp_path / "my-agent" / "skills" / "bundled"
+        assert (bundled_dir / "chat" / "skill.py").exists()
+        assert (bundled_dir / "tasks" / "skill.py").exists()
+        assert (bundled_dir / "pin" / "skill.py").exists()
+        assert not (bundled_dir / "human").exists()
 
     def test_init_hull_toml_has_skill_paths(self, tmp_path, monkeypatch):
         """Generated hull.toml contains skill_paths configuration."""
