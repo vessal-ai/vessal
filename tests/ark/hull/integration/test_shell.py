@@ -142,20 +142,18 @@ class TestInit:
         content = (tmp_path / "my-agent" / "pyproject.toml").read_text()
         assert 'name = "my-agent"' in content
         assert "requires-python" in content
-        assert "dependencies = []" in content
+        assert '"vessal"' in content
 
     def test_init_creates_venv(self, tmp_path, monkeypatch):
-        """vessal init calls python -m venv to create a virtual environment."""
+        """vessal init calls python -m venv when uv is not available."""
         monkeypatch.chdir(tmp_path)
         with patch("sys.argv", ["vessal", "init", "my-agent"]), \
+             patch("shutil.which", return_value=None), \
              patch("subprocess.run") as mock_run:
             main()
 
-        mock_run.assert_called_once()
-        call_args = mock_run.call_args[0][0]
-        assert call_args[0] == sys.executable
-        assert "-m" in call_args
-        assert "venv" in call_args
+        all_args = [call[0][0] for call in mock_run.call_args_list]
+        assert any("-m" in a and "venv" in a for a in all_args)
 
     def test_init_gitignore_includes_venv(self, tmp_path, monkeypatch):
         """Generated .gitignore contains .venv/ entry."""
@@ -282,6 +280,39 @@ class TestInit:
         assert "skill_paths" in content
         assert "skills" in content
 
+    def test_init_no_venv_skips_subprocess(self, tmp_path, monkeypatch):
+        """--no-venv flag skips all subprocess calls."""
+        monkeypatch.chdir(tmp_path)
+        with patch("sys.argv", ["vessal", "init", "my-agent", "--no-venv"]), \
+             patch("subprocess.run") as mock_run:
+            main()
+
+        mock_run.assert_not_called()
+
+    def test_init_uses_uv_sync_when_uv_available(self, tmp_path, monkeypatch):
+        """When uv is on PATH, init calls uv sync instead of python -m venv."""
+        monkeypatch.chdir(tmp_path)
+        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
+             patch("shutil.which", return_value="/usr/bin/uv"), \
+             patch("subprocess.run") as mock_run:
+            main()
+
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args[0][0]
+        assert call_args == ["uv", "sync"]
+
+    def test_init_uses_pip_when_uv_not_available(self, tmp_path, monkeypatch):
+        """When uv is not on PATH, init falls back to python -m venv + pip install."""
+        monkeypatch.chdir(tmp_path)
+        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
+             patch("shutil.which", return_value=None), \
+             patch("subprocess.run") as mock_run:
+            main()
+
+        assert mock_run.call_count == 2
+        all_args = [call[0][0] for call in mock_run.call_args_list]
+        assert any("venv" in a for a in all_args)
+        assert any("pip" in a for a in all_args)
 
 
 # ============================================================

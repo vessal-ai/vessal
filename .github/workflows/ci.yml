@@ -29,4 +29,4 @@ jobs:
         run: uv run pytest -q
 
       - name: Check import structure
-        run: uv run python -c "from vessal.ark.cell import Cell; from vessal.ark.hull import Hull; print('Import check passed')"
+        run: uv run python -c "from vessal.ark import Cell, Hull; print('Import check passed')"
