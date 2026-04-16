@@ -72,6 +72,10 @@ def main() -> None:
     # vessal init
     init_parser = subparsers.add_parser("init", help="Create project scaffold")
     init_parser.add_argument("name", type=str, help="Project name")
+    init_parser.add_argument(
+        "--no-venv", action="store_true",
+        help="Skip virtual environment creation and dependency installation"
+    )
 
     # vessal skill
     skill_parser = subparsers.add_parser("skill", help="Skill management")
@@ -396,7 +400,9 @@ def _cmd_init(args: argparse.Namespace) -> None:
     """Execute vessal init command.
 
     Creates project directory, generates hull.toml, SOUL.md, pyproject.toml, .env.example,
-    .gitignore, skills/example/ example Skill package, and creates .venv virtual environment.
+    .gitignore, skills/example/ example Skill package, and sets up the virtual environment.
+    Detects uv (runs uv sync) or falls back to python -m venv + pip install vessal.
+    Pass --no-venv to skip virtual environment creation.
     Exits with error if directory already exists.
     """
     project_dir = Path(args.name)
@@ -480,7 +486,7 @@ name = "{args.name}"
 version = "0.1.0"
 description = "Vessal Agent"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["vessal"]
 """,
         encoding="utf-8",
     )
@@ -629,22 +635,23 @@ Load and call via example.word_count() etc.
         encoding="utf-8",
     )
 
-    # Create virtual environment
+    # Create virtual environment and install dependencies
     import subprocess as sp
-    sp.run([sys.executable, "-m", "venv", str(project_dir / ".venv")], check=True)
+    if not getattr(args, "no_venv", False):
+        if shutil.which("uv"):
+            sp.run(["uv", "sync"], cwd=str(project_dir), check=True)
+        else:
+            venv_dir = project_dir / ".venv"
+            sp.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+            bin_dir = "Scripts" if sys.platform == "win32" else "bin"
+            venv_python = str(venv_dir / bin_dir / "python")
+            sp.run([venv_python, "-m", "pip", "install", "vessal"], check=True)
 
-    print(f"\nProject {args.name} created.\n")
-    print(f"Required: configure API Key")
+    print(f"\nDone! Project '{args.name}' is ready.\n")
     print(f"  cd {args.name}")
     print(f"  cp .env.example .env")
-    print(f"  # Edit .env and fill in the following three fields:")
-    print(f"  #   OPENAI_API_KEY   API key from your model provider")
-    print(f"  #   OPENAI_BASE_URL  API URL (OpenAI official: https://api.openai.com/v1)")
-    print(f"  #   OPENAI_MODEL     Model name (e.g. gpt-4o, claude-3-5-sonnet-20241022)")
+    print(f"  # Fill in OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL")
     print()
-    print(f"Optional: edit SOUL.md to define the Agent's role and behavioral preferences")
-    print()
-    print(f"Start:")
     print(f"  vessal start")
 
 

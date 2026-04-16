@@ -84,6 +84,10 @@ def main() -> None:
     # vessal init
     init_parser = subparsers.add_parser("init", help="Create project scaffold")
     init_parser.add_argument("name", type=str, help="Project name")
+    init_parser.add_argument(
+        "--no-venv", action="store_true",
+        help="Skip virtual environment creation and dependency installation"
+    )
 
     # vessal skill
     skill_parser = subparsers.add_parser("skill", help="Skill management")

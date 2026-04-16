@@ -26,13 +26,24 @@ Every major agent framework gives the LLM a menu of functions and lets it pick. 
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - An API key from any OpenAI-compatible provider (OpenAI, Anthropic via proxy, DeepSeek, local models, etc.)
 
+### Install globally (once)
+
+```bash
+# Recommended
+uv tool install vessal
+
+# Or with pipx
+pipx install vessal
+```
+
 ### Create a new agent
 
 ```bash
-uv add vessal
-vs init my-agent
+vessal init my-agent
 cd my-agent
 ```
+
+`vessal init` automatically creates a `.venv` and installs dependencies. Pass `--no-venv` to skip this step.
 
 > **Tip:** `vs` is a shorthand for `vessal`. All commands work with either name — `vs start`, `vs stop`, `vs skill init`, etc.
 
