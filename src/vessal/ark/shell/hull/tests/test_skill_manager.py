@@ -162,3 +162,76 @@ def test_parse_no_frontmatter(tmp_path: Path):
     meta, body = _parse_skill_md(md)
     assert meta == {}
     assert "No frontmatter here." in body
+
+
+# ---------------------------------------------------------------------------
+# requires.skills dependency checking tests
+# ---------------------------------------------------------------------------
+
+def _make_skill_dir(base: Path, name: str, requires_skills: list[str] | None = None) -> Path:
+    """Create a minimal valid skill directory."""
+    skill_dir = base / name
+    skill_dir.mkdir()
+
+    class_name = "".join(part.capitalize() for part in name.split("_"))
+
+    (skill_dir / "__init__.py").write_text(
+        f"from .skill import {class_name} as Skill\n"
+    )
+    (skill_dir / "skill.py").write_text(
+        f"from vessal.ark.shell.hull.skill import SkillBase\n\n"
+        f"class {class_name}(SkillBase):\n"
+        f"    name = '{name}'\n"
+        f"    description = 'test skill'\n"
+    )
+
+    requires_block = ""
+    if requires_skills is not None:
+        skills_str = ", ".join(requires_skills)
+        requires_block = f"requires:\n  skills: [{skills_str}]\n"
+
+    (skill_dir / "SKILL.md").write_text(
+        f"---\nname: {name}\nversion: \"1.0.0\"\ndescription: test\n{requires_block}---\n\nGuide."
+    )
+    return skill_dir
+
+
+def test_load_skill_with_satisfied_deps(tmp_path: Path):
+    """Loading a skill whose requires.skills are all loaded succeeds."""
+    from vessal.ark.shell.hull.skill_manager import SkillManager
+
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+    _make_skill_dir(skills_dir, "dep_a")
+    _make_skill_dir(skills_dir, "dep_b", requires_skills=["dep_a"])
+
+    mgr = SkillManager(skill_paths=[str(skills_dir)])
+    mgr.load("dep_a")
+    cls = mgr.load("dep_b")
+    assert cls.name == "dep_b"
+
+
+def test_load_skill_with_missing_deps(tmp_path: Path):
+    """Loading a skill with unsatisfied requires.skills raises RuntimeError."""
+    from vessal.ark.shell.hull.skill_manager import SkillManager
+
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+    _make_skill_dir(skills_dir, "lonely", requires_skills=["nonexistent"])
+
+    mgr = SkillManager(skill_paths=[str(skills_dir)])
+    with pytest.raises(RuntimeError, match="requires skill 'nonexistent'"):
+        mgr.load("lonely")
+
+
+def test_load_skill_without_requires(tmp_path: Path):
+    """Loading a skill without requires block succeeds (backward compat)."""
+    from vessal.ark.shell.hull.skill_manager import SkillManager
+
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+    _make_skill_dir(skills_dir, "simple")
+
+    mgr = SkillManager(skill_paths=[str(skills_dir)])
+    cls = mgr.load("simple")
+    assert cls.name == "simple"

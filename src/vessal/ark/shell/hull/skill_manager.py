@@ -186,6 +186,20 @@ class SkillManager:
             skill_dir = Path(spec.origin).parent  # .../vessal/skills/chat/
             is_package_skill = True
 
+        # Check requires.skills dependencies before loading
+        skill_md_path = skill_dir / "SKILL.md"
+        meta, _ = _parse_skill_md(skill_md_path)
+        requires = meta.get("requires", {})
+        if isinstance(requires, dict):
+            required_skills = requires.get("skills", [])
+            if isinstance(required_skills, list):
+                for dep in required_skills:
+                    if dep not in self._loaded:
+                        raise RuntimeError(
+                            f"Skill '{name}' requires skill '{dep}', but '{dep}' is not loaded. "
+                            f"Load '{dep}' first."
+                        )
+
         # Unload old version
         if name in self._loaded:
             self.unload(name)
