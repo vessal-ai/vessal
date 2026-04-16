@@ -1,0 +1,15 @@
+# vessal-skills — SkillHub Curated Registry
+#
+# Format:
+#   [skill_name]
+#   source = "owner/repo" or "owner/repo#skills/subpath"
+#   description = "one-line description"
+#   tags = ["tag1", "tag2"]
+#
+# Official skills hosted in this repo use:
+#   source = "vessal-ai/vessal-skills#skills/<name>"
+#
+# Third-party skills point to external repos:
+#   source = "username/vessal-skill-name"
+
+# (No skills registered yet — add entries as skills are created)
