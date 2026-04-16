@@ -1,7 +1,7 @@
 # src/vessal/ark/shell/hub/tests/test_metadata.py
 """Tests for .installed.toml metadata read/write."""
 from pathlib import Path
-from vessal.ark.shell.hub.metadata import write_installed, read_installed
+from vessal.ark.shell.hub.metadata import write_installed, read_installed, is_hub_installed
 
 
 def test_write_and_read(tmp_path: Path):
@@ -39,8 +39,6 @@ def test_read_missing(tmp_path: Path):
 
 
 def test_is_hub_installed(tmp_path: Path):
-    from vessal.ark.shell.hub.metadata import is_hub_installed
-
     assert is_hub_installed(tmp_path) is False
     write_installed(tmp_path, source="x", version="0.1.0", verified=True)
     assert is_hub_installed(tmp_path) is True

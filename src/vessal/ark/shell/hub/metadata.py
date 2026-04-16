@@ -2,10 +2,15 @@
 """Read/write .installed.toml metadata for hub-installed skills."""
 from __future__ import annotations
 
+import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
 _FILENAME = ".installed.toml"
+
+
+def _toml_str(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def write_installed(
@@ -17,8 +22,8 @@ def write_installed(
     """Write .installed.toml into a skill directory."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     content = (
-        f'source = "{source}"\n'
-        f'version = "{version}"\n'
+        f'source = "{_toml_str(source)}"\n'
+        f'version = "{_toml_str(version)}"\n'
         f'installed_at = "{now}"\n'
         f'verified = {"true" if verified else "false"}\n'
     )
@@ -27,7 +32,6 @@ def write_installed(
 
 def read_installed(skill_dir: Path) -> dict | None:
     """Read .installed.toml from a skill directory. Returns None if not found."""
-    import tomllib
 
     path = skill_dir / _FILENAME
     if not path.exists():
