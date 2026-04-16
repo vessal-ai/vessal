@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+from vessal.ark.shell.hub.registry import Registry
 
 if TYPE_CHECKING:
     from vessal.ark.shell.hull.hull import Hull
@@ -22,7 +25,7 @@ class SkillsManager:
 
     name = "skills"
     description = "skill lifecycle management"
-    tools = ["load", "unload"]
+    tools = ["load", "unload", "search_hub", "download_skill", "list_hub"]
 
     def __init__(self, hull: "Hull"):
         self._hull = hull
@@ -107,3 +110,88 @@ class SkillsManager:
 
         self._hull.unload_skill_from_manager(name)
         return f"unloaded {name}"
+
+    def search_hub(self, keyword: str) -> str:
+        """Search the SkillHub registry for skills matching a keyword.
+
+        Args:
+            keyword: Search term (matches name, description, tags).
+
+        Returns:
+            Formatted search results string.
+        """
+        try:
+            registry = Registry.fetch()
+        except RuntimeError as e:
+            return f"search failed: {e}"
+
+        results = registry.search(keyword)
+        if not results:
+            return f"No skills found matching '{keyword}'"
+
+        lines = [f"Found {len(results)} skill(s):"]
+        for entry in results:
+            tags = ", ".join(entry.get("tags", []))
+            tag_str = f" [{tags}]" if tags else ""
+            lines.append(f"  {entry['name']} — {entry.get('description', '')}{tag_str}")
+        lines.append("")
+        lines.append("To install: skills.download_skill('name')")
+        return "\n".join(lines)
+
+    def download_skill(self, name: str) -> str:
+        """Download and install a skill from SkillHub into skills/hub/.
+
+        Args:
+            name: Skill short name (from SkillHub registry).
+
+        Returns:
+            Result string (success or failure message).
+        """
+        from vessal.ark.shell.hub.resolver import resolve
+        from vessal.ark.shell.hub.installer import install
+
+        skill_paths = self._hull.get_ns("skill_paths")
+        if not skill_paths:
+            return "download failed: no skill_paths configured"
+
+        hub_dir = None
+        for sp in skill_paths:
+            if sp.endswith("/hub") or sp.endswith("\\hub"):
+                hub_dir = Path(sp)
+                break
+
+        if hub_dir is None:
+            hub_dir = Path(skill_paths[0])
+
+        try:
+            resolved = resolve(name)
+            result = install(resolved, hub_dir)
+            return result
+        except RuntimeError as e:
+            return f"download failed: {e}"
+
+    def list_hub(self, page: int = 1) -> str:
+        """List skills available on SkillHub with pagination.
+
+        Args:
+            page: Page number (20 skills per page, starting from 1).
+
+        Returns:
+            Formatted skill list string.
+        """
+        try:
+            registry = Registry.fetch()
+        except RuntimeError as e:
+            return f"list failed: {e}"
+
+        entries = registry.list_paged(page=page, per_page=20)
+        if not entries:
+            return f"No more skills (page {page})"
+
+        total = len(registry.list_all())
+        lines = [f"SkillHub (page {page}, {total} total):"]
+        for entry in entries:
+            lines.append(f"  {entry['name']} — {entry.get('description', '')}")
+        lines.append("")
+        lines.append(f"Use skills.search_hub('keyword') to search, or skills.list_hub({page + 1}) for next page")
+        return "\n".join(lines)
