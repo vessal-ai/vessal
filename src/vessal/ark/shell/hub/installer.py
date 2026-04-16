@@ -62,12 +62,16 @@ def copy_skill(source_dir: Path, target_base: Path, name: str) -> Path:
 def clone_repo(git_url: str) -> Path:
     """Clone a git repo to a temporary directory. Returns the repo path."""
     tmp_dir = Path(tempfile.mkdtemp(prefix="vessal_install_"))
-    subprocess.run(
-        ["git", "clone", "--depth", "1", git_url, str(tmp_dir / "repo")],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        subprocess.run(
+            ["git", "clone", "--depth", "1", git_url, str(tmp_dir / "repo")],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise
     return tmp_dir / "repo"
 
 
