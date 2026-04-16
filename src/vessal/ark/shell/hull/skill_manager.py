@@ -188,7 +188,7 @@ class SkillManager:
 
         # Check requires.skills dependencies before loading
         skill_md_path = skill_dir / "SKILL.md"
-        meta, _ = _parse_skill_md(skill_md_path)
+        meta, body = _parse_skill_md(skill_md_path)
         requires = meta.get("requires", {})
         if isinstance(requires, dict):
             required_skills = requires.get("skills", [])
@@ -251,8 +251,6 @@ class SkillManager:
             )
 
         # Set guide from SKILL.md body (Agent queries via print(name.guide))
-        skill_md_path = skill_dir / "SKILL.md"
-        _, body = _parse_skill_md(skill_md_path)
         if body:
             skill_cls.guide = body
 
