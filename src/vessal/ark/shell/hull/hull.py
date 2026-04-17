@@ -436,6 +436,14 @@ class Hull:
             ok = self.reload_skill(name)
             return (200 if ok else 404), {"status": "skill_reloaded" if ok else "not_loaded", "name": name}
 
+        if method == "GET" and path == "/skills/ui":
+            entries = []
+            for name in self._skill_manager.loaded_names:
+                skill_dir = self._skill_manager.skill_dir(name)
+                if skill_dir and (Path(skill_dir) / "ui" / "index.html").exists():
+                    entries.append({"name": name, "url": f"/skills/{name}/ui/index.html"})
+            return 200, {"skills": entries}
+
         return 404, {"error": f"not found: {method} {path}"}
 
     def _handle_logs_viewer(self) -> tuple[int, "StaticResponse"]:

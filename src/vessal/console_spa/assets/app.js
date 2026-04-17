@@ -28,6 +28,7 @@ window.consoleApp = function consoleApp() {
       setInterval(() => this.pollStatus(), 2000);
       this.openSse();
       await this.loadMessages();
+      await this.loadSkillUis();
     },
 
     async pollStatus() {
@@ -93,6 +94,17 @@ window.consoleApp = function consoleApp() {
         this.banner = { level: "red", text: `Send failed: ${e}` };
       }
       setTimeout(() => this.loadMessages(), 500);
+    },
+
+    async loadSkillUis() {
+      try {
+        const r = await fetch("/skills/ui");
+        if (!r.ok) return;
+        const body = await r.json();
+        for (const s of body.skills || []) {
+          this.views.push({ id: `skill:${s.name}`, icon: "🧩", label: s.name, url: s.url });
+        }
+      } catch {}
     },
 
     async loadFrames() {

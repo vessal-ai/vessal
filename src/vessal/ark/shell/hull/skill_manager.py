@@ -307,6 +307,11 @@ class SkillManager:
         """List of currently loaded skill names."""
         return list(self._loaded.keys())
 
+    def skill_dir(self, name: str) -> str | None:
+        """Return the directory path for a loaded skill, or None if not loaded."""
+        entry = self._loaded.get(name)
+        return entry["path"] if entry else None
+
     def has_server(self, name: str) -> bool:
         """Check whether a Skill has a server.py module.
 

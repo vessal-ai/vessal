@@ -84,6 +84,11 @@
         <template x-if="current === 'market'">
           <section id="market-view"><p class="placeholder">Skill Market — coming soon</p></section>
         </template>
+        <template x-for="v in views.filter(x => x.id.startsWith('skill:'))" :key="v.id">
+          <section x-show="current === v.id" class="skill-iframe-wrap">
+            <iframe :src="v.url" class="skill-iframe"></iframe>
+          </section>
+        </template>
       </main>
     </div>
   </div>
