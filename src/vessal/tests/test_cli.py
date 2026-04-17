@@ -30,3 +30,12 @@ def test_help_still_works():
     assert "start" in result.stdout
     assert "send" not in result.stdout
     assert "read" not in result.stdout
+
+
+def test_create_subcommand_exists():
+    result = subprocess.run(
+        [sys.executable, "-m", "vessal.cli", "create", "--help"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0
+    assert "create" in result.stdout.lower()

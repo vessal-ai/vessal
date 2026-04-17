@@ -77,6 +77,10 @@ def main() -> None:
         help="Skip virtual environment creation and dependency installation"
     )
 
+    # vessal create (interactive wizard)
+    create_parser = subparsers.add_parser("create", help="Interactive 6-question new-project wizard")
+    create_parser.add_argument("name", nargs="?", default=None, help="Project name (skipped in wizard if provided)")
+
     # vessal skill
     skill_parser = subparsers.add_parser("skill", help="Skill management")
     skill_sub = skill_parser.add_subparsers(dest="skill_command")
@@ -130,6 +134,9 @@ def main() -> None:
         _cmd_container_run(args)
     elif args.command == "init":
         _cmd_init(args)
+    elif args.command == "create":
+        from vessal.ark.shell.tui.create_wizard import run as wizard_run
+        sys.exit(wizard_run(Path.cwd()))
     elif args.command == "skill":
         if args.skill_command == "init":
             _cmd_skill_init(args)
@@ -151,6 +158,9 @@ def main() -> None:
             skill_parser.print_help()
             sys.exit(1)
     else:
+        if args.command is None:
+            from vessal.ark.shell.tui.picker import run as picker_run
+            sys.exit(picker_run(Path.cwd()))
         parser.print_help()
         sys.exit(1)
 
