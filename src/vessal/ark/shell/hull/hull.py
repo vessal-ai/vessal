@@ -120,6 +120,8 @@ class Hull:
         self._cell.set("_data_dir", str(self._project_dir / "data"))
         compress_threshold = hull_cfg.get("compress_threshold", 50)
         self._cell.set("_compress_threshold", compress_threshold)
+        self._cell.set("_compaction_k", hull_cfg.get("compaction_k", 16))
+        self._cell.set("_compaction_n", hull_cfg.get("compaction_n", 8))
 
         self._routes: dict[tuple[str, str], Any] = {}
         self._running_servers: dict[str, Any] = {}

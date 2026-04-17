@@ -1141,3 +1141,10 @@ def test_restore_emits_reconstruction_signal(tmp_path):
     signals = kernel2.ns.get("_signal_outputs", [])
     signal_text = "\n".join(body for _, body in signals)
     assert "db_conn" in signal_text
+
+
+def test_init_namespace_has_compaction_defaults():
+    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+    k = Kernel()
+    assert k.ns["_compaction_k"] == 16
+    assert k.ns["_compaction_n"] == 8

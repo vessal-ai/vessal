@@ -130,6 +130,10 @@ class Kernel:
         # Mirror variable (updated by Cell._commit_frame())
         ns["_verdict"] = None                     # verdict from the previous frame
 
+        # Hierarchical compaction config
+        ns["_compaction_k"] = 16                  # hot-bucket depth; frames before shift
+        ns["_compaction_n"] = 8                   # max cold-zone layers
+
         # Frame drop count
         ns["_dropped_frame_count"] = 0            # number of frames dropped in this render; written by renderer
 
