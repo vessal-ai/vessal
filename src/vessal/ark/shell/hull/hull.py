@@ -528,6 +528,10 @@ class Hull:
             fs.abort_compaction()
         if results_to_apply:
             fs.apply_results(results_to_apply)
+            s = fs.stats()
+            frame_number = self._cell.get("_frame", 0)
+            self._tracer.log(frame_number, "compaction.layer_stats", "gauge", -1,
+                             f"hot={s['hot_counts']},cold={s['cold_counts']}")
             self.snapshot()
             self._compaction_frames_since_snapshot = 0
 
@@ -609,6 +613,12 @@ trace = false  # disable to reduce IO
             if len(fs._hot[0]) >= fs.k and fs.in_flight:
                 self._tracer.log(frame_number, "compaction.shift_blocked", "gauge", -1, "value=1")
         else:
+            self._tracer.log(frame_number, "compaction.in_flight", "gauge", -1, "value=1")
+            raw = task.get("raw_bytes", 0)
+            stripped = task.get("stripped_bytes", 0)
+            if raw > 0:
+                self._tracer.log(frame_number, "compaction.stripping_ratio", "gauge", -1,
+                                 f"raw={raw},stripped={stripped}")
             self._thread_pool.submit(self._run_compaction_task, task, frame_number)
         self._compaction_frames_since_snapshot += 1
         if self._compaction_frames_since_snapshot >= self._compaction_snapshot_every_n:
@@ -630,16 +640,21 @@ trace = false  # disable to reduce IO
 
     def _run_compaction_task(self, task: dict, frame_number: int) -> None:
         """Compaction worker body. Runs on the compaction thread. Must not touch ns."""
+        import time
         layer = task["layer"]
         payload = task["payload"]
         if not payload:
             self._result_queue.put(("skip", layer))
             return
         ping = self._build_compression_ping(payload, layer)
+        t0 = time.monotonic()
         try:
             pong, _p, _c = self._compression_core.run(ping, tracer=self._tracer, frame=frame_number)
             raw_json = pong.action.operation
             record = parse_compaction_json(raw_json, layer=layer, compacted_at=frame_number)
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            self._tracer.log(frame_number, "compaction.latency_ms", "span", elapsed_ms,
+                             f"layer={layer}")
             self._result_queue.put((record.to_dict(), layer))
         except (CompactionParseError, Exception) as e:
             self._tracer.log(frame_number, "compaction.error", "worker", -1, f"layer={layer} err={e!r}")

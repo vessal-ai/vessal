@@ -119,12 +119,14 @@ class FrameStream:
         """
         # old B_4 becomes compression payload (stripped to level 4)
         ejected = self._hot[4]
+        raw_bytes = sum(len(str(f)) for f in ejected)
         stripped = [strip_frame(f, 4) for f in ejected]
+        stripped_bytes = sum(len(str(f)) for f in stripped)
         self._compression_zone = stripped
         # Cascade: B_3→B_4, B_2→B_3, B_1→B_2, B_0→B_1, new B_0 empty
         self._hot = [[], self._hot[0], self._hot[1], self._hot[2], self._hot[3]]
         self._in_flight = True
-        return {"layer": 0, "payload": list(stripped)}
+        return {"layer": 0, "payload": list(stripped), "raw_bytes": raw_bytes, "stripped_bytes": stripped_bytes}
 
     def apply_results(self, results: list[tuple[dict, int]]) -> None:
         """Append compacted records to cold zone; enqueue cascades if any L_i overflows.
