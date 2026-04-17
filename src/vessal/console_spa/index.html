@@ -62,7 +62,18 @@
           </section>
         </template>
         <template x-if="current === 'frames'">
-          <section id="frames-view"></section>
+          <section class="frames-layout" x-init="loadFrames()">
+            <ol class="frame-list">
+              <template x-for="f in frames" :key="f.number">
+                <li :class="{active: selectedFrame === f.number}"
+                    @click="selectFrame(f)">
+                  <span class="n" x-text="'#' + f.number"></span>
+                  <span class="excerpt" x-text="(f.think || f.action || '').toString().slice(0, 80)"></span>
+                </li>
+              </template>
+            </ol>
+            <div class="frame-detail" id="frame-detail-pane"></div>
+          </section>
         </template>
         <template x-if="current === 'state'">
           <section id="state-view"><p class="placeholder">State — coming soon</p></section>

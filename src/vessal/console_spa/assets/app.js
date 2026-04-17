@@ -20,6 +20,8 @@ window.consoleApp = function consoleApp() {
     rightCollapsed: localStorage.getItem("right-collapsed") === "1",
     messages: [],
     input: "",
+    frames: [],
+    selectedFrame: null,
 
     async init() {
       this.pollStatus();
@@ -49,6 +51,7 @@ window.consoleApp = function consoleApp() {
     handleEvent(ev) {
       if (ev.type === "frame") {
         this.pinnedFrame = ev.payload;
+        this.frames.push(ev.payload);
         const pane = document.getElementById("frame-pinned");
         if (pane) renderFrame(pane, ev.payload);
       } else if (ev.type === "agent_crash") {
@@ -90,6 +93,25 @@ window.consoleApp = function consoleApp() {
         this.banner = { level: "red", text: `Send failed: ${e}` };
       }
       setTimeout(() => this.loadMessages(), 500);
+    },
+
+    async loadFrames() {
+      try {
+        const r = await fetch("/frames");
+        if (r.ok) {
+          const body = await r.json();
+          this.frames = body.frames || [];
+          if (this.frames.length > 0) this.selectFrame(this.frames[this.frames.length - 1]);
+        }
+      } catch {}
+    },
+
+    selectFrame(f) {
+      this.selectedFrame = f.number;
+      const pane = document.getElementById("frame-detail-pane");
+      if (pane) {
+        import("./frame-renderer.js").then(m => m.renderFrame(pane, f));
+      }
     },
 
     toggleRight() {

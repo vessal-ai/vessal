@@ -37,3 +37,11 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; }
 .frame-section { white-space: pre-wrap; background: #fff; padding: 6px; border-radius: 4px; border: 1px solid #eee; margin-bottom: 8px; font-family: ui-monospace, monospace; font-size: 12px; }
 .frame-label { text-transform: uppercase; font-size: 11px; color: #888; margin: 4px 0; }
 .placeholder { color: #888; padding: 30px; text-align: center; }
+
+.frames-layout { display: grid; grid-template-columns: 280px 1fr; height: 100%; }
+.frame-list { list-style: none; margin: 0; padding: 0; overflow: auto; border-right: 1px solid #e0e0e0; }
+.frame-list li { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+.frame-list li.active { background: #e3f2fd; }
+.frame-list .n { font-weight: 600; margin-right: 8px; color: #555; }
+.frame-list .excerpt { color: #666; }
+.frame-detail { padding: 14px; overflow: auto; }
