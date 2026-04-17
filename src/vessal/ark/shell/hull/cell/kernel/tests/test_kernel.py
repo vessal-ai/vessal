@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vessal.ark.shell.hull.cell.kernel import Kernel
+from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, attach_source, execute, _compress_traceback, _maybe_capture_last_expr
 from vessal.ark.shell.hull.cell.kernel.render import render
@@ -45,7 +46,7 @@ def bare_ns() -> dict:
         "_log_path": "",
         "_context_pct": 0,
         "_ns_meta": {},
-        "_frame_log": [],
+        "_frame_stream": FrameStream(k=16, n=8),
         "_progress": "",
     }
 
@@ -314,12 +315,12 @@ class TestExecute:
         assert ns["_diff"] == ""
 
     def test_history_not_managed_by_execute(self):
-        """executor does not append _frame_log; frame logging is managed by Cell (Phase 3)."""
+        """executor does not commit to _frame_stream; frame logging is managed by Cell (Phase 3)."""
         ns = bare_ns()
         execute("x = 1", ns, frame_number=1)
         execute("y = 2", ns, frame_number=2)
-        # execute should not append to _frame_log
-        assert len(ns["_frame_log"]) == 0
+        # execute should not commit to _frame_stream
+        assert ns["_frame_stream"].hot_frame_count() == 0
 
     def test_source_function_on_object(self):
         """Function source is stored on obj._source, not in ns['_source']."""
@@ -513,11 +514,13 @@ class TestRenderIntegration:
 
     def test_frame_stream_in_state(self):
         """Frame stream section appears in the rendered output."""
+        from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
         k = Kernel()
-        # Manually inject a frame dict into _frame_log to trigger the frame stream section
-        k.ns.setdefault("_frame_log", []).append({
-            "schema_version": 5,
+        # Manually commit a frame dict into _frame_stream to trigger the frame stream section
+        k.ns["_frame_stream"].commit_frame({
+            "schema_version": FRAME_SCHEMA_VERSION,
             "number": 1,
+            "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
             "pong": {"think": "", "action": {"operation": "x = 1", "expect": ""}},
             "observation": {"stdout": "", "diff": "+x = 1", "error": None, "verdict": None},
         })
@@ -549,7 +552,7 @@ class TestKernel:
         assert k.ns.get("_frame") == 0
         # v4 vars
         assert k.ns.get("_system_prompt") == ""
-        assert isinstance(k.ns.get("_frame_log"), list)
+        assert isinstance(k.ns.get("_frame_stream"), FrameStream)
         # _history and _history_depth removed in v3
         assert "_history" not in k.ns
         assert "_history_depth" not in k.ns
@@ -613,12 +616,12 @@ class TestKernel:
         k.render()
         assert k.ns["_frame"] == frame_before
 
-    def test_render_method_does_not_append_frame_log(self):
-        """render() does not append to the frame log (_frame_log)."""
+    def test_render_method_does_not_append_frame_stream(self):
+        """render() does not commit to the frame stream (_frame_stream)."""
         k = Kernel()
         k.render()
         k.render()
-        assert len(k.ns["_frame_log"]) == 0
+        assert k.ns["_frame_stream"].hot_frame_count() == 0
 
     def test_kernel_render_returns_ping(self, tmp_path):
         from vessal.ark.shell.hull.cell.protocol import Ping
@@ -634,12 +637,12 @@ class TestKernel:
         k.exec_operation("pass", frame_number=5)
         assert k.ns["_frame"] == 5
 
-    def test_exec_operation_does_not_append_frame_log(self):
-        """exec_operation does not append to _frame_log (Cell's responsibility, Phase 3)."""
+    def test_exec_operation_does_not_append_frame_stream(self):
+        """exec_operation does not commit to _frame_stream (Cell's responsibility, Phase 3)."""
         k = Kernel()
         k.exec_operation("x = 1", frame_number=1)
         k.exec_operation("y = 2", frame_number=2)
-        assert len(k.ns["_frame_log"]) == 0
+        assert k.ns["_frame_stream"].hot_frame_count() == 0
 
     def test_variable_persists_across_exec_operations(self):
         k = Kernel()
@@ -898,13 +901,13 @@ class TestKernel:
         assert k.ns["x"] == 1
 
     def test_run_returns_none_and_commits_frame(self):
-        """run(Pong) returns None; _frame_log gets one item appended; _frame increments by 1."""
+        """run(Pong) returns None; _frame_stream gets one frame committed; _frame increments by 1."""
         from vessal.ark.shell.hull.cell.protocol import Action, Pong
         from vessal.ark.shell.hull.cell.kernel.executor import ExecResult
 
         k = Kernel()
         frame_before = k.ns["_frame"]
-        log_len_before = len(k.ns["_frame_log"])
+        count_before = k.ns["_frame_stream"].hot_frame_count()
 
         pong = Pong(think="", action=Action(operation="x = 1", expect=""))
 
@@ -919,7 +922,7 @@ class TestKernel:
 
         assert result is None
         assert k.ns["_frame"] == frame_before + 1
-        assert len(k.ns["_frame_log"]) == log_len_before + 1
+        assert k.ns["_frame_stream"].hot_frame_count() == count_before + 1
         mock_exec.assert_called_once_with(
             "x = 1", frame_before + 1, None
         )
@@ -1043,46 +1046,46 @@ class TestRunReturnsNone:
         assert result is None, f"Expected None, got {type(result)}"
 
 
-def test_restore_clears_incompatible_frame_log(tmp_path):
-    """restore() clears _frame_log when schema is incompatible; no exception raised."""
+def test_restore_clears_incompatible_frame_stream(tmp_path):
+    """restore() re-initializes _frame_stream when snapshot has incompatible type; no exception raised."""
     import cloudpickle
-    from unittest.mock import MagicMock
     from vessal.ark.shell.hull.cell.kernel import Kernel
-    from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
+    from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
-    # Create a mock old-format FrameRecord (non-dict, schema < current)
-    old_record = MagicMock()
-
-    # Create a snapshot with old format _frame_log (two-part format: header + body)
+    # Create a snapshot with old-format _frame_log list (pre-FrameStream) instead of FrameStream
     snap_path = tmp_path / "test.snap"
-    ns = {"_frame_log": [old_record], "_system_prompt": "test"}
+    ns = {"_frame_log": [{"schema_version": 0}], "_system_prompt": "test"}
     with open(snap_path, "wb") as f:
         cloudpickle.dump({}, f)   # header: empty _loaded_skills
         cloudpickle.dump(ns, f)   # body: namespace
 
-    # Restore and verify frame_log is cleared (incompatible format)
+    # Restore and verify _frame_stream is a fresh FrameStream (incompatible format re-initialized)
     k = Kernel()
     k.restore(str(snap_path))
 
-    frame_log = k.ns["_frame_log"]
-    assert frame_log == []
+    assert isinstance(k.ns["_frame_stream"], FrameStream)
+    assert k.ns["_frame_stream"].hot_frame_count() == 0
 
 
-def test_restore_keeps_current_schema_frame_log(tmp_path):
-    """restore() preserves _frame_log that is already at the current schema version."""
+def test_restore_keeps_current_schema_frame_stream(tmp_path):
+    """restore() preserves _frame_stream that is already a valid FrameStream."""
     import cloudpickle
     from vessal.ark.shell.hull.cell.kernel import Kernel
+    from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
     from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
 
-    current_frame = {
+    # Build a FrameStream with one committed frame
+    fs = FrameStream(k=16, n=8)
+    fs.commit_frame({
         "schema_version": FRAME_SCHEMA_VERSION,
         "number": 1,
+        "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
         "pong": {"think": "", "action": {"operation": "x = 1", "expect": ""}},
         "observation": {"stdout": "", "diff": "+x = 1", "error": None, "verdict": None},
-    }
+    })
 
     snap_path = tmp_path / "test.snap"
-    ns = {"_frame_log": [current_frame], "_system_prompt": "test"}
+    ns = {"_frame_stream": fs, "_system_prompt": "test"}
     with open(snap_path, "wb") as f:
         cloudpickle.dump({}, f)
         cloudpickle.dump(ns, f)
@@ -1090,9 +1093,9 @@ def test_restore_keeps_current_schema_frame_log(tmp_path):
     k = Kernel()
     k.restore(str(snap_path))
 
-    frame_log = k.ns["_frame_log"]
-    assert len(frame_log) == 1
-    assert frame_log[0]["schema_version"] == FRAME_SCHEMA_VERSION
+    assert isinstance(k.ns["_frame_stream"], FrameStream)
+    assert k.ns["_frame_stream"].hot_frame_count() == 1
+    assert k.ns["_frame_stream"]._hot[0][0]["schema_version"] == FRAME_SCHEMA_VERSION
 
 
 def test_snapshot_tracks_dropped_keys(tmp_path):

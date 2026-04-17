@@ -6,7 +6,7 @@
 #   run(pong, tracer)              single-frame execution: exec → expect → frame → commit
 #   prepare()                      per-frame init: update_signals → render → Ping
 #   exec_operation(operation, frame_number, tracer) -> ExecResult
-#                      execute operation code; does NOT increment _frame or append _frame_log
+#                      execute operation code; does NOT increment _frame or commit to _frame_stream
 #   eval_expect(expect, tracer)  -> Verdict
 #                      evaluate prediction assertions on a shallow copy of the namespace;
 #                      does NOT modify the real namespace
@@ -36,14 +36,12 @@ from vessal.ark.shell.hull.cell.protocol import (
     State,
     Verdict,
 )
+from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
 from vessal.ark.util.logging import Tracer
 
 logger = logging.getLogger(__name__)
-
-# Maximum number of frames retained in _frame_log. Oldest frames are trimmed when exceeded.
-_FRAME_LOG_MAX = 200
 
 
 def _utc_now() -> str:
@@ -103,10 +101,17 @@ class Kernel:
         ns["_render_config"] = None              # RenderConfig written by Hull; uses default when None
         ns["_wake"] = ""                         # wake reason; written by Hull.run()
 
+        # Hierarchical compaction config (must precede _frame_stream init)
+        ns["_compaction_k"] = 16                  # hot-bucket depth; frames before shift
+        ns["_compaction_n"] = 8                   # max cold-zone layers
+
         # Execution state
         ns["_frame"] = 0                          # current frame number; set by executor before execution
         ns["_ns_meta"] = {}                       # variable usage tracking; rewritten by executor each frame
-        ns["_frame_log"] = []                     # structured frame log; appended by Cell._commit_frame() each frame
+        ns["_frame_stream"] = FrameStream(
+            k=ns["_compaction_k"],
+            n=ns["_compaction_n"],
+        )
         ns["_signal_outputs"] = []               # populated by update_signals() each frame
 
         # Context utilization (written by renderer on each frame render)
@@ -129,10 +134,6 @@ class Kernel:
 
         # Mirror variable (updated by Cell._commit_frame())
         ns["_verdict"] = None                     # verdict from the previous frame
-
-        # Hierarchical compaction config
-        ns["_compaction_k"] = 16                  # hot-bucket depth; frames before shift
-        ns["_compaction_n"] = 8                   # max cold-zone layers
 
         # Frame drop count
         ns["_dropped_frame_count"] = 0            # number of frames dropped in this render; written by renderer
@@ -337,13 +338,10 @@ class Kernel:
                 for k in stale:
                     del _sys.modules[k]
             self.ns = cloudpickle.load(f)
-        self._migrate_frame_log()
+        self._migrate_snapshot()
 
     def _find_creation_operation(self, key: str) -> str:
-        """Search frame_log in reverse for the most recent operation that created a variable.
-
-        frame_log may be empty (first snapshot or cleared by schema migration),
-        in which case an empty string is returned.
+        """Search hot-zone frames in reverse for the most recent operation that created a variable.
 
         Args:
             key: Variable name.
@@ -351,23 +349,43 @@ class Kernel:
         Returns:
             The operation string that created the variable, or empty string if not found.
         """
-        for frame in reversed(self.ns.get("_frame_log", [])):
-            diff = frame.get("observation", {}).get("diff", "")
-            if f"+ {key}" in diff:
-                return frame.get("pong", {}).get("action", {}).get("operation", "")
+        fs = self.ns.get("_frame_stream")
+        if fs is None:
+            return ""
+        # Search all hot buckets newest-first: B_0 (newest) through B_4
+        for bucket in fs._hot:
+            for frame in reversed(bucket):
+                diff = frame.get("observation", {}).get("diff", "")
+                if f"+ {key}" in diff:
+                    return frame.get("pong", {}).get("action", {}).get("operation", "")
         return ""
 
-    def _migrate_frame_log(self) -> None:
-        """Check _frame_log schema version; clear it if incompatible."""
-        frame_log = self.ns.get("_frame_log", [])
-        if not frame_log:
+    def _migrate_snapshot(self) -> None:
+        """Clear per-run state whose schema version doesn't match.
+
+        For v6→v7, the flat _frame_log is dropped and _frame_stream is reinitialized.
+        No backfill is attempted.
+        """
+        # Drop stale _frame_log if present (v6 and earlier)
+        self.ns.pop("_frame_log", None)
+
+        fs = self.ns.get("_frame_stream")
+        if fs is None:
+            self.ns["_frame_stream"] = FrameStream(
+                k=self.ns.get("_compaction_k", 16),
+                n=self.ns.get("_compaction_n", 8),
+            )
             return
-        first = frame_log[0]
-        if isinstance(first, dict) and first.get("schema_version") == FRAME_SCHEMA_VERSION:
-            return
-        # Old format incompatible, clear
-        self.ns["_frame_log"] = []
-        logger.info("Cleared incompatible frame_log (schema < %d)", FRAME_SCHEMA_VERSION)
+        try:
+            d = fs.to_dict()
+            if d.get("schema_version") != FRAME_SCHEMA_VERSION:
+                raise ValueError("schema mismatch")
+        except Exception:
+            self.ns["_frame_stream"] = FrameStream(
+                k=self.ns.get("_compaction_k", 16),
+                n=self.ns.get("_compaction_n", 8),
+            )
+            logger.info("Cleared incompatible frame_stream (schema mismatch)")
 
     # ------------------------------------------------------------------ High-level interface
 
@@ -428,7 +446,7 @@ class Kernel:
         frame_number: int,
         ping: "Ping | None" = None,
     ) -> None:
-        """Construct FrameRecord, append to _frame_log, update verdict mirror.
+        """Construct FrameRecord, commit to _frame_stream, update verdict mirror.
 
         Args:
             pong:         Control signal from the reasoner.
@@ -447,8 +465,9 @@ class Kernel:
             pong=pong,
             observation=observation,
         )
-        frame_log = ns.setdefault("_frame_log", [])
-        frame_log.append(record.to_dict())
-        if len(frame_log) > _FRAME_LOG_MAX:
-            del frame_log[: len(frame_log) - _FRAME_LOG_MAX]
+        fs = ns.get("_frame_stream")
+        if fs is None:
+            fs = FrameStream(k=ns.get("_compaction_k", 16), n=ns.get("_compaction_n", 8))
+            ns["_frame_stream"] = fs
+        fs.commit_frame(record.to_dict())
         ns["_verdict"] = observation.verdict

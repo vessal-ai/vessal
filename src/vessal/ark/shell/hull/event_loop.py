@@ -153,9 +153,9 @@ class EventLoop:
             result = self._cell.step(self._tracer)
 
             if result.protocol_error is None:
-                frame_log = self._cell.get("_frame_log", [])
-                if frame_log:
-                    last_frame = frame_log[-1]
+                fs = self._cell.get("_frame_stream")
+                last_frame = fs._hot[0][-1] if (fs is not None and fs._hot[0]) else None
+                if last_frame is not None:
                     if frame_logger is not None:
                         frame_logger.write_frame(last_frame)
                     print_frame_line(last_frame)

@@ -271,18 +271,24 @@ class Hull:
         return list(self._cell.keys())
 
     def frames(self, after: int | None = None) -> list[dict]:
-        """Query the frame log.
+        """Query hot-zone frames from the frame stream.
 
         Args:
             after: Only return frames with number > after. Returns all if None.
 
         Returns:
-            A copy of the frame record list.
+            A copy of all hot-zone frame dicts, ordered oldest to newest.
         """
-        frame_log = self._cell.get("_frame_log", [])
+        fs = self._cell.get("_frame_stream")
+        if fs is None:
+            return []
+        # Flatten hot buckets oldest-first (B_4..B_0) into a single list
+        all_frames: list[dict] = []
+        for bucket in reversed(fs._hot):
+            all_frames.extend(bucket)
         if after is not None:
-            frame_log = [f for f in frame_log if f.get("number", 0) > after]
-        return list(frame_log)
+            all_frames = [f for f in all_frames if f.get("number", 0) > after]
+        return list(all_frames)
 
     def next_alarm(self) -> float | None:
         """Return the absolute timestamp of the Agent's next scheduled wake-up.

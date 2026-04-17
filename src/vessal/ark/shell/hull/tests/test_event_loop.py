@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from vessal.ark.shell.hull.event_loop import EventLoop
+from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 
 @pytest.fixture
@@ -15,7 +16,7 @@ def mock_cell():
         "_next_wake": None,
         "_frame": 0,
         "_signal_outputs": [],
-        "_frame_log": [],
+        "_frame_stream": FrameStream(),
     }
     cell.get.side_effect = lambda key, default=None: cell.ns.get(key, default)
     cell.set.side_effect = lambda key, value: cell.ns.__setitem__(key, value)

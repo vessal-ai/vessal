@@ -65,10 +65,10 @@ class Memory(SkillBase):
         self._persist()
 
     def drop(self, n: int) -> None:
-        """Physically delete the oldest n frames from _frame_log. Cold storage is not affected.
+        """Physically delete the oldest n frames from the hot zone. Cold storage is not affected.
 
         Save key information from old frames with memory.save() before calling this.
-        Keeps at least 1 frame. Prints a confirmation prompt before executing deletion.
+        Keeps at least 1 frame in the hot zone. Prints a confirmation before executing.
 
         Args:
             n: Number of frames to delete.
@@ -77,17 +77,28 @@ class Memory(SkillBase):
             raise RuntimeError("drop() requires a namespace reference; Memory must be initialized with ns")
         if n <= 0:
             return
-        frame_log = self._ns.get("_frame_log", [])
-        actual = min(n, max(len(frame_log) - 1, 0))
+        fs = self._ns.get("_frame_stream")
+        if fs is None:
+            print("⚠ No frame stream in namespace; nothing to delete")
+            return
+        total_hot = fs.hot_frame_count()
+        actual = min(n, max(total_hot - 1, 0))
         if actual <= 0:
-            print(f"⚠ Frame log only has {len(frame_log)} frame(s); nothing to delete")
+            print(f"⚠ Hot zone only has {total_hot} frame(s); nothing to delete")
             return
         print(
-            f"About to delete the oldest {actual} frame(s). Have you saved key information to memory?"
+            f"About to delete the oldest {actual} hot frame(s). Have you saved key information to memory?"
             f" If not, use memory.save() first."
         )
-        del frame_log[:actual]
-        print(f"Deleted {actual} frame(s) ({len(frame_log)} remaining). Cold storage unaffected.")
+        # Delete from oldest buckets first (B_4..B_0)
+        remaining = actual
+        for bucket in reversed(fs._hot):
+            while bucket and remaining > 0:
+                bucket.pop(0)
+                remaining -= 1
+            if remaining == 0:
+                break
+        print(f"Deleted {actual} frame(s) ({fs.hot_frame_count()} hot remaining). Cold storage unaffected.")
 
     def _signal(self) -> tuple[str, str] | None:
         """Per-frame: output memory entries + context pressure warning."""

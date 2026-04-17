@@ -9,6 +9,24 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
+from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
+
+
+def _frame_dict(number: int, **kwargs) -> dict:
+    return {
+        "schema_version": FRAME_SCHEMA_VERSION,
+        "number": number,
+        "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
+        "pong": {"think": "", "action": {"operation": kwargs.get("operation", ""), "expect": ""}},
+        "observation": {
+            "stdout": kwargs.get("stdout", ""),
+            "diff": kwargs.get("diff", ""),
+            "error": kwargs.get("error", None),
+            "verdict": None,
+        },
+    }
+
 
 def _make_hull_with_mock_cell(tmp_path):
     """Create a minimal Hull instance with Cell and LLM calls mocked.
@@ -141,11 +159,11 @@ class TestHullFrames:
     def test_frames_after_filters(self, tmp_path):
         """frames(after=N) returns only frames with number > N."""
         hull = _make_hull_with_mock_cell(tmp_path)
-        hull._cell.ns["_frame_log"] = [
-            {"number": 1, "data": "a"},
-            {"number": 2, "data": "b"},
-            {"number": 3, "data": "c"},
-        ]
+        fs = FrameStream()
+        fs.commit_frame(_frame_dict(1, diff="+a = 1"))
+        fs.commit_frame(_frame_dict(2, diff="+b = 2"))
+        fs.commit_frame(_frame_dict(3, diff="+c = 3"))
+        hull._cell.ns["_frame_stream"] = fs
         result = hull.frames(after=1)
         assert len(result) == 2
         assert result[0]["number"] == 2
@@ -153,7 +171,9 @@ class TestHullFrames:
     def test_frames_returns_copy(self, tmp_path):
         """frames() returns a copy; modifications do not affect internal state."""
         hull = _make_hull_with_mock_cell(tmp_path)
-        hull._cell.ns["_frame_log"] = [{"number": 1}]
+        fs = FrameStream()
+        fs.commit_frame(_frame_dict(1))
+        hull._cell.ns["_frame_stream"] = fs
         result = hull.frames()
         result.append({"number": 999})
-        assert len(hull._cell.ns["_frame_log"]) == 1
+        assert hull._cell.ns["_frame_stream"].hot_frame_count() == 1
