@@ -247,6 +247,23 @@ class ShellServer:
         )
         self._hot_reloader.start()
 
+        try:
+            from vessal.ark.shell.tui.recent import RecentProjects
+            RecentProjects().add(self._project_dir)
+        except Exception:
+            pass  # recent tracking is best-effort; never block startup
+
+        try:
+            import json as _json
+            runtime_dir = Path(self._project_dir) / "data"
+            runtime_dir.mkdir(exist_ok=True)
+            (runtime_dir / "runtime.json").write_text(
+                _json.dumps({"port": self._port, "host": self._host}),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
     def _spawn_hull(self) -> None:
         """Start Hull subprocess and wait for READY signal to confirm successful startup.
 
