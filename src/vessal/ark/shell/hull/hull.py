@@ -64,6 +64,7 @@ class Hull:
         self._init_skills(hull_cfg)
         self._init_prompts(renderer_cfg)
         self._init_loop(gates_cfg)
+        self._resume_pending_compaction()
 
     # ------------------------------------------------------------------ Initialization phases
 
@@ -205,8 +206,9 @@ class Hull:
         self._rewrite_runtime_owned()
 
         hooks = FrameHooks(
-            before_frame=lambda: self._rewrite_runtime_owned(),
-            snapshot=lambda: self.snapshot(),
+            before_frame=self._rewrite_runtime_owned,
+            after_frame=self._after_frame,
+            snapshot=self.snapshot,
         )
 
         self._event_loop = EventLoop(
@@ -505,6 +507,29 @@ class Hull:
                 self._soul_mtime = current_mtime
         self._cell.set("_soul", self._soul_text)
 
+        # Drain compaction result queue and apply to FrameStream
+        fs = self._cell.get("_frame_stream")
+        if fs is None:
+            return
+        results_to_apply: list[tuple[dict, int]] = []
+        aborted = False
+        while True:
+            try:
+                item = self._result_queue.get_nowait()
+            except queue.Empty:
+                break
+            record, layer = item
+            if record in ("skip", "error"):
+                aborted = True
+                continue
+            results_to_apply.append((record, layer))
+        if aborted and not results_to_apply:
+            fs.abort_compaction()
+        if results_to_apply:
+            fs.apply_results(results_to_apply)
+            self.snapshot()
+            self._compaction_frames_since_snapshot = 0
+
     # ------------------------------------------------------------------ Internal helpers
 
     def _ensure_log_readme(self) -> None:
@@ -571,6 +596,32 @@ trace = false  # disable to reduce IO
             print(f"{name} loaded — {description}")
         except Exception as e:
             raise RuntimeError(f"skill '{name}' failed to load: {e}") from e
+
+    def _after_frame(self) -> None:
+        """Called after each successful frame. Evaluates try_shift and submits compaction task if due."""
+        fs = self._cell.get("_frame_stream")
+        if fs is None:
+            return
+        frame_number = self._cell.get("_frame", 0)
+        task = fs.try_shift()
+        if task is None:
+            if len(fs._hot[0]) >= fs.k and fs.in_flight:
+                self._tracer.log(frame_number, "compaction.shift_blocked", "gauge", -1, "value=1")
+            return
+        self._thread_pool.submit(self._run_compaction_task, task, frame_number)
+
+    def _resume_pending_compaction(self) -> None:
+        """Re-submit any in-flight compaction that survived in the snapshot after a crash-restart."""
+        fs = self._cell.get("_frame_stream")
+        if fs is None:
+            return
+        if fs.compression_zone is None:
+            return
+        frame_number = self._cell.get("_frame", 0)
+        payload = list(fs.compression_zone)
+        task = {"layer": 0, "payload": payload}
+        self._thread_pool.submit(self._run_compaction_task, task, frame_number)
+        self._tracer.log(frame_number, "compaction.resumed", "event", 0, f"payload_n={len(payload)}")
 
     def _run_compaction_task(self, task: dict, frame_number: int) -> None:
         """Compaction worker body. Runs on the compaction thread. Must not touch ns."""
