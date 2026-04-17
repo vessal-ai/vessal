@@ -27,12 +27,40 @@ class _ProxyHandler(http.server.BaseHTTPRequestHandler):
     """
 
     def do_GET(self) -> None:
-        """Handle GET requests: intercept /events for SSE, forward rest to Hull."""
+        """Handle GET requests: intercept /events for SSE, /console/* static, forward rest to Hull."""
         path = self.path.split("?")[0]
         if path == "/events":
             self._stream_events()
             return
+        if path == "/console" or path.startswith("/console/"):
+            self._serve_console_static(path)
+            return
         self._proxy("GET")
+
+    def _serve_console_static(self, path: str) -> None:
+        import mimetypes
+        from pathlib import Path as _Path
+        import vessal
+
+        root = _Path(vessal.__file__).resolve().parent / "console_spa"
+        if path in ("/console", "/console/"):
+            rel = "index.html"
+        else:
+            rel = path[len("/console/"):]
+        target = (root / rel).resolve()
+        if root not in target.parents and target != root:
+            self.send_response(403); self.end_headers(); return
+        if target.is_dir():
+            target = target / "index.html"
+        if not target.exists():
+            self.send_response(404); self.end_headers(); return
+        mime, _ = mimetypes.guess_type(str(target))
+        data = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", mime or "application/octet-stream")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def _stream_events(self) -> None:
         """SSE streaming endpoint; iterates EventBus subscription until client disconnects."""
