@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from vessal.ark.shell.events import EventBus
+from vessal.ark.shell.hot_reload import HotReloader
 
 _logger = logging.getLogger(__name__)
 
@@ -181,6 +182,7 @@ class ShellServer:
         self._http_server: http.server.ThreadingHTTPServer | None = None
         self._monitor_thread: threading.Thread | None = None
         self._event_bus = EventBus()
+        self._hot_reloader: HotReloader | None = None
 
     @property
     def port(self) -> int:
@@ -237,6 +239,13 @@ class ShellServer:
             name="hull-monitor",
         )
         self._monitor_thread.start()
+
+        self._hot_reloader = HotReloader(
+            project_dir=Path(self._project_dir),
+            internal_port_getter=lambda: self._internal_port,
+            publish=self._event_bus.publish,
+        )
+        self._hot_reloader.start()
 
     def _spawn_hull(self) -> None:
         """Start Hull subprocess and wait for READY signal to confirm successful startup.
@@ -342,6 +351,8 @@ class ShellServer:
             except subprocess.TimeoutExpired:
                 self._hull_proc.kill()
                 self._hull_proc.wait()
+        if self._hot_reloader is not None:
+            self._hot_reloader.stop()
         if self._http_server:
             self._http_server.shutdown()
 
