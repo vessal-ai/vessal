@@ -283,6 +283,30 @@ class Hull:
         """Unload a Skill from the SkillManager registry."""
         self._skill_manager.unload(name)
 
+    def reload_soul(self) -> None:
+        """Force re-read of SOUL.md regardless of mtime.
+
+        Normal hot-reload is handled by _rewrite_runtime_owned's mtime check each
+        frame. This method is called by the file watcher to invalidate the cache
+        proactively (covers edge cases where two writes hit the same mtime tick).
+        """
+        if self._soul_path.exists():
+            self._soul_text = self._soul_path.read_text(encoding="utf-8")
+            self._soul_mtime = self._soul_path.stat().st_mtime
+
+    def reload_skill(self, name: str) -> bool:
+        """Reload a skill by name. Returns True if the skill was reloaded."""
+        # NOTE: loaded_names is a @property on SkillManager (no parens).
+        if name not in self._skill_manager.loaded_names:
+            return False
+        try:
+            self._stop_skill_server(name)
+        except Exception:
+            pass
+        self._skill_manager.reload(name)
+        self._load_and_instantiate_skill(name)
+        return True
+
     def get_ns(self, key: str) -> Any:
         """Get a value from Cell namespace."""
         return self._cell.get(key)
@@ -395,6 +419,15 @@ class Hull:
         if method == "GET" and path == "/logs/raw":
             after = body.get("after") if body else None
             return self._handle_logs_raw(after=after)
+        if method == "POST" and path == "/reload/soul":
+            self.reload_soul()
+            return 200, {"status": "soul_reloaded"}
+        if method == "POST" and path == "/reload/skill":
+            name = (body or {}).get("name")
+            if not isinstance(name, str) or not name:
+                return 400, {"error": "missing 'name' in body"}
+            ok = self.reload_skill(name)
+            return (200 if ok else 404), {"status": "skill_reloaded" if ok else "not_loaded", "name": name}
 
         return 404, {"error": f"not found: {method} {path}"}
 

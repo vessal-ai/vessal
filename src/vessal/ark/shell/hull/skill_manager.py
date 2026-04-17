@@ -294,6 +294,14 @@ class SkillManager:
 
         self._loaded.pop(name, None)
 
+    def reload(self, name: str) -> None:
+        """Reload a skill's module by unloading it; caller re-instantiates via load().
+
+        Module name is not explicitly tracked, so unload() clears sys.modules
+        entries, then the next load() call imports fresh.
+        """
+        self.unload(name)
+
     @property
     def loaded_names(self) -> list[str]:
         """List of currently loaded skill names."""
