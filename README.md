@@ -20,6 +20,23 @@ Every major agent framework gives the LLM a menu of functions and lets it pick. 
 **Vessal's answer: give the agent a Code, not a Menu.** Python is the sole action mechanism — not "a code interpreter among other tools," but the *only* way to act. The upper bound of what the agent can do is the programs the model can write. That bound rises with every generation of LLMs. The framework itself never becomes the bottleneck.
 
 
+## 60-Second First Agent
+
+```bash
+pip install vessal
+vessal create                  # 6-question wizard (Enter × 6 to accept defaults)
+cd my-agent && vessal          # bare vessal = interactive TUI picker
+# pick "Run dev" → Console opens at http://127.0.0.1:8420/console/
+```
+
+That's it. Chat with the agent in the left pane; watch its thinking in
+the right pane (collapsible for non-developers). Edit `SOUL.md` and the
+next turn picks it up without restart. Edit `skills/*.py` and the
+affected skill reloads in place. Changes to `hull.toml` surface as an
+yellow "restart required" banner in the Console top bar.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -41,11 +58,11 @@ pipx install vessal
 ### Create a new agent
 
 ```bash
-vessal init my-agent
+vessal create        # interactive 6-question wizard (Enter × 6 to accept defaults)
 cd my-agent
 ```
 
-`vessal init` automatically creates a `.venv` and installs dependencies. Pass `--no-venv` to skip this step.
+`vessal create` runs a wizard that scaffolds the project, sets up `.env`, and gitignores your secrets. For a non-interactive scaffold, `vessal init my-agent` also works and accepts `--no-venv` to skip virtual-env creation.
 
 > **Tip:** `vs` is a shorthand for `vessal`. All commands work with either name — `vs start`, `vs stop`, `vs skill init`, etc.
 
@@ -80,14 +97,11 @@ vessal start
 You'll see:
 
 ```
-Shell server started: http://0.0.0.0:8420
-  Log viewer: http://localhost:8420/logs
-  Chat UI: http://127.0.0.1:8420/skills/chat/
+Shell server started: http://127.0.0.1:8420
+  Console: http://127.0.0.1:8420/console/
 ```
 
-**Open the Chat UI in your browser** — that's your conversation interface. Type a message, and the agent wakes up, writes Python, executes it, observes the results, and replies. Frame by frame, it works through your request until it's done.
-
-The Log viewer shows the raw frame stream — what the agent sees, thinks, and executes each step.
+**Open the Console in your browser** — that's your unified interface. The left pane is chat; the right pane shows the agent's current frame (collapsible). Type a message, and the agent wakes up, writes Python, executes it, observes the results, and replies.
 
 ### What just happened?
 
@@ -305,8 +319,6 @@ These commands are for programmatic access — shell scripts, CI pipelines, or o
 
 | Command | Description |
 |---------|-------------|
-| `vessal send <message>` | Post a message to the agent's chat inbox |
-| `vessal read` | Poll the agent's chat outbox for replies |
 | `vessal status` | Query agent state (idle/active, frame count) |
 | `vessal once --goal "..."` | Single-run mode: inject goal, run one cycle, exit |
 

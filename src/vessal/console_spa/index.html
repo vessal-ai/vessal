@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Vessal Console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <script defer src="assets/alpine.min.js"></script>
+  <script type="module" src="assets/app.js"></script>
+</head>
+<body>
+  <div id="app" x-data="consoleApp()" x-init="init()">
+    <header class="top-nav">
+      <span class="brand">Vessal</span>
+      <span class="project" x-text="project"></span>
+      <span class="state" :class="state.sleeping ? 'idle' : 'active'"
+            x-text="state.sleeping ? '● idle' : '● active'"></span>
+    </header>
+
+    <template x-if="banner">
+      <div class="banner" :class="banner.level" x-text="banner.text"></div>
+    </template>
+
+    <div class="layout">
+      <nav class="activity-bar" aria-label="views">
+        <template x-for="v in views" :key="v.id">
+          <button class="nav-btn"
+                  :class="{active: current === v.id}"
+                  @click="current = v.id"
+                  :title="v.label"
+                  x-text="v.icon"></button>
+        </template>
+      </nav>
+
+      <main class="main">
+        <template x-if="current === 'chat'">
+          <section class="chat-layout" :class="{collapsed: rightCollapsed}">
+            <div class="chat-main">
+              <div class="chat-log">
+                <template x-for="m in messages" :key="m.ts || Math.random()">
+                  <div class="msg" :class="m.role">
+                    <strong x-text="m.role + ':'"></strong>
+                    <span x-text="m.content"></span>
+                  </div>
+                </template>
+              </div>
+              <form class="chat-input" @submit.prevent="send()">
+                <input type="text" x-model="input" placeholder="Type a message..."
+                       aria-label="Message input" autofocus />
+                <button type="submit">Send</button>
+              </form>
+            </div>
+            <aside class="chat-side" x-show="!rightCollapsed">
+              <header>
+                <span>🎞️ Current Frame</span>
+                <button class="collapse-btn" @click="toggleRight()" title="Collapse">⊟</button>
+              </header>
+              <div id="frame-pinned" class="frame-container"></div>
+            </aside>
+            <button class="expand-btn" x-show="rightCollapsed" @click="toggleRight()"
+                    title="Expand pinned frame">⊡</button>
+          </section>
+        </template>
+        <template x-if="current === 'frames'">
+          <section class="frames-layout" x-init="loadFrames()">
+            <ol class="frame-list">
+              <template x-for="f in frames" :key="f.number">
+                <li :class="{active: selectedFrame === f.number}"
+                    @click="selectFrame(f)">
+                  <span class="n" x-text="'#' + f.number"></span>
+                  <span class="excerpt" x-text="(f.pong?.think || f.pong?.action?.operation || '').toString().slice(0, 80)"></span>
+                </li>
+              </template>
+            </ol>
+            <div class="frame-detail" id="frame-detail-pane"></div>
+          </section>
+        </template>
+        <template x-if="current === 'state'">
+          <section id="state-view"><p class="placeholder">State — coming soon</p></section>
+        </template>
+        <template x-if="current === 'logs'">
+          <section id="logs-view"><p class="placeholder">Logs — coming soon</p></section>
+        </template>
+        <template x-if="current === 'market'">
+          <section id="market-view"><p class="placeholder">Skill Market — coming soon</p></section>
+        </template>
+        <template x-for="v in views.filter(x => x.id.startsWith('skill:'))" :key="v.id">
+          <section x-show="current === v.id" class="skill-iframe-wrap">
+            <iframe :src="v.url" class="skill-iframe"></iframe>
+          </section>
+        </template>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

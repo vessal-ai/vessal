@@ -6,8 +6,6 @@ Runtime commands (require ARK):
   vessal start     Start the Agent server (Shell + Hull + Companions)
   vessal stop      Stop the Agent server
   vessal status    Query Agent status
-  vessal send      Send a message to the Agent inbox
-  vessal read      Read Agent replies
   vessal once      Single-run mode (--goal required)
 
 Container commands (require Docker):
@@ -50,16 +48,6 @@ def main() -> None:
     status_parser = subparsers.add_parser("status", help="Query Agent status")
     status_parser.add_argument("--port", type=int, default=8420, help="Shell port")
 
-    # vessal send
-    send_parser = subparsers.add_parser("send", help="Send a message to the Agent inbox")
-    send_parser.add_argument("message", type=str, help="Message content")
-    send_parser.add_argument("--port", type=int, default=8420, help="Shell port")
-
-    # vessal read
-    read_parser = subparsers.add_parser("read", help="Read Agent replies")
-    read_parser.add_argument("--port", type=int, default=8420, help="Shell port")
-    read_parser.add_argument("--wait", type=float, default=0, help="Seconds to wait")
-
     # vessal once (single-run mode)
     once_parser = subparsers.add_parser("once", help="Run Agent once (exit after completing one goal)")
     once_parser.add_argument("--goal", type=str, required=True, help="Goal message for the task")
@@ -88,6 +76,10 @@ def main() -> None:
         "--no-venv", action="store_true",
         help="Skip virtual environment creation and dependency installation"
     )
+
+    # vessal create (interactive wizard)
+    create_parser = subparsers.add_parser("create", help="Interactive 6-question new-project wizard")
+    create_parser.add_argument("name", nargs="?", default=None, help="Project name (skipped in wizard if provided)")
 
     # vessal skill
     skill_parser = subparsers.add_parser("skill", help="Skill management")
@@ -134,10 +126,6 @@ def main() -> None:
         _cmd_stop(args)
     elif args.command == "status":
         _cmd_status(args)
-    elif args.command == "send":
-        _cmd_send(args)
-    elif args.command == "read":
-        _cmd_read(args)
     elif args.command == "once":
         _cmd_once(args)
     elif args.command == "build":
@@ -146,6 +134,9 @@ def main() -> None:
         _cmd_container_run(args)
     elif args.command == "init":
         _cmd_init(args)
+    elif args.command == "create":
+        from vessal.ark.shell.tui.create_wizard import run as wizard_run
+        sys.exit(wizard_run(Path.cwd()))
     elif args.command == "skill":
         if args.skill_command == "init":
             _cmd_skill_init(args)
@@ -167,6 +158,9 @@ def main() -> None:
             skill_parser.print_help()
             sys.exit(1)
     else:
+        if args.command is None:
+            from vessal.ark.shell.tui.picker import run as picker_run
+            sys.exit(picker_run(Path.cwd()))
         parser.print_help()
         sys.exit(1)
 
@@ -187,16 +181,6 @@ def _cmd_stop(args: argparse.Namespace) -> None:
 def _cmd_status(args: argparse.Namespace) -> None:
     from vessal.ark.shell.cli import _cmd_status as shell_status
     shell_status(args)
-
-
-def _cmd_send(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli import _cmd_send as shell_send
-    shell_send(args)
-
-
-def _cmd_read(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli import _cmd_read as shell_read
-    shell_read(args)
 
 
 def _cmd_once(args: argparse.Namespace) -> None:
@@ -298,3 +282,7 @@ def _cmd_skill_list(args: argparse.Namespace) -> None:
 def _cmd_skill_publish(args: argparse.Namespace) -> None:
     from vessal.ark.shell.cli import _cmd_skill_publish as shell_skill_publish
     shell_skill_publish(args)
+
+
+if __name__ == "__main__":
+    main()

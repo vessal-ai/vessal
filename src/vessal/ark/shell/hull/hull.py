@@ -283,6 +283,30 @@ class Hull:
         """Unload a Skill from the SkillManager registry."""
         self._skill_manager.unload(name)
 
+    def reload_soul(self) -> None:
+        """Force re-read of SOUL.md regardless of mtime.
+
+        Normal hot-reload is handled by _rewrite_runtime_owned's mtime check each
+        frame. This method is called by the file watcher to invalidate the cache
+        proactively (covers edge cases where two writes hit the same mtime tick).
+        """
+        if self._soul_path.exists():
+            self._soul_text = self._soul_path.read_text(encoding="utf-8")
+            self._soul_mtime = self._soul_path.stat().st_mtime
+
+    def reload_skill(self, name: str) -> bool:
+        """Reload a skill by name. Returns True if the skill was reloaded."""
+        # NOTE: loaded_names is a @property on SkillManager (no parens).
+        if name not in self._skill_manager.loaded_names:
+            return False
+        try:
+            self._stop_skill_server(name)
+        except Exception:
+            pass
+        self._skill_manager.reload(name)
+        self._load_and_instantiate_skill(name)
+        return True
+
     def get_ns(self, key: str) -> Any:
         """Get a value from Cell namespace."""
         return self._cell.get(key)
@@ -377,8 +401,15 @@ class Hull:
         # Built-in routes
         if method == "GET" and path == "/status":
             return 200, self.status()
-        if method == "GET" and path == "/frames":
-            after = body.get("after")
+        if method == "GET" and path.startswith("/frames"):
+            after = None
+            if "?" in path:
+                from urllib.parse import parse_qs, urlparse
+                qs = parse_qs(urlparse(path).query)
+                if "after" in qs:
+                    after = int(qs["after"][0])
+            if after is None:
+                after = (body or {}).get("after")
             return 200, {"frames": self.frames(after=after)}
         if method == "POST" and path == "/wake":
             reason = body.get("reason", "external")
@@ -395,21 +426,31 @@ class Hull:
         if method == "GET" and path == "/logs/raw":
             after = body.get("after") if body else None
             return self._handle_logs_raw(after=after)
+        if method == "POST" and path == "/reload/soul":
+            self.reload_soul()
+            return 200, {"status": "soul_reloaded"}
+        if method == "POST" and path == "/reload/skill":
+            name = (body or {}).get("name")
+            if not isinstance(name, str) or not name:
+                return 400, {"error": "missing 'name' in body"}
+            ok = self.reload_skill(name)
+            return (200 if ok else 404), {"status": "skill_reloaded" if ok else "not_loaded", "name": name}
+
+        if method == "GET" and path == "/skills/ui":
+            entries = []
+            for name in self._skill_manager.loaded_names:
+                skill_dir = self._skill_manager.skill_dir(name)
+                if skill_dir and (Path(skill_dir) / "ui" / "index.html").exists():
+                    entries.append({"name": name, "url": f"/skills/{name}/ui/index.html"})
+            return 200, {"skills": entries}
 
         return 404, {"error": f"not found: {method} {path}"}
 
     def _handle_logs_viewer(self) -> tuple[int, "StaticResponse"]:
-        """GET /logs — Return the HTML viewer content.
-
-        Returns:
-            (200, StaticResponse) containing viewer.html content.
-        """
+        """GET /logs — Redirect to /console/ (unified Console SPA)."""
         from vessal.ark.shell.hull.hull_api import StaticResponse
-        viewer_path = Path(__file__).parent.parent.parent / "util" / "logging" / "viewer.html"
-        if not viewer_path.exists():
-            return 404, StaticResponse(b"viewer.html not found", "text/plain")
-        content = viewer_path.read_bytes()
-        return 200, StaticResponse(content, "text/html; charset=utf-8")
+        body = b'<meta http-equiv="refresh" content="0;url=/console/">Redirecting to Console...'
+        return 200, StaticResponse(body, "text/html; charset=utf-8")
 
     def _handle_logs_raw(self, after: int | None = None) -> tuple[int, "StaticResponse"]:
         """GET /logs/raw[?after=N] — Return frames.jsonl content (supports incremental reads).
