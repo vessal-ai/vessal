@@ -68,7 +68,7 @@
                 <li :class="{active: selectedFrame === f.number}"
                     @click="selectFrame(f)">
                   <span class="n" x-text="'#' + f.number"></span>
-                  <span class="excerpt" x-text="(f.think || f.action || '').toString().slice(0, 80)"></span>
+                  <span class="excerpt" x-text="(f.pong?.think || f.pong?.action?.operation || '').toString().slice(0, 80)"></span>
                 </li>
               </template>
             </ol>

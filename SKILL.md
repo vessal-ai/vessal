@@ -11,14 +11,21 @@ skills/<name>/
 └── server.py       # (optional) HTTP sub-server for inbox/outbox routes
 ```
 
-## SKILL.md Frontmatter
+## SKILL.md Frontmatter (v1 schema)
 
 ```yaml
 ---
 name: my-skill
-description: One-line description shown to the LLM
+version: "0.1.0"
+description: "Functional description, 15 words or fewer"
+author: ""
+license: "Apache-2.0"
+requires:
+  skills: []
 ---
 ```
+
+`name` and `description` are the only required fields. The remaining fields are used by `vessal skill check` and SkillHub publishing. Run `vessal skill check <path>` to validate before publishing.
 
 ## skill.py
 

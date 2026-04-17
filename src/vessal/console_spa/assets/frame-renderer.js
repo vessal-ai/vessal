@@ -11,7 +11,7 @@ export function renderFrame(container, frame) {
 
   const h = document.createElement("div");
   h.className = "frame-header";
-  h.textContent = `Frame #${frame.number ?? "?"}`;
+  h.textContent = `Frame #${frame.number ?? "?"}${frame.wake ? "  ·  " + frame.wake : ""}`;
   container.appendChild(h);
 
   if (frame.pong) {
