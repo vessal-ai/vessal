@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 from vessal.ark.shell.hull.cell import Cell
+from vessal.ark.shell.hull.cell.kernel.compression_parser import CompactionParseError, parse_compaction_json
 from vessal.ark.shell.hull.event_loop import EventLoop, FrameHooks
 from vessal.ark.shell.hull.skills_manager import SkillsManager
 from vessal.ark.shell.hull.skill_manager import SkillManager
@@ -570,6 +571,41 @@ trace = false  # disable to reduce IO
             print(f"{name} loaded — {description}")
         except Exception as e:
             raise RuntimeError(f"skill '{name}' failed to load: {e}") from e
+
+    def _run_compaction_task(self, task: dict, frame_number: int) -> None:
+        """Compaction worker body. Runs on the compaction thread. Must not touch ns."""
+        layer = task["layer"]
+        payload = task["payload"]
+        if not payload:
+            self._result_queue.put(("skip", layer))
+            return
+        ping = self._build_compression_ping(payload, layer)
+        try:
+            pong, _p, _c = self._compression_core.run(ping, tracer=self._tracer, frame=frame_number)
+            raw_json = pong.action.operation
+            record = parse_compaction_json(raw_json, layer=layer, compacted_at=frame_number)
+            self._result_queue.put((record.to_dict(), layer))
+        except (CompactionParseError, Exception) as e:
+            self._tracer.log(frame_number, "compaction.error", "worker", -1, f"layer={layer} err={e!r}")
+            self._result_queue.put(("error", layer))
+
+    def _build_compression_ping(self, payload: list[dict], layer: int) -> "Ping":
+        """Assemble a compression Ping from a stripped frame or cold record payload."""
+        from vessal.ark.shell.hull.cell.protocol import Ping, State
+        from vessal.ark.shell.hull.cell.kernel.render._frame_render import project_frame_dict
+        from vessal.ark.shell.hull.cell.kernel.render._cold_render import project_compaction_record
+
+        if layer == 0:
+            body = "\n\n".join(project_frame_dict(f) for f in payload)
+        else:
+            body = "\n\n".join(project_compaction_record(r) for r in payload)
+        return Ping(
+            system_prompt=self._compression_prompt,
+            state=State(
+                frame_stream="══════ frame stream ══════\n" + body,
+                signals="",
+            ),
+        )
 
     def _activate_venv(self) -> None:
         """Add the project .venv's site-packages to sys.path.
