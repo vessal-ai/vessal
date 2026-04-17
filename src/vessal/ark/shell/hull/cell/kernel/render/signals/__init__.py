@@ -10,7 +10,6 @@ Signal function protocol: fn(ns: dict) -> str
 """
 
 from vessal.ark.shell.hull.cell.kernel.render.signals import (
-    compressed_history,
     dropped_keys,
     errors,
     namespace_dir,
@@ -22,7 +21,6 @@ BASE_SIGNALS: list[tuple[str, callable]] = [
     ("verdict", verdict.render),
     ("namespace directory", namespace_dir.render),
     ("system", system_vars.render),
-    ("history summary", compressed_history.render),
     ("reconstruction hint", dropped_keys.render),
     ("errors", errors.render),
 ]

@@ -1,5 +1,7 @@
 # 6. Cache Coordination
 
+> **TL;DR.** Modern agent frameworks systematically destroy the KV cache that inference engines maintain, and users pay for the computation twice. Five destruction patterns, all avoidable, reduce to five context-construction principles (P1–P5). Applied to Vessal, they yield a purified system_prompt, hierarchical compaction of the frame stream, and a clean path from framework-only tricks to end-to-end model–engine coordination.
+
 The previous chapters answered how an Agent thinks and acts. This chapter answers a question the entire industry has overlooked: how much of the computation behind that thinking is simply wasted?
 
 The answer is unsettling. The computation that current Agent frameworks trigger on inference engines far exceeds what the task itself requires — not because models are too large or contexts too long, but because a structural fracture exists between Agent frameworks and inference engines. The two have evolved independently, with no information channel between them. The KV Cache that inference engines carefully maintain gets systematically destroyed by the way Agent frameworks construct their contexts.
@@ -92,7 +94,7 @@ graph TD
     M5 --> WASTE["compute wasted<br/>cache capacity consumed<br/>(no direct cache invalidation)"]
 ```
 
-Of these five patterns, Vessal's frame architecture naturally avoids Pattern 3 (the frame loop does not use dialogue-style context — there is no tool call insertion). It avoids the *problem* described by Pattern 5 — low information density — through the frame protocol's structured FrameRecord format, which enforces a determinate per-frame structure and prevents the unbounded growth of low-value content. Pattern 5 does not destroy the KV Cache directly; it wastes compute and cache capacity by filling the context with redundant, low-density tokens. Vessal avoids this problem structurally, not by preserving cache entries that would otherwise be invalidated. Patterns 1, 2, and 4 — the three patterns that cause direct cache destruction — remain to be addressed.
+Vessal's frame architecture sidesteps two of the five patterns by construction. The frame loop is not dialogue-shaped, so Pattern 3 (tool call insertion) cannot happen. The FrameRecord format is structured and bounded, so Pattern 5 (density bloat) never gets off the ground — low-value tokens have nowhere to accumulate. Patterns 1, 2, and 4 — the three that actually invalidate cache — are what this chapter addresses.
 
 More importantly, these patterns reveal a symmetric information gap.
 
@@ -258,85 +260,194 @@ Under this structure, system_prompt does not change at any point during the sess
 To borrow CPU cache terminology: system_prompt is the hot data that permanently resides in L1 Cache and is never evicted. frame_stream is the data in L2 Cache growing linearly along a timeline, cold only at the tail. signals are register-level ephemeral data that miss on every access. Ordered from highest to lowest cache affinity, this is a precise implementation of P2 (Stability Layering).
 
 
-### 6.4.2 Reverse Compression: The Three-Segment Model
+### 6.4.2 Hierarchical Compaction
 
-The frame stream grows without bound and will eventually exceed the context window budget. Compression is inevitable — the question is how.
+§6.4.1 made `system_prompt` byte-stable for the lifetime of the session. What remains is the frame stream — a structure that has to keep growing. A ten-million-frame session will not fit in any context window, no matter how large. Compression is unavoidable. The real question is how to compress without wrecking the prefix cache, and how to compress in a way that itself scales as the session runs longer.
 
-The traditional approach: compress from the oldest frames.
+**Why a three-segment model is not enough.**
 
-```
-Before:  [F1][F2][F3]...[F98][F99][F100]
-After:   [Summary_1-30][F31]...[F98][F99][F100]
-→ prefix changes from [F1] to [Summary_1-30]
-→ Prefix Cache fully invalidated
-```
+An earlier Vessal design proposed `[oldest raw | middle summary | latest raw]`: preserve the prefix, preserve recent working memory, and compress the middle. This obeys P5 at small scale. Two flaws surface as soon as sessions run long:
 
-This violates P5. The oldest frames are part of the Ping prefix; their KV Cache is the most valuable in the session — every frame's request opens with them, and every frame hits their cache. Compressing the oldest frames is equivalent to destroying the entire cache foundation.
+- **Middle grows without bound.** Sessions extend monotonically. No matter what ratio the summary achieves, middle keeps accumulating. At ten million frames it overruns any window.
+- **The oldest/middle boundary is ill-defined.** No principled rule says where oldest ends and middle begins. Whatever heuristic is picked becomes an arbitrary implementation choice that varies between runs.
 
-Vessal reverses the compression direction: **compress from the newest frames**.
+The deeper problem is that three-segment compression has a single axis: space. It compresses once. It has no mechanism to compress the compressed output, which is what open-ended operation demands. **Compression has to be recursive.**
 
-```
-Before:  [F1][F2][F3]...[F98][F99][F100]
-After:   [F1][F2][F3]...[F70][Summary_71-100]
-→ prefix [F1]..[F70] unchanged
-→ cache hit through F70
-```
+**The key move: physical position ≠ logical time.**
 
-The core insight: old frames are part of the prefix — keeping old frames means keeping cache. New frames were just added; the engine has not yet built cache entries for them, so compressing them incurs no cache loss.
+The trick is to separate two orderings that frameworks usually conflate:
 
-But the newest frames are the Agent's working memory. Unconditionally compressing the newest frames may degrade the Agent's understanding of recent events. The solution is a three-segment structure:
+- *Logical time* orders frames by when they happened. The oldest frames should be compressed first — that is just freshness.
+- *Physical position* orders content by where it sits in the Ping. Content at the prefix gets cache hits; content at the tail does not.
 
-```
-[oldest — original text | middle — compressed summary | latest N frames — original text]
- └── preserve prefix      └── save token budget         └── preserve working memory
-```
+The insight is to let these two orderings disagree on purpose. Compressed material is *placed by how recently it was last rewritten*, not by the age of the content it represents. The layer that has sat untouched the longest goes closest to the prefix, regardless of whether it holds frame 1 or frame 10,000,000.
+
+Log-structured file systems and LSM-tree databases have exploited this for decades: on-disk layout is not chronological layout. The index that maintains logical order is cheap; the savings from stable physical layout are enormous. Hierarchical compaction borrows that trick wholesale.
+
+**Three zones.**
 
 ```mermaid
-stateDiagram-v2
-    [*] --> latest: new frame written
+flowchart LR
+    SP["system_prompt<br/>invariant"] --> LN["L_n<br/>deepest cold layer"]
+    LN --> LDOT["..."]
+    LDOT --> L0["L_0<br/>shallowest cold layer"]
+    L0 --> CZ["compression<br/>zone"]
+    CZ --> B4["B_4"]
+    B4 --> B3["B_3"]
+    B3 --> B2["B_2"]
+    B2 --> B1["B_1"]
+    B1 --> B0["B_0<br/>raw, newest"]
+    B0 --> SIG["signals<br/>rewritten per frame"]
 
-    latest --> middle: after accumulating frames\ntrigger compression
-    note right of latest
-        retain original text
-        working memory
-    end note
-
-    middle --> middle: continuously receives\ncompressed frames
-    note right of middle
-        compress to summary\nsave token budget
-    end note
-
-    middle --> oldest: oldest segment\nexhausts budget, freezes
-    note right of oldest
-        permanently retain original\nnever modify\ncache anchor
-    end note
-
-    oldest --> [*]: session ends
+    style SP fill:#c8e6c9
+    style LN fill:#c8e6c9
+    style LDOT fill:#c8e6c9
+    style L0 fill:#dcedc8
+    style CZ fill:#fff3e0
+    style B4 fill:#fff3e0
+    style B3 fill:#fff3e0
+    style B2 fill:#fff3e0
+    style B1 fill:#fff3e0
+    style B0 fill:#ffe0b2
+    style SIG fill:#ffccbc
 ```
 
-**oldest segment**: the oldest frames are kept as original text, unchanged. This is the highest-value cache region in the entire Ping — every frame's request opens with these frames, and every frame hits their cache. Never compress.
+Left to right, rewrite frequency increases monotonically. The pairing of rewrite frequency with physical position is the load-bearing invariant of the entire design.
 
-**middle segment**: intermediate frames are compressed into summaries. These frames are no longer in the Agent's recent working memory, and they no longer sit at the prefix position (because the oldest segment is already long enough). Compressing them recovers token budget; the information loss has limited impact on current decisions.
+- **Cold zone — `L_0 … L_n`.** Logarithmic layers of semantic summaries. L_0 is the shallowest; each deeper layer summarizes k entries of the layer above it. Deeper layers have exponentially longer rewrite periods and behave, for practical purposes, as permanent prefix.
+- **Hot zone — `B_0 … B_4` plus a compression zone.** The recent window, held either raw or partially stripped. `B_0` holds the k newest frames in full. Each older bucket has already shed a field via mechanical stripping. The compression zone queues k frames awaiting LLM summarization into a new L_0 entry.
+- **Signals.** Rewritten every frame, at the tail. Never cached. Covered by P3.
 
-**latest segment**: the most recent N frames are kept as original text. This is the working memory the Agent is actively using. The value of N requires empirical tuning — too small and recent context is lost, too large and there is insufficient compression headroom.
+A fourth zone lives off the Ping:
 
-Execution: use a compression Skill to guide the Agent through compression itself. Starting from the newest frames, the Agent judges whether recent frames can be condensed into a more compact description. If so, a multi-frame summary is placed into the frame record. The FrameRecord data structure is extended to support both single-frame and multi-frame aggregation — one record can carry either the raw content of a single frame or a compressed summary spanning multiple frames.
+- **Static storage.** Every raw frame is appended to disk as it is produced. This is the absolute backing store. "Not forgotten" means recoverable from static storage, not present in the Ping. In-Ping structure is an active working window; durability is somebody else's job.
 
-This design has an unexpected positive effect: the summary produced by compressing recent frames may have higher information density than the original scattered frame records. The Agent has just processed those frames; forcing a summary is a mandatory information integration pass that can actually improve decision-making about recent events.
+**Two-stage compression.**
+
+Compression decomposes along a second, orthogonal axis — who is doing the work:
+
+| Stage | Triggered at | Cost | What it does |
+|---|---|---|---|
+| Mechanical stripping | bucket boundaries (hot zone) | zero LLM calls | Deterministic field removal along a fixed schema |
+| Semantic summarization | layer boundaries (cold zone commits) | one LLM call per k entries | Cross-frame pattern extraction into a fixed schema |
+
+Mechanical stripping handles information decay inside the hot zone: as a frame ages from bucket to bucket, less-referenced fields are shed on a fixed schedule. Semantic summarization handles pattern extraction across buckets: once the compression zone fills with k stripped frames, the LLM folds them into a single summary, which becomes a new L_0 entry. The two stages never overlap — they act on disjoint parts of the structure at disjoint moments.
+
+**Stripping gradient.**
+
+Fields fall away in order of cross-frame reference frequency:
+
+| Bucket | Dropped | Kept |
+|---|---|---|
+| B_0 (k newest) | — | full: `think`, `operation`, `expect`, `observation`, `signals` |
+| B_1 | `think` | `operation`, `expect`, `observation`, `signals` |
+| B_2 | `signals` | `operation`, `expect`, `observation` |
+| B_3 | `expect` and verification metadata | `operation`, `observation` |
+| B_4 | `observation` | **complete operation code** |
+| compression zone | — | k stripped frames queued |
+| → L_0 | whole bucket collapsed | one schema-v1 record |
+
+`B_4` keeps the operation code in full, not a signature. "What I did" is the minimum faithful residue of a frame, and keeping full code over four frames costs little. Everything more expensive — model reasoning, verification metadata, observations — has already gone.
+
+The alignment that makes this work: every stripping step happens at a bucket boundary, i.e., on the same clock as compaction. No bucket ever mutates mid-life. The only moments the prefix bytes can shift are compaction events themselves — not every frame, not arbitrary points in between.
+
+**Semantic schema.**
+
+Every semantic summarization produces a record in a fixed structured form:
+
+```yaml
+range: "t=N..M"            # frame-number interval covered
+intent: "..."              # the batch's overall intent (one sentence)
+operations: [...]          # ≤4 operation summaries
+outcomes: "..."            # what actually happened (1-2 sentences)
+artifacts: [...]           # ≤4 persistent outputs (files, variables, IDs)
+notable: "..."             # optional: errors, anomalies, surprises
+```
+
+The schema is recursive. At L_0, `operations` summarizes four raw frames. At L_1, `operations` summarizes four sub-themes — each being the `intent` of an L_0 entry beneath it. Fields stay fixed; semantic abstraction rises with depth. That is what makes the structure scale: the shape of a record does not change from layer to layer.
+
+Bounded list widths (both `operations` and `artifacts` capped at four) keep record length nearly constant, so layers at the same depth stay structurally comparable across sessions.
+
+**Compaction rule.**
+
+One rule, applied at every layer:
+
+> When a layer holds k entries, the oldest k collapse into a single entry in the layer below, and the layer resets.
+
+Cascading is strict serial. Layer `L_{i+1}` consumes the output of `L_i`; running them in parallel would race on a semantic dependency. Cascade depth is bounded by `log_k(total frames)` — on the order of 8-10 steps for ten million frames at k = 4.
+
+**Shift gating.**
+
+Semantic summarization runs as an async task, outside the main frame loop. The SORA loop never blocks on it. When compression lags behind frame production, the system must neither drop frames nor corrupt layer order. One invariant handles both:
+
+> A bucket shift is permitted only when `len(B_0) ≥ k`, the compression zone is empty, and no compaction task is in flight.
+
+If any precondition fails, the shift is deferred. New frames keep arriving at `B_0`, which is allowed to exceed k for as long as necessary. This is classical pipeline backpressure: a stalled downstream lets the upstream buffer grow until drainage catches up. When compression completes and the compression zone clears, the pending frames shift in a single batch — possibly advancing multiple buckets at once.
+
+**Classical algorithm backing.**
+
+The structure is not new. It is the union of four well-known patterns:
+
+| Pattern | Origin | Contribution |
+|---|---|---|
+| LSM-tree compaction | LevelDB, RocksDB, Cassandra | Layered compaction with fixed per-layer capacity k; two decades of industrial validation |
+| Exponential Histograms (DGIM, 2002) | Streaming algorithms | `O(log² N / ε)` space bound for sliding-window statistics |
+| Binary counter amortized analysis (CLRS) | Algorithm analysis | Proves layer i is rewritten every `k^(i+1)` frames — O(1) amortized cost per frame |
+| Fenwick tree | Data structures | Linear physical layout with implicit logarithmic depth |
+
+Between them, these four give a complete correctness argument: capacity is bounded, per-frame cost is constant, and every layer's physical position is stable at a cadence matched to its rewrite period.
+
+**Rewrite cadence.**
+
+At k = 4, one frame per second, layer i rewrites every `k^(i+1)` frames:
+
+| Layer | Rewrite period (frames) | Wall clock at 1 frame/s |
+|---|---:|---|
+| L_0 | 4 | 4 s |
+| L_2 | 64 | ~1 min |
+| L_4 | 1,024 | ~17 min |
+| L_6 | 16,384 | ~4.5 h |
+| L_8 | 262,144 | ~3 d |
+| L_11 | ~16.8M | ~194 d |
+
+Deep layers are effectively permanent. A change at L_11 has not happened even once during 194 days of continuous operation. From the cache's point of view, it is indistinguishable from `system_prompt`.
+
+**Coverage and cache economics.**
+
+At k = 4 with a hot zone of roughly two dozen frames, covering ten million frames takes 8-10 layers. The Ping never needs to exceed that bound, no matter how long the session runs.
+
+Per-frame cost breaks down as:
+
+- `system_prompt` — never recomputed; absolute prefix.
+- Cold zone — layer i invalidates every `k^(i+1)` frames. Summed over all layers, amortized cost per frame is O(1).
+- Hot zone — byte-stable within each bucket lifetime. Shifts invalidate the hot zone at bucket boundaries (every k frames). Prefill cost is bounded by the hot zone size, which is constant.
+- Signals — never cached, by design.
+
+For almost every frame, prefill hits cache up to the end of the cold zone. Real computation is confined to a short tail of hot-zone frames and signals.
+
+Compared to the three-segment model, hierarchical compaction:
+
+- **Bounds total in-context size.** `log_k` layers versus unbounded middle.
+- **Replaces a heuristic boundary with a binary counter.** Layer boundaries fall where the arithmetic says, not where a designer guesses.
+- **Separates deterministic work from LLM work.** Most "compression" is schema-driven field removal; the LLM is reserved for genuine cross-frame induction.
+- **Preserves P1-P5.** Bytes are stable within each bucket lifetime; signals stay at the tail; compression still advances from the tail, but the products age *toward* the prefix as they become increasingly permanent. Hierarchical compaction is the open-ended generalization of P5.
 
 ```mermaid
-graph LR
-    subgraph "traditional compression"
+flowchart LR
+    subgraph bad["three-segment"]
         direction LR
-        T1["Summary"] --> T2["F31..F100"]
-        T1 -.->|"prefix changed"| X["entire cache invalidated ✗"]
+        T1["oldest<br/>raw"] --> T2["middle<br/>unbounded summary"] --> T3["latest<br/>raw"]
+        T2 -.->|"grows forever"| X["fails at scale ✗"]
     end
-    
-    subgraph "three-segment reverse compression"
+
+    subgraph good["hierarchical compaction"]
         direction LR
-        R1["F1..F50<br/>oldest original"] --> R2["Summary<br/>middle compressed"] --> R3["F90..F100<br/>latest original"]
-        R1 -.->|"prefix unchanged"| Y["cache hit through F50 ✓"]
+        H1["L_n"] --> H2["..."] --> H3["L_0"] --> H4["hot zone"]
+        H1 -.->|"log_k layers, bounded"| Y["10M frames fit ✓"]
     end
+
+    style bad fill:#ffebee
+    style good fill:#e8f5e9
 ```
 
 
@@ -417,7 +528,7 @@ Cache hit rate = `cache_read / (cache_read + cache_creation + input)`.
 
 Vessal records per-frame cache metrics in the frame log, establishing a quantitative feedback loop: adjust context construction strategy → observe hit rate change → iterate. The implementation cost is minimal — extract the fields from the API response and write them to the frame log.
 
-Over time, this data can also drive: runtime adaptive compression (trigger strategy adjustments when hit rate drops), frame-type analysis (compare cache behavior of work frames versus compression frames), and session health monitoring (hit rate trend as a proxy indicator of session quality).
+Over time, this data can also drive: runtime adaptive compaction (tune bucket/layer parameters when hit rate drops), per-layer analysis (compare cache behavior across hot zone, cold zone, and signals), and session health monitoring (hit rate trend as a proxy indicator of session quality).
 
 
 ### The Ultimate Path: Protocol into Parameters

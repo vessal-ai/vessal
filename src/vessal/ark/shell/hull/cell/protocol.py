@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-FRAME_SCHEMA_VERSION = 6
+FRAME_SCHEMA_VERSION = 7
 
 
 # ─────────────────────────────────────────────
@@ -445,10 +445,55 @@ class StepResult:
     protocol_error: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class CompactionRecord:
+    """Schema v1 compaction record — one summary of k frames or k lower-layer records.
+
+    Fields mirror whitepaper §6.4.2. `layer` is the cold-zone index (0 = L_0).
+    `compacted_at` is the frame number at which this record was produced.
+    """
+
+    range: tuple[int, int]
+    intent: str
+    operations: tuple[str, ...]
+    outcomes: str
+    artifacts: tuple[str, ...]
+    notable: str
+    layer: int
+    compacted_at: int
+
+    def to_dict(self) -> dict:
+        return {
+            "schema_version": FRAME_SCHEMA_VERSION,
+            "range": list(self.range),
+            "intent": self.intent,
+            "operations": list(self.operations),
+            "outcomes": self.outcomes,
+            "artifacts": list(self.artifacts),
+            "notable": self.notable,
+            "layer": self.layer,
+            "compacted_at": self.compacted_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "CompactionRecord":
+        return cls(
+            range=tuple(d["range"]),
+            intent=d["intent"],
+            operations=tuple(d["operations"]),
+            outcomes=d["outcomes"],
+            artifacts=tuple(d["artifacts"]),
+            notable=d["notable"],
+            layer=d["layer"],
+            compacted_at=d["compacted_at"],
+        )
+
+
 __all__ = [
     "FRAME_SCHEMA_VERSION",
     "Action", "State",
     "Ping", "Pong", "Observation", "FrameRecord", "StepResult",
     "Verdict", "VerdictFailure",
     "ErrorRecord",
+    "CompactionRecord",
 ]

@@ -128,7 +128,7 @@ Multiple files: `skill.py` + `server.py` + `sop.md` + `__init__.py`. Distributio
 
 ### Q: Any changes to compressed frames in V5?
 
-None. The principle behind compressed frames (semantic compression can only be done by an LLM) is unchanged. Hull switches the prompt — and possibly the Skill configuration — before triggering a compression frame.
+Yes. Compression is no longer a special "compression frame" that Hull triggers with a prompt switch. It runs as a Kernel-internal pipeline: mechanical stripping inside the hot zone on bucket boundaries, and semantic summarization at layer boundaries on an async worker. The core principle — **only the LLM can do semantic compression; the runtime does mechanical work only** — is unchanged. What changes is that the Agent no longer has to notice or initiate compression; it happens under the hood on the frame stream's own clock. See Chapter 6 §6.4.2.
 
 ---
 

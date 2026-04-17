@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from vessal.ark.shell.hull.event_loop import EventLoop
+from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 
 @pytest.fixture
@@ -15,7 +16,7 @@ def mock_cell():
         "_next_wake": None,
         "_frame": 0,
         "_signal_outputs": [],
-        "_frame_log": [],
+        "_frame_stream": FrameStream(),
     }
     cell.get.side_effect = lambda key, default=None: cell.ns.get(key, default)
     cell.set.side_effect = lambda key, value: cell.ns.__setitem__(key, value)
@@ -126,6 +127,32 @@ def test_inject_wake_fn_puts_event_on_queue():
     inject_fn("user_message")
     event = loop.event_queue.get(timeout=1)
     assert event["reason"] == "user_message"
+
+
+def test_after_frame_hook_fires(mock_cell):
+    """_frame_loop calls hooks.after_frame once per successful frame."""
+    from vessal.ark.shell.hull.event_loop import FrameHooks
+
+    calls = {"n": 0}
+
+    def after():
+        calls["n"] += 1
+
+    hooks = FrameHooks(after_frame=after)
+
+    def step_then_idle(tracer=None):
+        mock_cell.ns["_sleeping"] = True
+        r = MagicMock()
+        r.protocol_error = None
+        return r
+
+    mock_cell.ns["_sleeping"] = False
+    mock_cell.step = step_then_idle
+
+    loop = EventLoop(cell=mock_cell, hooks=hooks)
+    loop._frame_loop()
+
+    assert calls["n"] == 1
 
 
 def test_frame_loop_breaks_on_protocol_error(mock_cell):

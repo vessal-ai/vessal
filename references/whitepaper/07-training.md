@@ -1,5 +1,7 @@
 # 7. Training and Scaling
 
+> **TL;DR.** The SORA loop satisfies the formal requirements of a Markov decision process, and frame records already have the shape of RL tuples. Running an agent therefore produces structured, labelled training data for free — across three scaling axes, fed by three reward channels, closing a deployment-training loop. The chapter builds the argument end to end and is honest about what remains unsolved.
+
 The previous chapter ended with a conjecture: the SORA protocol is stable enough that it could be trained into model weights. system_prompt shrinks. Context budget grows. The agent gets more room to work.
 
 This chapter develops that conjecture into a complete argument. The SORA loop is not merely a runtime architecture — it is a naturally structured training environment for agent models. That claim requires derivation, not assertion. The derivation begins with the gap that current training pipelines leave open.
@@ -156,7 +158,7 @@ The verdict provides what conversation-based agents cannot: **automatic quality 
 
 This is the property that makes Vessal's frame architecture naturally generative of training data. Ordinary operation produces structured, labeled trajectories. The agent does not need to be run in a special training mode. Every production deployment is also a data collection system.
 
-The compression frame (§4.5) is particularly useful here. When the frame stream reaches the compression threshold and Hull triggers a compression frame, the resulting frame record contains the agent's own summary of what it accomplished and what it learned over the preceding sequence. This is a natural form of trajectory distillation: the agent's compressed understanding of a multi-frame sub-task, expressed as a namespace delta. Trained on compression frames as well as work frames, the model learns not just how to act but how to synthesize what it has done — a meta-cognitive capability that standard trajectory data does not contain.
+Hierarchical compaction (§4.5, §6.4.2) sharpens this further. Every time the compression zone fills, the Kernel asks the model to summarize a bucket of frames into a structured record — `intent`, `operations`, `outcomes`, `artifacts`, `notable`. Each such record is a natural trajectory distillation: the model's own account of what it accomplished and what stands out from a multi-frame sub-task. Deeper layers recurse on the same schema, producing summaries of summaries. Trained on these compaction records alongside raw frames, the model learns not just how to act but how to synthesize what it has done — a meta-cognitive capability that standard trajectory data does not contain, and one the agent produces for free as a byproduct of running.
 
 The signal (§4.3) adds another layer. Before each Ping, Skills emit `_signal()` output that injects perception data — inbox messages, hardware state, external API responses. A frame record that includes signal context captures the full perceptual situation that led to each action, not just the namespace state. The trajectory carries richer information about why each action made sense in context. For multi-modal Skills (camera, audio), signal-annotated trajectories contain the perceptual grounding that makes actions interpretable to a training algorithm trying to learn when each action is appropriate.
 
