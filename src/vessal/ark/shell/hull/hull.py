@@ -387,6 +387,9 @@ class Hull:
         if method == "POST" and path == "/stop":
             self.stop()
             return 200, {"status": "stopping"}
+        if method == "GET" and path == "/state/compactions":
+            fs = self._cell.get("_frame_stream")
+            return 200, ({} if fs is None else fs.project_compactions())
         if method == "GET" and path == "/logs":
             return self._handle_logs_viewer()
         if method == "GET" and path == "/logs/raw":
