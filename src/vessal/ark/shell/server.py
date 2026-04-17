@@ -119,14 +119,14 @@ class ShellServer:
     def __init__(
         self,
         project_dir: str,
-        host: str = "0.0.0.0",
+        host: str = "127.0.0.1",
         port: int = 8420,
     ) -> None:
         """Initialize ShellServer.
 
         Args:
             project_dir: Agent project directory path.
-            host: HTTP listen address, defaults to 0.0.0.0.
+            host: HTTP listen address, defaults to 127.0.0.1.
             port: HTTP listen port, 0 for dynamic allocation.
         """
         self._project_dir = project_dir
@@ -151,13 +151,28 @@ class ShellServer:
         """Start Shell: launch Hull subprocess + HTTP reverse proxy + monitor thread.
 
         Raises:
-            RuntimeError: Hull subprocess failed to start or timed out.
+            RuntimeError: Hull subprocess failed to start or timed out, or no free port
+                found in 20 retries.
         """
         self._spawn_hull()
 
-        self._http_server = http.server.HTTPServer(
-            (self._host, self._port), _ProxyHandler
-        )
+        requested = self._port
+        last_err: OSError | None = None
+        for offset in range(20):
+            try:
+                self._http_server = http.server.HTTPServer(
+                    (self._host, requested + offset), _ProxyHandler
+                )
+                self._port = requested + offset
+                break
+            except OSError as e:
+                last_err = e
+                continue
+        else:
+            raise RuntimeError(
+                f"No free port in range {requested}..{requested + 19}: {last_err}"
+            )
+
         self._http_server.internal_port = self._internal_port
         self._http_server.hull_alive = self._hull_alive
         self._http_server._shell_server = self
