@@ -48,6 +48,51 @@ def test_multiple_subscribers_each_get_event():
     assert len(received_a) == 1 and len(received_b) == 1
 
 
+def test_frame_publisher_emits_new_frames(monkeypatch, tmp_path):
+    """FramePublisher polls Hull and publishes delta as 'frame' events."""
+    import time
+    from vessal.ark.shell.events import EventBus
+    from vessal.ark.shell.server import FramePublisher
+
+    bus = EventBus()
+    frames_returned = [
+        [{"number": 1}, {"number": 2}],
+        [{"number": 1}, {"number": 2}, {"number": 3}],
+    ]
+    calls = iter(frames_returned)
+
+    def fake_fetch(port, after):
+        try:
+            batch = next(calls)
+        except StopIteration:
+            return []
+        return [f for f in batch if f["number"] > (after or 0)]
+
+    publisher = FramePublisher(
+        port_getter=lambda: 9999,
+        publish=bus.publish,
+        fetch_frames=fake_fetch,
+        interval=0.05,
+    )
+    publisher.start()
+    received = []
+    import threading
+    stop = threading.Event()
+
+    def consume():
+        for ev in bus.subscribe(stop):
+            received.append(ev)
+            if len(received) >= 3:
+                stop.set()
+
+    t = threading.Thread(target=consume, daemon=True)
+    t.start()
+    t.join(timeout=2.0)
+    publisher.stop()
+    numbers = [e["payload"]["number"] for e in received if e["type"] == "frame"]
+    assert numbers == [1, 2, 3]
+
+
 def test_sse_endpoint_streams_events(tmp_path, monkeypatch):
     import urllib.request
 

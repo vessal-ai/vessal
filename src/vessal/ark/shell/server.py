@@ -211,6 +211,7 @@ class ShellServer:
         self._monitor_thread: threading.Thread | None = None
         self._event_bus = EventBus()
         self._hot_reloader: HotReloader | None = None
+        self._frame_publisher: FramePublisher | None = None
 
     @property
     def port(self) -> int:
@@ -274,6 +275,12 @@ class ShellServer:
             publish=self._event_bus.publish,
         )
         self._hot_reloader.start()
+
+        self._frame_publisher = FramePublisher(
+            port_getter=lambda: self._internal_port,
+            publish=self._event_bus.publish,
+        )
+        self._frame_publisher.start()
 
         try:
             from vessal.ark.shell.tui.recent import RecentProjects
@@ -398,6 +405,8 @@ class ShellServer:
                 self._hull_proc.wait()
         if self._hot_reloader is not None:
             self._hot_reloader.stop()
+        if getattr(self, "_frame_publisher", None) is not None:
+            self._frame_publisher.stop()
         if self._http_server:
             self._http_server.shutdown()
 
@@ -427,3 +436,54 @@ class ShellServer:
         with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
             s.bind(("127.0.0.1", 0))
             return s.getsockname()[1]
+
+
+class FramePublisher:
+    """Polls Hull /frames?after=N and publishes new frames onto an EventBus."""
+
+    def __init__(
+        self,
+        port_getter,
+        publish,
+        fetch_frames=None,
+        interval: float = 0.5,
+    ) -> None:
+        self._get_port = port_getter
+        self._publish = publish
+        self._fetch = fetch_frames or self._default_fetch
+        self._interval = interval
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._last_number = 0
+
+    @staticmethod
+    def _default_fetch(port: int, after: int) -> list:
+        import json
+        import urllib.error
+        import urllib.request
+        url = f"http://127.0.0.1:{port}/frames?after={after}"
+        try:
+            resp = urllib.request.urlopen(url, timeout=2)
+            body = json.loads(resp.read())
+            return body.get("frames", [])
+        except urllib.error.URLError:
+            return []
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._run, daemon=True, name="frame-publisher")
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval):
+            port = self._get_port()
+            if port is not None:
+                frames = self._fetch(port, self._last_number)
+                for f in frames:
+                    n = f.get("number", 0)
+                    if n <= self._last_number:
+                        continue
+                    self._last_number = n
+                    self._publish({"type": "frame", "ts": time.time(), "payload": f})

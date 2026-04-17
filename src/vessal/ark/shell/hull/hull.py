@@ -401,8 +401,15 @@ class Hull:
         # Built-in routes
         if method == "GET" and path == "/status":
             return 200, self.status()
-        if method == "GET" and path == "/frames":
-            after = body.get("after")
+        if method == "GET" and path.startswith("/frames"):
+            after = None
+            if "?" in path:
+                from urllib.parse import parse_qs, urlparse
+                qs = parse_qs(urlparse(path).query)
+                if "after" in qs:
+                    after = int(qs["after"][0])
+            if after is None:
+                after = (body or {}).get("after")
             return 200, {"frames": self.frames(after=after)}
         if method == "POST" and path == "/wake":
             reason = body.get("reason", "external")
