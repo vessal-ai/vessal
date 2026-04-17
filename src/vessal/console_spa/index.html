@@ -1,3 +1,55 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Vessal Console</title></head>
-<body><main id="console-root"></main></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Vessal Console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <script defer src="assets/alpine.min.js"></script>
+  <script type="module" src="assets/app.js"></script>
+</head>
+<body>
+  <div id="app" x-data="consoleApp()" x-init="init()">
+    <header class="top-nav">
+      <span class="brand">Vessal</span>
+      <span class="project" x-text="project"></span>
+      <span class="state" :class="state.sleeping ? 'idle' : 'active'"
+            x-text="state.sleeping ? '● idle' : '● active'"></span>
+    </header>
+
+    <template x-if="banner">
+      <div class="banner" :class="banner.level" x-text="banner.text"></div>
+    </template>
+
+    <div class="layout">
+      <nav class="activity-bar" aria-label="views">
+        <template x-for="v in views" :key="v.id">
+          <button class="nav-btn"
+                  :class="{active: current === v.id}"
+                  @click="current = v.id"
+                  :title="v.label"
+                  x-text="v.icon"></button>
+        </template>
+      </nav>
+
+      <main class="main">
+        <template x-if="current === 'chat'">
+          <section id="chat-view"></section>
+        </template>
+        <template x-if="current === 'frames'">
+          <section id="frames-view"></section>
+        </template>
+        <template x-if="current === 'state'">
+          <section id="state-view"><p class="placeholder">State — coming soon</p></section>
+        </template>
+        <template x-if="current === 'logs'">
+          <section id="logs-view"><p class="placeholder">Logs — coming soon</p></section>
+        </template>
+        <template x-if="current === 'market'">
+          <section id="market-view"><p class="placeholder">Skill Market — coming soon</p></section>
+        </template>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

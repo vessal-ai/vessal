@@ -14,7 +14,7 @@ def test_console_root_redirects_to_index(monkeypatch, tmp_path):
         body = resp.read().decode()
         assert resp.status == 200
         assert "<!doctype html>" in body.lower()
-        assert "console-root" in body
+        assert 'id="app"' in body
     finally:
         server.shutdown()
 
