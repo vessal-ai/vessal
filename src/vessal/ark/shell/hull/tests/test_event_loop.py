@@ -129,6 +129,32 @@ def test_inject_wake_fn_puts_event_on_queue():
     assert event["reason"] == "user_message"
 
 
+def test_after_frame_hook_fires(mock_cell):
+    """_frame_loop calls hooks.after_frame once per successful frame."""
+    from vessal.ark.shell.hull.event_loop import FrameHooks
+
+    calls = {"n": 0}
+
+    def after():
+        calls["n"] += 1
+
+    hooks = FrameHooks(after_frame=after)
+
+    def step_then_idle(tracer=None):
+        mock_cell.ns["_sleeping"] = True
+        r = MagicMock()
+        r.protocol_error = None
+        return r
+
+    mock_cell.ns["_sleeping"] = False
+    mock_cell.step = step_then_idle
+
+    loop = EventLoop(cell=mock_cell, hooks=hooks)
+    loop._frame_loop()
+
+    assert calls["n"] == 1
+
+
 def test_frame_loop_breaks_on_protocol_error(mock_cell):
     """_frame_loop breaks immediately on protocol_error without retrying."""
     from vessal.ark.shell.hull.cell.protocol import StepResult
