@@ -20,6 +20,23 @@ Every major agent framework gives the LLM a menu of functions and lets it pick. 
 **Vessal's answer: give the agent a Code, not a Menu.** Python is the sole action mechanism — not "a code interpreter among other tools," but the *only* way to act. The upper bound of what the agent can do is the programs the model can write. That bound rises with every generation of LLMs. The framework itself never becomes the bottleneck.
 
 
+## 60-Second First Agent
+
+```bash
+pip install vessal
+vessal create                  # 6-question wizard (Enter × 6 to accept defaults)
+cd my-agent && vessal          # bare vessal = interactive TUI picker
+# pick "Run dev" → Console opens at http://127.0.0.1:8420/console/
+```
+
+That's it. Chat with the agent in the left pane; watch its thinking in
+the right pane (collapsible for non-developers). Edit `SOUL.md` and the
+next turn picks it up without restart. Edit `skills/*.py` and the
+affected skill reloads in place. Changes to `hull.toml` surface as an
+orange "restart required" banner in the Console top bar.
+
+---
+
 ## Quick Start
 
 ### Prerequisites

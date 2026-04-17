@@ -447,17 +447,10 @@ class Hull:
         return 404, {"error": f"not found: {method} {path}"}
 
     def _handle_logs_viewer(self) -> tuple[int, "StaticResponse"]:
-        """GET /logs — Return the HTML viewer content.
-
-        Returns:
-            (200, StaticResponse) containing viewer.html content.
-        """
+        """GET /logs — Redirect to /console/ (unified Console SPA)."""
         from vessal.ark.shell.hull.hull_api import StaticResponse
-        viewer_path = Path(__file__).parent.parent.parent / "util" / "logging" / "viewer.html"
-        if not viewer_path.exists():
-            return 404, StaticResponse(b"viewer.html not found", "text/plain")
-        content = viewer_path.read_bytes()
-        return 200, StaticResponse(content, "text/html; charset=utf-8")
+        body = b'<meta http-equiv="refresh" content="0;url=/console/">Redirecting to Console...'
+        return 200, StaticResponse(body, "text/html; charset=utf-8")
 
     def _handle_logs_raw(self, after: int | None = None) -> tuple[int, "StaticResponse"]:
         """GET /logs/raw[?after=N] — Return frames.jsonl content (supports incremental reads).
