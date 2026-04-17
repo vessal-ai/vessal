@@ -1,4 +1,4 @@
-"""cli.py — Vessal CLI entry point: start / stop / send / status / read / init / skill subcommands."""
+"""cli.py — Vessal CLI entry point: start / stop / status / init / skill subcommands."""
 from __future__ import annotations
 
 import argparse
@@ -43,30 +43,11 @@ def main() -> None:
         help="Listen port (default: 8420)",
     )
 
-    # vessal send
-    send_parser = subparsers.add_parser("send", help="Send message to Agent inbox")
-    send_parser.add_argument("message", type=str, help="Message content")
-    send_parser.add_argument(
-        "--port", type=int, default=8420,
-        help="Shell port (default: 8420)",
-    )
-
     # vessal status
     status_parser = subparsers.add_parser("status", help="Query Agent status")
     status_parser.add_argument(
         "--port", type=int, default=8420,
         help="Listen port (default: 8420)",
-    )
-
-    # vessal read
-    read_parser = subparsers.add_parser("read", help="Read Agent replies")
-    read_parser.add_argument(
-        "--port", type=int, default=8420,
-        help="Shell port (default: 8420)",
-    )
-    read_parser.add_argument(
-        "--wait", type=float, default=0,
-        help="Maximum seconds to wait for a reply (default: 0 = no wait)",
     )
 
     # vessal init
@@ -120,12 +101,8 @@ def main() -> None:
         _cmd_start(args)
     elif args.command == "stop":
         _cmd_stop(args)
-    elif args.command == "send":
-        _cmd_send(args)
     elif args.command == "status":
         _cmd_status(args)
-    elif args.command == "read":
-        _cmd_read(args)
     elif args.command == "init":
         _cmd_init(args)
     elif args.command == "skill":
@@ -358,60 +335,6 @@ def _cmd_stop(args: argparse.Namespace) -> None:
         else:
             print("Error: stop timed out", file=sys.stderr)
             sys.exit(1)
-
-
-def _cmd_send(args: argparse.Namespace) -> None:
-    """Send a message to the Human Skill inbox."""
-    import json
-    import urllib.request
-    import urllib.error
-
-    # Chat Skill inbox endpoint (/skills/chat/ namespace)
-    url = f"http://localhost:{args.port}/skills/chat/inbox"
-    data = json.dumps({"content": args.message}).encode()
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            print(f"Sent ({resp.status})")
-    except urllib.error.URLError as e:
-        print(f"Error: cannot connect to Agent ({e})", file=sys.stderr)
-        sys.exit(1)
-
-
-def _cmd_read(args: argparse.Namespace) -> None:
-    """Read Agent replies (from Human Skill outbox)."""
-    import json
-    import time
-    import urllib.request
-    import urllib.error
-
-    # Chat Skill outbox endpoint (/skills/chat/ namespace)
-    url = f"http://localhost:{args.port}/skills/chat/outbox"
-    deadline = time.time() + args.wait if args.wait > 0 else 0
-    found = False
-
-    while True:
-        try:
-            with urllib.request.urlopen(url, timeout=5) as resp:
-                data = json.loads(resp.read())
-                for msg in data.get("messages", []):
-                    print(msg.get("content", ""))
-                    found = True
-        except urllib.error.URLError as e:
-            print(f"Error: cannot connect to Agent ({e})", file=sys.stderr)
-            sys.exit(1)
-
-        if found or deadline == 0 or time.time() >= deadline:
-            break
-        time.sleep(1)
-
-    if not found and args.wait > 0:
-        print("(no reply)")
 
 
 def _cmd_status(args: argparse.Namespace) -> None:
