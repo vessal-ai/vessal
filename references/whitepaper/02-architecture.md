@@ -1,5 +1,7 @@
 # 2. Architecture
 
+> **TL;DR.** The three runtime problems — state, information, validation — change at different rates. Sorting them by frequency yields three layers: Cell for single-call computation, Hull for cross-call orchestration, Shell for the outside world. The layering is a consequence of the problem, not a stylistic choice.
+
 The previous chapter started from the action-space problem and, through the SORA loop and code-as-action, derived three problems the runtime must solve: state persistence, information management, and action validation. This chapter organizes those three problems by change frequency and derives Vessal's three-layer architecture.
 
 

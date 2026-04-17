@@ -1,5 +1,7 @@
 # 6. Cache Coordination
 
+> **TL;DR.** Modern agent frameworks systematically destroy the KV cache that inference engines maintain, and users pay for the computation twice. Five destruction patterns, all avoidable, reduce to five context-construction principles (P1–P5). Applied to Vessal, they yield a purified system_prompt, hierarchical compaction of the frame stream, and a clean path from framework-only tricks to end-to-end model–engine coordination.
+
 The previous chapters answered how an Agent thinks and acts. This chapter answers a question the entire industry has overlooked: how much of the computation behind that thinking is simply wasted?
 
 The answer is unsettling. The computation that current Agent frameworks trigger on inference engines far exceeds what the task itself requires — not because models are too large or contexts too long, but because a structural fracture exists between Agent frameworks and inference engines. The two have evolved independently, with no information channel between them. The KV Cache that inference engines carefully maintain gets systematically destroyed by the way Agent frameworks construct their contexts.

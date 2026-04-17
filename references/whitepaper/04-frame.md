@@ -1,5 +1,7 @@
 # 4. Frame Protocol
 
+> **TL;DR.** A frame is the atom of Agent execution: one Ping from the runtime, one Pong from the model, one `exec()` of the code inside. The chapter specifies the protocol end to end, and shows how signals, sleep, and compression fit inside a structure that never changes.
+
 This chapter describes the smallest unit of system operation: the frame. A frame is the atom of Agent execution.
 
 

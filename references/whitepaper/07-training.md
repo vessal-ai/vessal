@@ -1,5 +1,7 @@
 # 7. Training and Scaling
 
+> **TL;DR.** The SORA loop satisfies the formal requirements of a Markov decision process, and frame records already have the shape of RL tuples. Running an agent therefore produces structured, labelled training data for free — across three scaling axes, fed by three reward channels, closing a deployment-training loop. The chapter builds the argument end to end and is honest about what remains unsolved.
+
 The previous chapter ended with a conjecture: the SORA protocol is stable enough that it could be trained into model weights. system_prompt shrinks. Context budget grows. The agent gets more room to work.
 
 This chapter develops that conjecture into a complete argument. The SORA loop is not merely a runtime architecture — it is a naturally structured training environment for agent models. That claim requires derivation, not assertion. The derivation begins with the gap that current training pipelines leave open.

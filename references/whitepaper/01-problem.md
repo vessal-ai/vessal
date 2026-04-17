@@ -1,5 +1,8 @@
 # 1. Problem and Choice
 
+> **TL;DR.** Every mainstream agent framework hands the LLM a menu of functions. A menu is a finite automaton; real work needs a Turing machine. Vessal replaces the menu with a programming language and derives the rest of the system from that single choice.
+
+
 ## 1.1 Action Space
 
 Every mainstream Agent framework today is doing the same thing: handing the LLM a menu of functions and letting it choose. The menu can be long — search, read file, call an API, query a database — but the nature of the thing never changes. The action space is a finite set.

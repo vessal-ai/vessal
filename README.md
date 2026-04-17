@@ -10,7 +10,7 @@ An agent runtime where Python is the only way to act.
 
 [Whitepaper](references/whitepaper/)
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Skills](#skills) · [SkillHub](#skillhub) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment) · [HTTP API](#http-api)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Context Scaling](#context-scaling) · [Skills](#skills) · [SkillHub](#skillhub) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment) · [HTTP API](#http-api)
 
 
 ## The Problem
@@ -141,6 +141,22 @@ graph TD
 **The Ping-Pong protocol** is the fixed contract inside Cell. The Kernel renders the namespace into a **Ping** (system prompt + frame history + signals) and sends it to the LLM. The LLM returns a **Pong** (reasoning trace + Python code + optional assertion). The Kernel executes the code and records the result. The protocol never changes — Skills extend capabilities, models can be swapped, but every frame follows this same structure.
 
 The three together form **ARK** (Agent Runtime Kit). Vessal is a distribution built on ARK: the base system plus standard Skills plus defaults.
+
+
+## Context Scaling
+
+Every agent framework eventually hits the same wall: the frame log keeps growing, and no context window is large enough. Chopping the oldest frames off the front is the easy answer — and the wrong one. It destroys the prefix cache that inference engines rely on, and it silently loses the continuity the agent needs to stay coherent over long sessions.
+
+Vessal's frame stream is built for the long run. Compression runs automatically inside the Kernel on two clocks. **Mechanical stripping** peels fields off aging frames on a fixed schedule — `think`, then `signals`, then `expect`, then `observation` — each removed at a bucket boundary, with zero LLM calls involved. **Semantic summarization** fires at layer boundaries: once a bucket of stripped frames fills, the model folds it into a structured record and promotes it to the next layer. Layers compound: four frames collapse into one L₀ record, four L₀ records into one L₁, and so on. The structure is LSM-tree compaction applied to a context window.
+
+```mermaid
+flowchart LR
+    B0["B_0<br/>raw"] --> B1["B_1<br/>−think"] --> B2["B_2<br/>−signals"] --> B3["B_3<br/>−expect"] --> B4["B_4<br/>−obs"] --> CZ["compression<br/>zone"]
+    CZ -.->|"LLM, async"| L0["L_0"]
+    L0 -->|"full"| L1["L_1"] -->|"full"| LN["..."]
+```
+
+Amortized cost is O(1) per frame, capacity grows logarithmically, and ten million frames fit in eight to ten layers. Every raw frame is also appended to static storage as it is produced, so nothing is ever lost — compression only shapes the active working window. The derivation and cache economics live in [whitepaper §6.4.2](references/whitepaper/06-cache.md).
 
 
 ## Skills
@@ -323,7 +339,6 @@ max_tokens = 4096
 [hull]
 skills = ["tasks", "pin", "chat", "heartbeat"]
 skill_paths = ["skills/bundled", "skills/hub", "skills/local"]
-# compress_threshold = 50     # Context pressure signal threshold (%)
 
 [gates]
 # Safety gate configuration (see Gates section below)
