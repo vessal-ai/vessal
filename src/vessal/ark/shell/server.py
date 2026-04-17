@@ -6,7 +6,10 @@ import logging
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
+
+from vessal.ark.shell.events import EventBus
 
 _logger = logging.getLogger(__name__)
 
@@ -23,8 +26,46 @@ class _ProxyHandler(http.server.BaseHTTPRequestHandler):
     """
 
     def do_GET(self) -> None:
-        """Handle GET requests: forward to Hull's internal port."""
+        """Handle GET requests: intercept /events for SSE, forward rest to Hull."""
+        path = self.path.split("?")[0]
+        if path == "/events":
+            self._stream_events()
+            return
         self._proxy("GET")
+
+    def _stream_events(self) -> None:
+        """SSE streaming endpoint; iterates EventBus subscription until client disconnects."""
+        import json
+
+        bus = getattr(self.server, "_event_bus", None)
+        if bus is None:
+            self.send_response(503)
+            self.end_headers()
+            return
+
+        # Register subscription BEFORE flushing headers to eliminate the race
+        # condition where a publisher fires between urlopen() returning and
+        # the subscription being registered.
+        stop = threading.Event()
+        q = bus.open_queue()
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+
+            for event in bus.drain_queue(q, stop):
+                payload = f"data: {json.dumps(event, ensure_ascii=False)}\n\n".encode("utf-8")
+                try:
+                    self.wfile.write(payload)
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    break
+        finally:
+            stop.set()
+            bus.close_queue(q)
 
     def do_POST(self) -> None:
         """Handle POST requests: forward to Hull's internal port. For /stop, mark stop intent before forwarding."""
@@ -137,8 +178,9 @@ class ShellServer:
         self._hull_alive = False
         self._stop_requested = False
         self._stop_event = threading.Event()
-        self._http_server: http.server.HTTPServer | None = None
+        self._http_server: http.server.ThreadingHTTPServer | None = None
         self._monitor_thread: threading.Thread | None = None
+        self._event_bus = EventBus()
 
     @property
     def port(self) -> int:
@@ -146,6 +188,10 @@ class ShellServer:
         if self._http_server:
             return self._http_server.server_address[1]
         return self._port
+
+    @property
+    def event_bus(self) -> EventBus:
+        return self._event_bus
 
     def start(self) -> None:
         """Start Shell: launch Hull subprocess + HTTP reverse proxy + monitor thread.
@@ -160,7 +206,7 @@ class ShellServer:
         last_err: OSError | None = None
         for offset in range(20):
             try:
-                self._http_server = http.server.HTTPServer(
+                self._http_server = http.server.ThreadingHTTPServer(
                     (self._host, requested + offset), _ProxyHandler
                 )
                 self._port = requested + offset
@@ -176,6 +222,7 @@ class ShellServer:
         self._http_server.internal_port = self._internal_port
         self._http_server.hull_alive = self._hull_alive
         self._http_server._shell_server = self
+        self._http_server._event_bus = self._event_bus
 
         http_thread = threading.Thread(
             target=self._http_server.serve_forever,
@@ -264,6 +311,11 @@ class ShellServer:
                 if self._stop_requested or self._stop_event.is_set():
                     break
                 _logger.warning("Hull subprocess exited (code %d), restarting...", exit_code)
+                self._event_bus.publish({
+                    "type": "agent_crash",
+                    "ts": time.time(),
+                    "payload": {"exit_code": exit_code},
+                })
                 try:
                     self._spawn_hull()
                     _logger.info("Hull subprocess restarted")
