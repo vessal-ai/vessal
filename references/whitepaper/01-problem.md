@@ -64,7 +64,7 @@ Within the SORA loop, Reasoning is provided by the LLM and Action is provided by
 
 **State persistence.** The model is stateless; the runtime maintains the namespace. Before each call, the runtime selects information from the namespace and encodes it as input. After the call, it writes the code execution results back. The runtime is the model's external memory.
 
-**Information management.** The namespace grows as the task progresses, but the model can only see a finite number of tokens at a time. The runtime must decide what enters the context window. Mechanical decisions — ordering by time, truncating at capacity — are the runtime's to make. Semantic decisions — judging relevance and importance — only the model can make. The runtime must trigger semantic compression at the right moments.
+**Information management.** The namespace grows as the task progresses, but the model can only see a finite number of tokens at a time. The runtime decides what enters the context window. Mechanical decisions — ordering by time, truncating at capacity, shedding low-value fields on a fixed schedule — belong to the runtime. Semantic decisions — judging relevance, condensing many frames into one, naming the through-line of a task — can only be made by the model. The runtime invokes the model for semantic compression on the natural clock of the frame stream, not in response to ad-hoc pressure.
 
 **Action verification.** Code execution carries full system permissions — HTTP requests, file operations, system commands. Before execution, the runtime runs structural checks through the Gate. This is the price of a Turing-complete action space: outbound behavior cannot be fully controlled. The Gate provides a best-effort safety barrier, not a guarantee.
 

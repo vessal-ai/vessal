@@ -22,7 +22,7 @@ graph TB
     subgraph freq["layered by change frequency"]
         direction TB
         F1["high frequency · per call\nstate + validation"] --> Cell
-        F2["mid frequency · cross-call\nlog + compression + Skill"] --> Hull
+        F2["mid frequency · cross-call\nlog + Skill lifecycle"] --> Hull
         F3["low frequency · system level\nHTTP + process"] --> Shell
     end
 ```
@@ -108,7 +108,7 @@ Hull is the middle layer, managing Cell and all extension modules (Skills). Hull
 
 Hull's responsibility boundary:
 
-What Hull does: run the event loop (sleeping → waking → executing frame → sleeping), manage the loading, unloading, and lifecycle of Skills, maintain the frame log, trigger semantic compression, route external requests to the appropriate Skill handlers, and call `Cell.step()` to execute frames.
+What Hull does: run the event loop (sleeping → waking → executing frame → sleeping), manage the loading, unloading, and lifecycle of Skills, maintain the frame log, route external requests to the appropriate Skill handlers, and call `Cell.step()` to execute frames. Compression is not Hull's concern — it runs inside the Kernel on the frame stream's own clock (§4.5, §6.4.2).
 
 What Hull does not do: perform network I/O (all HTTP is handled by Shell), contain any application logic (no built-in heartbeat, no built-in timer, no built-in domain-specific behavior). Hull is pure infrastructure.
 
