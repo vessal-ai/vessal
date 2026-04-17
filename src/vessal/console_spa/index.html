@@ -34,7 +34,32 @@
 
       <main class="main">
         <template x-if="current === 'chat'">
-          <section id="chat-view"></section>
+          <section class="chat-layout" :class="{collapsed: rightCollapsed}">
+            <div class="chat-main">
+              <div class="chat-log">
+                <template x-for="m in messages" :key="m.ts || Math.random()">
+                  <div class="msg" :class="m.role">
+                    <strong x-text="m.role + ':'"></strong>
+                    <span x-text="m.content"></span>
+                  </div>
+                </template>
+              </div>
+              <form class="chat-input" @submit.prevent="send()">
+                <input type="text" x-model="input" placeholder="Type a message..."
+                       aria-label="Message input" autofocus />
+                <button type="submit">Send</button>
+              </form>
+            </div>
+            <aside class="chat-side" x-show="!rightCollapsed">
+              <header>
+                <span>🎞️ Current Frame</span>
+                <button class="collapse-btn" @click="toggleRight()" title="Collapse">⊟</button>
+              </header>
+              <div id="frame-pinned" class="frame-container"></div>
+            </aside>
+            <button class="expand-btn" x-show="rightCollapsed" @click="toggleRight()"
+                    title="Expand pinned frame">⊡</button>
+          </section>
         </template>
         <template x-if="current === 'frames'">
           <section id="frames-view"></section>
