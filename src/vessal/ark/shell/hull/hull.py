@@ -125,6 +125,7 @@ class Hull:
         self._result_queue: queue.Queue = queue.Queue()
         self._thread_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="compaction")
         self._compaction_frames_since_snapshot = 0
+        self._compaction_snapshot_every_n = int(hull_cfg.get("snapshot_every_n_frames", 20))
         prompt_path = Path(__file__).parent / "prompts" / "compression.md"
         self._compression_prompt = prompt_path.read_text(encoding="utf-8")
         self._cell.set("_compression_prompt", self._compression_prompt)
@@ -607,8 +608,12 @@ trace = false  # disable to reduce IO
         if task is None:
             if len(fs._hot[0]) >= fs.k and fs.in_flight:
                 self._tracer.log(frame_number, "compaction.shift_blocked", "gauge", -1, "value=1")
-            return
-        self._thread_pool.submit(self._run_compaction_task, task, frame_number)
+        else:
+            self._thread_pool.submit(self._run_compaction_task, task, frame_number)
+        self._compaction_frames_since_snapshot += 1
+        if self._compaction_frames_since_snapshot >= self._compaction_snapshot_every_n:
+            self.snapshot()
+            self._compaction_frames_since_snapshot = 0
 
     def _resume_pending_compaction(self) -> None:
         """Re-submit any in-flight compaction that survived in the snapshot after a crash-restart."""

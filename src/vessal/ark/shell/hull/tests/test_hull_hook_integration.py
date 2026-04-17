@@ -98,3 +98,22 @@ def test_after_frame_hook_wired_in_event_loop(tmp_path):
     hull = _make_hull(tmp_path)
     hooks = hull._event_loop._hooks
     assert hooks.after_frame is not None
+
+
+def test_periodic_snapshot_fires_every_n_frames(tmp_path, monkeypatch):
+    """Snapshot fires when _compaction_frames_since_snapshot reaches N."""
+    hull = _make_hull(tmp_path)
+    hull._compaction_snapshot_every_n = 3
+
+    snapshots = []
+    monkeypatch.setattr(hull, "snapshot", lambda: snapshots.append(1))
+
+    # try_shift always returns None (hot-only path, no compaction)
+    fs = hull._cell.get("_frame_stream")
+    fs.try_shift = MagicMock(return_value=None)
+
+    for _ in range(7):
+        hull._after_frame()
+
+    # 7 frames with N=3: snapshot fires at frame 3 and 6 → 2 times
+    assert len(snapshots) == 2
