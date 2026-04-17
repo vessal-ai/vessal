@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import logging
+import queue
 import sys
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -57,6 +59,7 @@ class Hull:
         gates_cfg = config.get("gates", {})
 
         self._init_cell(core_cfg, cell_cfg, agent_cfg)
+        self._init_compression(hull_cfg)
         self._init_skills(hull_cfg)
         self._init_prompts(renderer_cfg)
         self._init_loop(gates_cfg)
@@ -105,6 +108,24 @@ class Hull:
 
         if "language" in agent_cfg:
             self._cell.set("language", agent_cfg["language"])
+
+    def _init_compression(self, hull_cfg: dict) -> None:
+        """Phase 2b: Create compression Core, result queue, and single-worker ThreadPoolExecutor."""
+        from vessal.ark.shell.hull.cell.core import Core
+        self._compression_core = Core(
+            timeout=float(hull_cfg.get("compression_timeout", 120.0)),
+            max_retries=int(hull_cfg.get("compression_max_retries", 2)),
+            api_params={
+                "temperature": float(hull_cfg.get("compression_temperature", 0.3)),
+                "max_tokens": int(hull_cfg.get("compression_max_tokens", 2048)),
+            },
+        )
+        self._result_queue: queue.Queue = queue.Queue()
+        self._thread_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="compaction")
+        self._compaction_frames_since_snapshot = 0
+        prompt_path = Path(__file__).parent / "prompts" / "compression.md"
+        self._compression_prompt = prompt_path.read_text(encoding="utf-8")
+        self._cell.set("_compression_prompt", self._compression_prompt)
 
     def _init_skills(self, hull_cfg: dict) -> None:
         """Phase 3: SkillManager, SkillsManager, route table, pre-load Skills, start servers."""
@@ -322,6 +343,7 @@ class Hull:
     def stop(self) -> None:
         """Request stop."""
         self._event_loop.stop()
+        self._thread_pool.shutdown(wait=False)
 
     def handle(self, method: str, path: str, body: dict | None = None) -> tuple[int, dict | "StaticResponse"]:
         """Single entry point for HTTP requests. Shell calls this; Hull routes internally.
