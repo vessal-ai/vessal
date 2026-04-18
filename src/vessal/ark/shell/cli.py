@@ -170,9 +170,9 @@ def _cmd_start(args: argparse.Namespace) -> None:
 
     # Verify startup (health check)
     if _wait_for_health(args.port, timeout=5):
-        print(f"Agent started (PID {proc.pid})")
-        print(f"  Log viewer: http://localhost:{args.port}/logs")
-        print(f"  Stop: vessal stop")
+        print(f"Vessal agent running (PID {proc.pid}).")
+        print(f"  Console: http://127.0.0.1:{args.port}/console/")
+        print(f"  Stop:    vessal stop")
     else:
         lines = []
         if log_file.exists():
@@ -236,13 +236,9 @@ def _start_foreground(args: argparse.Namespace) -> None:
         lock_path.unlink(missing_ok=True)
         sys.exit(1)
 
-    print(f"Shell server started: http://0.0.0.0:{args.port}")
-    print(f"  Log viewer: http://localhost:{args.port}/logs")
-    hull_cfg = config.get("hull", {})
-    if "chat" in hull_cfg.get("skills", []):
-        print(f"  Chat UI: http://127.0.0.1:{args.port}/skills/chat/")
-    if "ui" in hull_cfg.get("skills", []):
-        print(f"  Agent UI: http://127.0.0.1:{args.port}/skills/ui/")
+    print(f"Vessal agent running.")
+    print(f"  Console: http://127.0.0.1:{args.port}/console/")
+    print(f"  Stop:    vessal stop")
 
     # Start companion processes (consistent with existing logic)
     import shlex
