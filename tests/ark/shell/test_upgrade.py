@@ -29,3 +29,24 @@ def test_compare_versions_newer_available():
     assert upgrade.is_newer("1.2.3", current="1.2.0") is True
     assert upgrade.is_newer("1.2.0", current="1.2.3") is False
     assert upgrade.is_newer("1.2.3", current="1.2.3") is False
+
+
+def test_build_upgrade_cmd_uv():
+    cmd = upgrade.build_upgrade_cmd("uv")
+    assert cmd == ["uv", "tool", "upgrade", "vessal"]
+
+
+def test_build_upgrade_cmd_pipx():
+    cmd = upgrade.build_upgrade_cmd("pipx")
+    assert cmd == ["pipx", "upgrade", "vessal"]
+
+
+def test_build_upgrade_cmd_pip_uses_current_interpreter():
+    cmd = upgrade.build_upgrade_cmd("pip")
+    assert cmd[0] == sys.executable
+    assert cmd[1:] == ["-m", "pip", "install", "--upgrade", "vessal"]
+
+
+def test_detect_installer_returns_string():
+    """detect_installer is environment-dependent; just assert contract."""
+    assert upgrade.detect_installer() in ("uv", "pipx", "pip")

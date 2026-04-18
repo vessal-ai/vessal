@@ -86,6 +86,10 @@ def main() -> None:
     # vessal check-update
     subparsers.add_parser("check-update", help="Check PyPI for a newer version")
 
+    # vessal upgrade
+    upgrade_parser = subparsers.add_parser("upgrade", help="Upgrade vessal to the latest release")
+    upgrade_parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
+
     # vessal create (interactive wizard)
     create_parser = subparsers.add_parser("create", help="Interactive new-project wizard")
     create_parser.add_argument("name", nargs="?", default=None, help="Project name (skipped in wizard if provided)")
@@ -145,6 +149,8 @@ def main() -> None:
         _cmd_init(args)
     elif args.command == "check-update":
         _cmd_check_update()
+    elif args.command == "upgrade":
+        _cmd_upgrade(args)
     elif args.command == "create":
         from vessal.ark.shell.tui.create_wizard import run as wizard_run
         sys.exit(wizard_run(Path.cwd()))
