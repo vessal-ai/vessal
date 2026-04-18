@@ -436,6 +436,15 @@ class Hull:
             ok = self.reload_skill(name)
             return (200 if ok else 404), {"status": "skill_reloaded" if ok else "not_loaded", "name": name}
 
+        if method == "GET" and path == "/skills/list":
+            entries = []
+            for name in self._skill_manager.loaded_names:
+                skill_dir = self._skill_manager.skill_dir(name)
+                has_ui = bool(skill_dir and (Path(skill_dir) / "ui" / "index.html").exists())
+                summary = getattr(self._skill_manager, "skill_summary", lambda _n: "")(name)
+                entries.append({"name": name, "summary": summary or "", "has_ui": has_ui})
+            return 200, {"skills": entries}
+
         if method == "GET" and path == "/skills/ui":
             entries = []
             for name in self._skill_manager.loaded_names:
