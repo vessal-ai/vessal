@@ -11,7 +11,7 @@ Responsible for:
 - Real-time terminal output (console.py) — per-frame summary and run totals
 
 Not responsible for:
-- HTML frame visualization — retired with viewer.html; frame visualization is now owned by the Launcher's built-in frames view
+- HTML frame visualization — retired; frame visualization is now owned by the Launcher's built-in frames view
 - Markdown report generation (reporter.py deleted)
 - General utilities outside of logging (in the util/ parent package)
 - Protocols with Shell, Hull, or Cell layers
