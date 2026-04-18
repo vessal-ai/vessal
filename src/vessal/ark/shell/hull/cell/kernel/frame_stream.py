@@ -205,7 +205,7 @@ class FrameStream:
         return {"cold": cold_view, "hot": hot_view}
 
     def project_compactions(self) -> dict:
-        """View for viewer.html /state/compactions endpoint."""
+        """View for the /state/compactions endpoint."""
         return {
             "schema_version": FRAME_SCHEMA_VERSION,
             "k": self._k,

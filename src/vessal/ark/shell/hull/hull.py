@@ -421,11 +421,6 @@ class Hull:
         if method == "GET" and path == "/state/compactions":
             fs = self._cell.get("_frame_stream")
             return 200, ({} if fs is None else fs.project_compactions())
-        if method == "GET" and path == "/logs":
-            return self._handle_logs_viewer()
-        if method == "GET" and path == "/logs/raw":
-            after = body.get("after") if body else None
-            return self._handle_logs_raw(after=after)
         if method == "POST" and path == "/reload/soul":
             self.reload_soul()
             return 200, {"status": "soul_reloaded"}
@@ -454,33 +449,6 @@ class Hull:
             return 200, {"skills": entries}
 
         return 404, {"error": f"not found: {method} {path}"}
-
-    def _handle_logs_viewer(self) -> tuple[int, "StaticResponse"]:
-        """GET /logs — Redirect to /console/ (unified Console SPA)."""
-        from vessal.ark.shell.hull.hull_api import StaticResponse
-        body = b'<meta http-equiv="refresh" content="0;url=/console/">Redirecting to Console...'
-        return 200, StaticResponse(body, "text/html; charset=utf-8")
-
-    def _handle_logs_raw(self, after: int | None = None) -> tuple[int, "StaticResponse"]:
-        """GET /logs/raw[?after=N] — Return frames.jsonl content (supports incremental reads).
-
-        Args:
-            after: Line offset; return content starting from line `after` (0-indexed). Returns all if None.
-
-        Returns:
-            (200, StaticResponse) containing JSONL text.
-        """
-        from vessal.ark.shell.hull.hull_api import StaticResponse
-        path = Path(self._log_dir) / "frames.jsonl"
-        if not path.exists():
-            return 200, StaticResponse(b"", "text/plain; charset=utf-8")
-        lines = path.read_text(encoding="utf-8").splitlines()
-        if after is not None and isinstance(after, int) and after > 0:
-            lines = lines[after:]
-        content = "\n".join(lines)
-        if content:
-            content += "\n"
-        return 200, StaticResponse(content.encode("utf-8"), "text/plain; charset=utf-8")
 
     def snapshot(self, path: str | None = None) -> str:
         """Save a snapshot to disk.
