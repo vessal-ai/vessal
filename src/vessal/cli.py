@@ -29,6 +29,12 @@ def main() -> None:
         prog="vessal",
         description="Vessal — Agent Runtime",
     )
+    from importlib import metadata as _metadata
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"vessal {_metadata.version('vessal')}",
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     # ── Runtime commands ──
