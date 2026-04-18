@@ -9,7 +9,7 @@ const VIEWS = [
   { id: "market", icon: "🛒", label: "Skill Market" },
 ];
 
-window.consoleApp = function consoleApp() {
+function consoleApp() {
   return {
     views: VIEWS,
     current: "chat",
@@ -131,4 +131,8 @@ window.consoleApp = function consoleApp() {
       localStorage.setItem("right-collapsed", this.rightCollapsed ? "1" : "0");
     },
   };
-};
+}
+
+document.addEventListener("alpine:init", () => {
+  window.Alpine.data("consoleApp", consoleApp);
+});
