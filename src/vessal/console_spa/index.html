@@ -5,11 +5,11 @@
   <title>Vessal Console</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="assets/style.css" />
-  <script src="assets/alpine.min.js"></script>
   <script type="module" src="assets/app.js"></script>
+  <script defer src="assets/alpine.min.js"></script>
 </head>
 <body>
-  <div id="app" x-data="consoleApp()" x-init="init()">
+  <div id="app" x-data="consoleApp" x-init="init()">
     <header class="top-nav">
       <span class="brand">Vessal</span>
       <span class="project" x-text="project"></span>
