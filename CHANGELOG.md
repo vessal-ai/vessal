@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.3] - 2026-04-18
+
+### Added
+
+- **Vessal Console** — Browser-based agent UI served at `/console/`. Left pane is live chat; collapsible right pane shows the agent's current Frame (think, action, observation). Alpine.js v3.13.10 vendored (no CDN dependency).
+- **TUI picker** — Running bare `vessal` inside an agent project opens an interactive menu (Run dev, Build image, Install skill, Open Console, Stop). Outside a project, prompts to create or open a recent one.
+- **`vessal create` wizard** — Six-question interactive scaffold (name, provider, API key, template, Docker, deploy). Accepts Enter × 6 to use all defaults.
+- **Hot reload** — `watchfiles`-based file watcher auto-applies changes without Hull restart: `SOUL.md` edits take effect on the next frame, Skill edits reload the affected Skill in place, `hull.toml` changes surface as a yellow Console banner.
+- **SSE event bus** — `/events` endpoint streams `frame`, `agent_crash`, `gate_reject`, `llm_timeout`, and `restart_required` events to the Console.
+- **Skill UI convention** — A Skill may ship a pre-built static frontend under `ui/index.html`; the Console auto-discovers and mounts it as an iframe activity-bar tab.
+- **`GET /frames?after=N`** — Incremental frame polling endpoint used by the Console and FramePublisher.
+
+### Changed
+
+- Shell server now binds to `127.0.0.1` by default (was `0.0.0.0`). Port auto-retries up to +20 if the default is occupied.
+- `GET /logs` redirects to `/console/` (HTML log viewer removed).
+- README logo now uses a versioned local asset (`assets/vessal-logo-text.jpg`) instead of a private GitHub image URL.
+
+### Fixed
+
+- `ThreadingHTTPServer` replaces plain `HTTPServer` so SSE connections no longer block other requests.
+
 ## [0.0.2] - 2026-04-16
 
 ### Added
