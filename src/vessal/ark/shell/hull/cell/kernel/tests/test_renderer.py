@@ -28,6 +28,7 @@ from vessal.ark.shell.hull.cell.protocol import (
     FrameRecord, Pong, Action, Observation,
     FRAME_SCHEMA_VERSION,
 )
+from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -44,13 +45,11 @@ def make_frame_record(
     error=None,
     verdict=None,
 ):
-    """Construct a test frame dict (simulating an entry in _frame_log).
-
-    _frame_log now stores dicts (FrameRecord.to_dict() output), not FrameRecord instances.
-    """
+    """Construct a test frame dict (schema_version 7) for use with FrameStream.commit_frame()."""
     return {
         "schema_version": FRAME_SCHEMA_VERSION,
         "number": number,
+        "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
         "pong": {"think": think, "action": {"operation": operation, "expect": expect}},
         "observation": {
             "stdout": stdout,
@@ -65,7 +64,7 @@ def bare_ns_v3() -> dict:
     """Return a minimal v4 namespace for test isolation."""
     return {
         "_frame": 0,
-        "_frame_log": [],
+        "_frame_stream": FrameStream(),
         "_system_prompt": "",
         "_context_budget": 128000,
         "_max_tokens": 4096,
@@ -86,7 +85,7 @@ def minimal_ns():
     """Minimal namespace fixture for Ping tests."""
     return {
         "_frame": 0,
-        "_frame_log": [],
+        "_frame_stream": FrameStream(),
         "_system_prompt": "",
         "_context_budget": 128000,
         "_max_tokens": 4096,
@@ -123,7 +122,7 @@ def test_render_ping_system_prompt(minimal_ns):
 
 
 def test_render_ping_frame_stream_empty_when_no_frames(minimal_ns):
-    minimal_ns["_frame_log"] = []
+    minimal_ns["_frame_stream"] = FrameStream()
     ping = render(minimal_ns)
     assert ping.state.frame_stream == ""
 
@@ -223,73 +222,95 @@ class TestRenderSingleFrame:
 
     def test_header_format(self):
         frame = make_frame_record(number=42, operation="x = 1")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "── frame 42 ──" in rendered
 
     def test_operation_section(self):
         frame = make_frame_record(operation="x = requests.get(...)")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[operation]" in rendered
         assert "x = requests.get(...)" in rendered
 
     def test_think_section_when_present(self):
         frame = make_frame_record(think="let me think...")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[think]" in rendered
         assert "let me think..." in rendered
 
     def test_think_section_absent_when_empty(self):
         frame = make_frame_record(think="")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[think]" not in rendered
 
     def test_stdout_section(self):
         frame = make_frame_record(stdout="142")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[stdout]" in rendered
         assert "142" in rendered
 
     def test_diff_section(self):
         frame = make_frame_record(diff="+ x = 42")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[diff]" in rendered
         assert "+ x = 42" in rendered
 
     def test_error_section(self):
         frame = make_frame_record(error="Traceback: NameError")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[error]" in rendered
         assert "Traceback: NameError" in rendered
 
     def test_no_stdout_section_when_empty(self):
         frame = make_frame_record(stdout="", diff="+ x = 1")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[stdout]" not in rendered
 
     def test_no_diff_section_when_empty(self):
         frame = make_frame_record(stdout="hello", diff="")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[diff]" not in rendered
 
     def test_expect_section_when_present(self):
         frame = make_frame_record(expect="assert x == 1")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[expect]" in rendered
         assert "assert x == 1" in rendered
 
     def test_expect_absent_when_empty(self):
         frame = make_frame_record(expect="")
-        ns = {"_frame_log": [frame]}
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(frame)
+        ns = {"_frame_stream": fs}
         rendered = _render_frame_stream(ns, 100000)
         assert "[expect]" not in rendered
 
@@ -299,45 +320,56 @@ class TestRenderSingleFrame:
 # ──────────────────────────────────────────────────────────────────────────────
 
 class TestRenderFrameStream:
-    def test_empty_frame_log(self):
+    def test_empty_frame_stream(self):
         ns = bare_ns_v3()
         assert _render_frame_stream(ns, 100000) == ""
 
     def test_header_present(self):
         ns = bare_ns_v3()
-        ns["_frame_log"] = [make_frame_record(number=1)]
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(make_frame_record(number=1))
+        ns["_frame_stream"] = fs
         result = _render_frame_stream(ns, 100000)
         assert result.startswith("══════ frame stream ══════\n")
 
     def test_single_frame_content(self):
         ns = bare_ns_v3()
-        ns["_frame_log"] = [make_frame_record(number=1, operation="x = 1")]
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(make_frame_record(number=1, operation="x = 1"))
+        ns["_frame_stream"] = fs
         result = _render_frame_stream(ns, 100000)
         assert "── frame 1 ──" in result
         assert "x = 1" in result
 
     def test_multiple_frames(self):
         ns = bare_ns_v3()
-        ns["_frame_log"] = [make_frame_record(number=1), make_frame_record(number=2)]
+        fs = FrameStream(k=16, n=8)
+        for f in [make_frame_record(number=1), make_frame_record(number=2)]:
+            fs.commit_frame(f)
+        ns["_frame_stream"] = fs
         result = _render_frame_stream(ns, 100000)
         assert "── frame 1 ──" in result
         assert "── frame 2 ──" in result
 
     def test_within_budget_no_deletion(self):
         ns = bare_ns_v3()
-        ns["_frame_log"] = [make_frame_record(number=1, operation="x = 1")]
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(make_frame_record(number=1, operation="x = 1"))
+        ns["_frame_stream"] = fs
         result = _render_frame_stream(ns, 100000)
         assert "earlier" not in result
 
     def test_over_budget_triggers_hard_delete(self):
-        # 1 token budget will always trigger hard deletion
+        # tiny budget with many frames should trigger bucket-level dropping
         ns = bare_ns_v3()
-        ns["_frame_log"] = [
-            make_frame_record(number=1, operation="x = 1"),
-            make_frame_record(number=2, operation="y = 2"),
-        ]
+        fs = FrameStream(k=16, n=8)
+        for i in range(50):
+            fs.commit_frame(make_frame_record(number=i, stdout="x" * 500))
+        ns["_frame_stream"] = fs
+        ns["_context_budget"] = 2000
+        ns["_max_tokens"] = 500
         result = _render_frame_stream(ns, 1)
-        # after hard deletion, at least 1 frame is retained (══════ frame stream ══════ header is present)
+        # the frame stream header is present (at least 1 frame rendered)
         assert "══════ frame stream ══════" in result
 
 
@@ -406,14 +438,18 @@ class TestRender:
 
     def test_frame_stream_in_output(self):
         ns = bare_ns_v3()
-        ns["_frame_log"] = [make_frame_record(number=1, operation="x = 1")]
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(make_frame_record(number=1, operation="x = 1"))
+        ns["_frame_stream"] = fs
         ping = render(ns)
         assert "══════ frame stream ══════" in ping.state.frame_stream
         assert "x = 1" in ping.state.frame_stream
 
     def test_context_pct_written(self):
         ns = bare_ns_v3()
-        ns["_frame_log"] = [make_frame_record(number=1, operation="x = 1")]
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(make_frame_record(number=1, operation="x = 1"))
+        ns["_frame_stream"] = fs
         render(ns)
         assert "_context_pct" in ns
         assert isinstance(ns["_context_pct"], int)
@@ -423,7 +459,9 @@ class TestRender:
         ns = bare_ns_v3()
         ns["_context_budget"] = 1000
         ns["_max_tokens"] = 100
-        ns["_frame_log"] = [make_frame_record(number=1, operation="x = 1")]
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(make_frame_record(number=1, operation="x = 1"))
+        ns["_frame_stream"] = fs
         render(ns)
         assert ns["_context_pct"] > 0
 
@@ -442,7 +480,9 @@ class TestRender:
     def test_three_segments_ordering(self):
         ns = bare_ns_v3()
         ns["_system_prompt"] = "System."
-        ns["_frame_log"] = [make_frame_record(number=1)]
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(make_frame_record(number=1))
+        ns["_frame_stream"] = fs
         ns["_signal_outputs"] = [("auxiliary", "auxiliary content")]
         ping = render(ns)
         # system_prompt, frame_stream, signals are independent fields — order is guaranteed by structure
@@ -485,24 +525,27 @@ class TestDroppedFrameCount:
 
     def test_no_frames_dropped_zero(self):
         ns = bare_ns_v3()
-        ns["_frame_log"] = [make_frame_record(number=1)]
+        fs = FrameStream(k=16, n=8)
+        fs.commit_frame(make_frame_record(number=1))
+        ns["_frame_stream"] = fs
         render(ns)
         assert ns["_dropped_frame_count"] == 0
 
     def test_frames_dropped_when_over_budget(self):
         ns = bare_ns_v3()
         # create many frames so the frame stream exceeds budget
-        ns["_frame_log"] = [
-            make_frame_record(number=i, stdout="x" * 500) for i in range(50)
-        ]
+        fs = FrameStream(k=16, n=8)
+        for i in range(50):
+            fs.commit_frame(make_frame_record(number=i, stdout="x" * 500))
+        ns["_frame_stream"] = fs
         ns["_context_budget"] = 2000
         ns["_max_tokens"] = 500
         render(ns)
         assert ns["_dropped_frame_count"] > 0
 
-    def test_empty_frame_log_zero(self):
+    def test_empty_frame_stream_zero(self):
         ns = bare_ns_v3()
-        ns["_frame_log"] = []
+        ns["_frame_stream"] = FrameStream()
         render(ns)
         assert ns["_dropped_frame_count"] == 0
 
@@ -527,12 +570,13 @@ class TestKernelRenderV3:
         result = k.exec_operation("x = 1", frame_number=1)
         assert isinstance(result, ExecResult)
 
-    def test_frame_log_populated(self):
+    def test_frame_stream_not_populated_by_exec(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.exec_operation("x = 1", frame_number=1)
-        # exec_operation does NOT write _frame_log — that is Cell's job
-        assert len(k.ns.get("_frame_log", [])) == 0
+        # exec_operation does NOT commit frames to _frame_stream — that is Cell's job
+        fs = k.ns.get("_frame_stream")
+        assert fs is None or fs.hot_frame_count() == 0
 
     def test_system_prompt_key_used(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
@@ -637,3 +681,38 @@ class TestThreeSegmentAssembly:
         assert "organize memories" in ping.system_prompt
         assert "══════ SOUL ══════" not in ping.system_prompt
         assert "══════ skill protocol ══════" not in ping.system_prompt
+
+
+def test_renderer_output_order_system_stream_signals():
+    from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
+    from vessal.ark.shell.hull.cell.kernel.render.renderer import render
+    fs = FrameStream(k=2, n=2)
+    fs._cold = [[{
+        "schema_version": 7, "range": [0, 1], "intent": "COLD_SENTINEL",
+        "operations": [], "outcomes": "", "artifacts": [], "notable": "",
+        "layer": 0, "compacted_at": 2,
+    }]]
+    fs.commit_frame({
+        "schema_version": 7, "number": 3,
+        "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
+        "pong": {"think": "", "action": {"operation": "HOT_SENTINEL", "expect": ""}},
+        "observation": {"stdout": "", "diff": "", "error": None, "verdict": None},
+    })
+    ns = {
+        "_frame_stream": fs,
+        "_system_prompt": "SYS_SENTINEL",
+        "_context_budget": 128000,
+        "_max_tokens": 4096,
+        "_builtin_names": [],
+        "_context_pct": 0,
+        "_ns_meta": {},
+        "_signal_outputs": [],
+        "_dropped_frame_count": 0,
+    }
+    out = render(ns)
+    full_text = out.system_prompt + out.state.frame_stream + out.state.signals
+    i_sys = full_text.index("SYS_SENTINEL")
+    i_stream_hdr = full_text.index("frame stream")
+    i_cold = full_text.index("COLD_SENTINEL")
+    i_hot = full_text.index("HOT_SENTINEL")
+    assert i_sys < i_stream_hdr < i_cold < i_hot

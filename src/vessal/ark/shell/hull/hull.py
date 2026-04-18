@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import logging
+import queue
 import sys
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -13,6 +15,7 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 from vessal.ark.shell.hull.cell import Cell
+from vessal.ark.shell.hull.cell.kernel.compression_parser import CompactionParseError, parse_compaction_json
 from vessal.ark.shell.hull.event_loop import EventLoop, FrameHooks
 from vessal.ark.shell.hull.skills_manager import SkillsManager
 from vessal.ark.shell.hull.skill_manager import SkillManager
@@ -57,9 +60,11 @@ class Hull:
         gates_cfg = config.get("gates", {})
 
         self._init_cell(core_cfg, cell_cfg, agent_cfg)
+        self._init_compression(hull_cfg)
         self._init_skills(hull_cfg)
         self._init_prompts(renderer_cfg)
         self._init_loop(gates_cfg)
+        self._resume_pending_compaction()
 
     # ------------------------------------------------------------------ Initialization phases
 
@@ -106,6 +111,25 @@ class Hull:
         if "language" in agent_cfg:
             self._cell.set("language", agent_cfg["language"])
 
+    def _init_compression(self, hull_cfg: dict) -> None:
+        """Phase 2b: Create compression Core, result queue, and single-worker ThreadPoolExecutor."""
+        from vessal.ark.shell.hull.cell.core import Core
+        self._compression_core = Core(
+            timeout=float(hull_cfg.get("compression_timeout", 120.0)),
+            max_retries=int(hull_cfg.get("compression_max_retries", 2)),
+            api_params={
+                "temperature": float(hull_cfg.get("compression_temperature", 0.3)),
+                "max_tokens": int(hull_cfg.get("compression_max_tokens", 2048)),
+            },
+        )
+        self._result_queue: queue.Queue = queue.Queue()
+        self._thread_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="compaction")
+        self._compaction_frames_since_snapshot = 0
+        self._compaction_snapshot_every_n = int(hull_cfg.get("snapshot_every_n_frames", 20))
+        prompt_path = Path(__file__).parent / "prompts" / "compression.md"
+        self._compression_prompt = prompt_path.read_text(encoding="utf-8")
+        self._cell.set("_compression_prompt", self._compression_prompt)
+
     def _init_skills(self, hull_cfg: dict) -> None:
         """Phase 3: SkillManager, SkillsManager, route table, pre-load Skills, start servers."""
         skill_paths = hull_cfg.get("skill_paths", [])
@@ -120,6 +144,8 @@ class Hull:
         self._cell.set("_data_dir", str(self._project_dir / "data"))
         compress_threshold = hull_cfg.get("compress_threshold", 50)
         self._cell.set("_compress_threshold", compress_threshold)
+        self._cell.set("_compaction_k", hull_cfg.get("compaction_k", 16))
+        self._cell.set("_compaction_n", hull_cfg.get("compaction_n", 8))
 
         self._routes: dict[tuple[str, str], Any] = {}
         self._running_servers: dict[str, Any] = {}
@@ -181,8 +207,9 @@ class Hull:
         self._rewrite_runtime_owned()
 
         hooks = FrameHooks(
-            before_frame=lambda: self._rewrite_runtime_owned(),
-            snapshot=lambda: self.snapshot(),
+            before_frame=self._rewrite_runtime_owned,
+            after_frame=self._after_frame,
+            snapshot=self.snapshot,
         )
 
         self._event_loop = EventLoop(
@@ -256,6 +283,30 @@ class Hull:
         """Unload a Skill from the SkillManager registry."""
         self._skill_manager.unload(name)
 
+    def reload_soul(self) -> None:
+        """Force re-read of SOUL.md regardless of mtime.
+
+        Normal hot-reload is handled by _rewrite_runtime_owned's mtime check each
+        frame. This method is called by the file watcher to invalidate the cache
+        proactively (covers edge cases where two writes hit the same mtime tick).
+        """
+        if self._soul_path.exists():
+            self._soul_text = self._soul_path.read_text(encoding="utf-8")
+            self._soul_mtime = self._soul_path.stat().st_mtime
+
+    def reload_skill(self, name: str) -> bool:
+        """Reload a skill by name. Returns True if the skill was reloaded."""
+        # NOTE: loaded_names is a @property on SkillManager (no parens).
+        if name not in self._skill_manager.loaded_names:
+            return False
+        try:
+            self._stop_skill_server(name)
+        except Exception:
+            pass
+        self._skill_manager.reload(name)
+        self._load_and_instantiate_skill(name)
+        return True
+
     def get_ns(self, key: str) -> Any:
         """Get a value from Cell namespace."""
         return self._cell.get(key)
@@ -269,18 +320,24 @@ class Hull:
         return list(self._cell.keys())
 
     def frames(self, after: int | None = None) -> list[dict]:
-        """Query the frame log.
+        """Query hot-zone frames from the frame stream.
 
         Args:
             after: Only return frames with number > after. Returns all if None.
 
         Returns:
-            A copy of the frame record list.
+            A copy of all hot-zone frame dicts, ordered oldest to newest.
         """
-        frame_log = self._cell.get("_frame_log", [])
+        fs = self._cell.get("_frame_stream")
+        if fs is None:
+            return []
+        # Flatten hot buckets oldest-first (B_4..B_0) into a single list
+        all_frames: list[dict] = []
+        for bucket in reversed(fs._hot):
+            all_frames.extend(bucket)
         if after is not None:
-            frame_log = [f for f in frame_log if f.get("number", 0) > after]
-        return list(frame_log)
+            all_frames = [f for f in all_frames if f.get("number", 0) > after]
+        return list(all_frames)
 
     def next_alarm(self) -> float | None:
         """Return the absolute timestamp of the Agent's next scheduled wake-up.
@@ -314,6 +371,7 @@ class Hull:
     def stop(self) -> None:
         """Request stop."""
         self._event_loop.stop()
+        self._thread_pool.shutdown(wait=False)
 
     def handle(self, method: str, path: str, body: dict | None = None) -> tuple[int, dict | "StaticResponse"]:
         """Single entry point for HTTP requests. Shell calls this; Hull routes internally.
@@ -343,8 +401,15 @@ class Hull:
         # Built-in routes
         if method == "GET" and path == "/status":
             return 200, self.status()
-        if method == "GET" and path == "/frames":
-            after = body.get("after")
+        if method == "GET" and path.startswith("/frames"):
+            after = None
+            if "?" in path:
+                from urllib.parse import parse_qs, urlparse
+                qs = parse_qs(urlparse(path).query)
+                if "after" in qs:
+                    after = int(qs["after"][0])
+            if after is None:
+                after = (body or {}).get("after")
             return 200, {"frames": self.frames(after=after)}
         if method == "POST" and path == "/wake":
             reason = body.get("reason", "external")
@@ -353,26 +418,39 @@ class Hull:
         if method == "POST" and path == "/stop":
             self.stop()
             return 200, {"status": "stopping"}
+        if method == "GET" and path == "/state/compactions":
+            fs = self._cell.get("_frame_stream")
+            return 200, ({} if fs is None else fs.project_compactions())
         if method == "GET" and path == "/logs":
             return self._handle_logs_viewer()
         if method == "GET" and path == "/logs/raw":
             after = body.get("after") if body else None
             return self._handle_logs_raw(after=after)
+        if method == "POST" and path == "/reload/soul":
+            self.reload_soul()
+            return 200, {"status": "soul_reloaded"}
+        if method == "POST" and path == "/reload/skill":
+            name = (body or {}).get("name")
+            if not isinstance(name, str) or not name:
+                return 400, {"error": "missing 'name' in body"}
+            ok = self.reload_skill(name)
+            return (200 if ok else 404), {"status": "skill_reloaded" if ok else "not_loaded", "name": name}
+
+        if method == "GET" and path == "/skills/ui":
+            entries = []
+            for name in self._skill_manager.loaded_names:
+                skill_dir = self._skill_manager.skill_dir(name)
+                if skill_dir and (Path(skill_dir) / "ui" / "index.html").exists():
+                    entries.append({"name": name, "url": f"/skills/{name}/ui/index.html"})
+            return 200, {"skills": entries}
 
         return 404, {"error": f"not found: {method} {path}"}
 
     def _handle_logs_viewer(self) -> tuple[int, "StaticResponse"]:
-        """GET /logs — Return the HTML viewer content.
-
-        Returns:
-            (200, StaticResponse) containing viewer.html content.
-        """
+        """GET /logs — Redirect to /console/ (unified Console SPA)."""
         from vessal.ark.shell.hull.hull_api import StaticResponse
-        viewer_path = Path(__file__).parent.parent.parent / "util" / "logging" / "viewer.html"
-        if not viewer_path.exists():
-            return 404, StaticResponse(b"viewer.html not found", "text/plain")
-        content = viewer_path.read_bytes()
-        return 200, StaticResponse(content, "text/html; charset=utf-8")
+        body = b'<meta http-equiv="refresh" content="0;url=/console/">Redirecting to Console...'
+        return 200, StaticResponse(body, "text/html; charset=utf-8")
 
     def _handle_logs_raw(self, after: int | None = None) -> tuple[int, "StaticResponse"]:
         """GET /logs/raw[?after=N] — Return frames.jsonl content (supports incremental reads).
@@ -474,6 +552,33 @@ class Hull:
                 self._soul_mtime = current_mtime
         self._cell.set("_soul", self._soul_text)
 
+        # Drain compaction result queue and apply to FrameStream
+        fs = self._cell.get("_frame_stream")
+        if fs is None:
+            return
+        results_to_apply: list[tuple[dict, int]] = []
+        aborted = False
+        while True:
+            try:
+                item = self._result_queue.get_nowait()
+            except queue.Empty:
+                break
+            record, layer = item
+            if record in ("skip", "error"):
+                aborted = True
+                continue
+            results_to_apply.append((record, layer))
+        if aborted and not results_to_apply:
+            fs.abort_compaction()
+        if results_to_apply:
+            fs.apply_results(results_to_apply)
+            s = fs.stats()
+            frame_number = self._cell.get("_frame", 0)
+            self._tracer.log(frame_number, "compaction.layer_stats", "gauge", -1,
+                             f"hot={s['hot_counts']},cold={s['cold_counts']}")
+            self.snapshot()
+            self._compaction_frames_since_snapshot = 0
+
     # ------------------------------------------------------------------ Internal helpers
 
     def _ensure_log_readme(self) -> None:
@@ -540,6 +645,82 @@ trace = false  # disable to reduce IO
             print(f"{name} loaded — {description}")
         except Exception as e:
             raise RuntimeError(f"skill '{name}' failed to load: {e}") from e
+
+    def _after_frame(self) -> None:
+        """Called after each successful frame. Evaluates try_shift and submits compaction task if due."""
+        fs = self._cell.get("_frame_stream")
+        if fs is None:
+            return
+        frame_number = self._cell.get("_frame", 0)
+        task = fs.try_shift()
+        if task is None:
+            if len(fs._hot[0]) >= fs.k and fs.in_flight:
+                self._tracer.log(frame_number, "compaction.shift_blocked", "gauge", -1, "value=1")
+        else:
+            self._tracer.log(frame_number, "compaction.in_flight", "gauge", -1, "value=1")
+            raw = task.get("raw_bytes", 0)
+            stripped = task.get("stripped_bytes", 0)
+            if raw > 0:
+                self._tracer.log(frame_number, "compaction.stripping_ratio", "gauge", -1,
+                                 f"raw={raw},stripped={stripped}")
+            self._thread_pool.submit(self._run_compaction_task, task, frame_number)
+        self._compaction_frames_since_snapshot += 1
+        if self._compaction_frames_since_snapshot >= self._compaction_snapshot_every_n:
+            self.snapshot()
+            self._compaction_frames_since_snapshot = 0
+
+    def _resume_pending_compaction(self) -> None:
+        """Re-submit any in-flight compaction that survived in the snapshot after a crash-restart."""
+        fs = self._cell.get("_frame_stream")
+        if fs is None:
+            return
+        if fs.compression_zone is None:
+            return
+        frame_number = self._cell.get("_frame", 0)
+        payload = list(fs.compression_zone)
+        task = {"layer": 0, "payload": payload}
+        self._thread_pool.submit(self._run_compaction_task, task, frame_number)
+        self._tracer.log(frame_number, "compaction.resumed", "event", 0, f"payload_n={len(payload)}")
+
+    def _run_compaction_task(self, task: dict, frame_number: int) -> None:
+        """Compaction worker body. Runs on the compaction thread. Must not touch ns."""
+        import time
+        layer = task["layer"]
+        payload = task["payload"]
+        if not payload:
+            self._result_queue.put(("skip", layer))
+            return
+        ping = self._build_compression_ping(payload, layer)
+        t0 = time.monotonic()
+        try:
+            pong, _p, _c = self._compression_core.run(ping, tracer=self._tracer, frame=frame_number)
+            raw_json = pong.action.operation
+            record = parse_compaction_json(raw_json, layer=layer, compacted_at=frame_number)
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            self._tracer.log(frame_number, "compaction.latency_ms", "span", elapsed_ms,
+                             f"layer={layer}")
+            self._result_queue.put((record.to_dict(), layer))
+        except (CompactionParseError, Exception) as e:
+            self._tracer.log(frame_number, "compaction.error", "worker", -1, f"layer={layer} err={e!r}")
+            self._result_queue.put(("error", layer))
+
+    def _build_compression_ping(self, payload: list[dict], layer: int) -> "Ping":
+        """Assemble a compression Ping from a stripped frame or cold record payload."""
+        from vessal.ark.shell.hull.cell.protocol import Ping, State
+        from vessal.ark.shell.hull.cell.kernel.render._frame_render import project_frame_dict
+        from vessal.ark.shell.hull.cell.kernel.render._cold_render import project_compaction_record
+
+        if layer == 0:
+            body = "\n\n".join(project_frame_dict(f) for f in payload)
+        else:
+            body = "\n\n".join(project_compaction_record(r) for r in payload)
+        return Ping(
+            system_prompt=self._compression_prompt,
+            state=State(
+                frame_stream="══════ frame stream ══════\n" + body,
+                signals="",
+            ),
+        )
 
     def _activate_venv(self) -> None:
         """Add the project .venv's site-packages to sys.path.

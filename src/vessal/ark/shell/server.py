@@ -6,7 +6,11 @@ import logging
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
+
+from vessal.ark.shell.events import EventBus
+from vessal.ark.shell.hot_reload import HotReloader
 
 _logger = logging.getLogger(__name__)
 
@@ -23,8 +27,74 @@ class _ProxyHandler(http.server.BaseHTTPRequestHandler):
     """
 
     def do_GET(self) -> None:
-        """Handle GET requests: forward to Hull's internal port."""
+        """Handle GET requests: intercept /events for SSE, /console/* static, forward rest to Hull."""
+        path = self.path.split("?")[0]
+        if path == "/events":
+            self._stream_events()
+            return
+        if path == "/console" or path.startswith("/console/"):
+            self._serve_console_static(path)
+            return
         self._proxy("GET")
+
+    def _serve_console_static(self, path: str) -> None:
+        import mimetypes
+        from pathlib import Path as _Path
+        import vessal
+
+        root = _Path(vessal.__file__).resolve().parent / "console_spa"
+        if path in ("/console", "/console/"):
+            rel = "index.html"
+        else:
+            rel = path[len("/console/"):]
+        target = (root / rel).resolve()
+        if root not in target.parents and target != root:
+            self.send_response(403); self.end_headers(); return
+        if target.is_dir():
+            target = target / "index.html"
+        if not target.exists():
+            self.send_response(404); self.end_headers(); return
+        mime, _ = mimetypes.guess_type(str(target))
+        data = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", mime or "application/octet-stream")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _stream_events(self) -> None:
+        """SSE streaming endpoint; iterates EventBus subscription until client disconnects."""
+        import json
+
+        bus = getattr(self.server, "_event_bus", None)
+        if bus is None:
+            self.send_response(503)
+            self.end_headers()
+            return
+
+        # Register subscription BEFORE flushing headers to eliminate the race
+        # condition where a publisher fires between urlopen() returning and
+        # the subscription being registered.
+        stop = threading.Event()
+        q = bus.open_queue()
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+
+            for event in bus.drain_queue(q, stop):
+                payload = f"data: {json.dumps(event, ensure_ascii=False)}\n\n".encode("utf-8")
+                try:
+                    self.wfile.write(payload)
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    break
+        finally:
+            stop.set()
+            bus.close_queue(q)
 
     def do_POST(self) -> None:
         """Handle POST requests: forward to Hull's internal port. For /stop, mark stop intent before forwarding."""
@@ -119,14 +189,14 @@ class ShellServer:
     def __init__(
         self,
         project_dir: str,
-        host: str = "0.0.0.0",
+        host: str = "127.0.0.1",
         port: int = 8420,
     ) -> None:
         """Initialize ShellServer.
 
         Args:
             project_dir: Agent project directory path.
-            host: HTTP listen address, defaults to 0.0.0.0.
+            host: HTTP listen address, defaults to 127.0.0.1.
             port: HTTP listen port, 0 for dynamic allocation.
         """
         self._project_dir = project_dir
@@ -137,8 +207,11 @@ class ShellServer:
         self._hull_alive = False
         self._stop_requested = False
         self._stop_event = threading.Event()
-        self._http_server: http.server.HTTPServer | None = None
+        self._http_server: http.server.ThreadingHTTPServer | None = None
         self._monitor_thread: threading.Thread | None = None
+        self._event_bus = EventBus()
+        self._hot_reloader: HotReloader | None = None
+        self._frame_publisher: FramePublisher | None = None
 
     @property
     def port(self) -> int:
@@ -147,20 +220,40 @@ class ShellServer:
             return self._http_server.server_address[1]
         return self._port
 
+    @property
+    def event_bus(self) -> EventBus:
+        return self._event_bus
+
     def start(self) -> None:
         """Start Shell: launch Hull subprocess + HTTP reverse proxy + monitor thread.
 
         Raises:
-            RuntimeError: Hull subprocess failed to start or timed out.
+            RuntimeError: Hull subprocess failed to start or timed out, or no free port
+                found in 20 retries.
         """
         self._spawn_hull()
 
-        self._http_server = http.server.HTTPServer(
-            (self._host, self._port), _ProxyHandler
-        )
+        requested = self._port
+        last_err: OSError | None = None
+        for offset in range(20):
+            try:
+                self._http_server = http.server.ThreadingHTTPServer(
+                    (self._host, requested + offset), _ProxyHandler
+                )
+                self._port = requested + offset
+                break
+            except OSError as e:
+                last_err = e
+                continue
+        else:
+            raise RuntimeError(
+                f"No free port in range {requested}..{requested + 19}: {last_err}"
+            )
+
         self._http_server.internal_port = self._internal_port
         self._http_server.hull_alive = self._hull_alive
         self._http_server._shell_server = self
+        self._http_server._event_bus = self._event_bus
 
         http_thread = threading.Thread(
             target=self._http_server.serve_forever,
@@ -175,6 +268,36 @@ class ShellServer:
             name="hull-monitor",
         )
         self._monitor_thread.start()
+
+        self._hot_reloader = HotReloader(
+            project_dir=Path(self._project_dir),
+            internal_port_getter=lambda: self._internal_port,
+            publish=self._event_bus.publish,
+        )
+        self._hot_reloader.start()
+
+        self._frame_publisher = FramePublisher(
+            port_getter=lambda: self._internal_port,
+            publish=self._event_bus.publish,
+        )
+        self._frame_publisher.start()
+
+        try:
+            from vessal.ark.shell.tui.recent import RecentProjects
+            RecentProjects().add(self._project_dir)
+        except Exception:
+            pass  # recent tracking is best-effort; never block startup
+
+        try:
+            import json as _json
+            runtime_dir = Path(self._project_dir) / "data"
+            runtime_dir.mkdir(exist_ok=True)
+            (runtime_dir / "runtime.json").write_text(
+                _json.dumps({"port": self._port, "host": self._host}),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
 
     def _spawn_hull(self) -> None:
         """Start Hull subprocess and wait for READY signal to confirm successful startup.
@@ -249,6 +372,11 @@ class ShellServer:
                 if self._stop_requested or self._stop_event.is_set():
                     break
                 _logger.warning("Hull subprocess exited (code %d), restarting...", exit_code)
+                self._event_bus.publish({
+                    "type": "agent_crash",
+                    "ts": time.time(),
+                    "payload": {"exit_code": exit_code},
+                })
                 try:
                     self._spawn_hull()
                     _logger.info("Hull subprocess restarted")
@@ -275,6 +403,10 @@ class ShellServer:
             except subprocess.TimeoutExpired:
                 self._hull_proc.kill()
                 self._hull_proc.wait()
+        if self._hot_reloader is not None:
+            self._hot_reloader.stop()
+        if getattr(self, "_frame_publisher", None) is not None:
+            self._frame_publisher.stop()
         if self._http_server:
             self._http_server.shutdown()
 
@@ -304,3 +436,54 @@ class ShellServer:
         with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
             s.bind(("127.0.0.1", 0))
             return s.getsockname()[1]
+
+
+class FramePublisher:
+    """Polls Hull /frames?after=N and publishes new frames onto an EventBus."""
+
+    def __init__(
+        self,
+        port_getter,
+        publish,
+        fetch_frames=None,
+        interval: float = 0.5,
+    ) -> None:
+        self._get_port = port_getter
+        self._publish = publish
+        self._fetch = fetch_frames or self._default_fetch
+        self._interval = interval
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._last_number = 0
+
+    @staticmethod
+    def _default_fetch(port: int, after: int) -> list:
+        import json
+        import urllib.error
+        import urllib.request
+        url = f"http://127.0.0.1:{port}/frames?after={after}"
+        try:
+            resp = urllib.request.urlopen(url, timeout=2)
+            body = json.loads(resp.read())
+            return body.get("frames", [])
+        except urllib.error.URLError:
+            return []
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._run, daemon=True, name="frame-publisher")
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval):
+            port = self._get_port()
+            if port is not None:
+                frames = self._fetch(port, self._last_number)
+                for f in frames:
+                    n = f.get("number", 0)
+                    if n <= self._last_number:
+                        continue
+                    self._last_number = n
+                    self._publish({"type": "frame", "ts": time.time(), "payload": f})

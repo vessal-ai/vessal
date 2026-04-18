@@ -1,4 +1,4 @@
-![Vessal-text](https://private-user-images.githubusercontent.com/251321079/579297227-2cfe5b37-4c3e-4e1a-aac9-de5ac859a5c2.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzYzNTA0NTcsIm5iZiI6MTc3NjM1MDE1NywicGF0aCI6Ii8yNTEzMjEwNzkvNTc5Mjk3MjI3LTJjZmU1YjM3LTRjM2UtNGUxYS1hYWM5LWRlNWFjODU5YTVjMi5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwNDE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDQxNlQxNDM1NTdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0zM2RjNTE4N2Y5ODQ0YmRjNjk2ZDA1OTQzMTVkMzZiYjkzNWFiNjUzNTU1MDQ0OThjYTBhZDNmZDA2YTEyMmRmJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZyZXNwb25zZS1jb250ZW50LXR5cGU9aW1hZ2UlMkZwbmcifQ.h7xyR8lot5LUSIQbjxKQYqvJC_SF9RZ5uam-AEIyncY)
+![Vessal-text](./assets/vessal-logo-text.jpg)
 
 # Vessal — Vessel for AI
 
@@ -10,7 +10,7 @@ An agent runtime where Python is the only way to act.
 
 [Whitepaper](references/whitepaper/)
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Skills](#skills) · [SkillHub](#skillhub) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment) · [HTTP API](#http-api)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Context Scaling](#context-scaling) · [Skills](#skills) · [SkillHub](#skillhub) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment) · [HTTP API](#http-api)
 
 
 ## The Problem
@@ -19,6 +19,23 @@ Every major agent framework gives the LLM a menu of functions and lets it pick. 
 
 **Vessal's answer: give the agent a Code, not a Menu.** Python is the sole action mechanism — not "a code interpreter among other tools," but the *only* way to act. The upper bound of what the agent can do is the programs the model can write. That bound rises with every generation of LLMs. The framework itself never becomes the bottleneck.
 
+
+## 60-Second First Agent
+
+```bash
+pip install vessal
+vessal create                  # 6-question wizard (Enter × 6 to accept defaults)
+cd my-agent && vessal          # bare vessal = interactive TUI picker
+# pick "Run dev" → Console opens at http://127.0.0.1:8420/console/
+```
+
+That's it. Chat with the agent in the left pane; watch its thinking in
+the right pane (collapsible for non-developers). Edit `SOUL.md` and the
+next turn picks it up without restart. Edit `skills/*.py` and the
+affected skill reloads in place. Changes to `hull.toml` surface as an
+yellow "restart required" banner in the Console top bar.
+
+---
 
 ## Quick Start
 
@@ -41,11 +58,11 @@ pipx install vessal
 ### Create a new agent
 
 ```bash
-vessal init my-agent
+vessal create        # interactive 6-question wizard (Enter × 6 to accept defaults)
 cd my-agent
 ```
 
-`vessal init` automatically creates a `.venv` and installs dependencies. Pass `--no-venv` to skip this step.
+`vessal create` runs a wizard that scaffolds the project, sets up `.env`, and gitignores your secrets. For a non-interactive scaffold, `vessal init my-agent` also works and accepts `--no-venv` to skip virtual-env creation.
 
 > **Tip:** `vs` is a shorthand for `vessal`. All commands work with either name — `vs start`, `vs stop`, `vs skill init`, etc.
 
@@ -80,14 +97,11 @@ vessal start
 You'll see:
 
 ```
-Shell server started: http://0.0.0.0:8420
-  Log viewer: http://localhost:8420/logs
-  Chat UI: http://127.0.0.1:8420/skills/chat/
+Shell server started: http://127.0.0.1:8420
+  Console: http://127.0.0.1:8420/console/
 ```
 
-**Open the Chat UI in your browser** — that's your conversation interface. Type a message, and the agent wakes up, writes Python, executes it, observes the results, and replies. Frame by frame, it works through your request until it's done.
-
-The Log viewer shows the raw frame stream — what the agent sees, thinks, and executes each step.
+**Open the Console in your browser** — that's your unified interface. The left pane is chat; the right pane shows the agent's current frame (collapsible). Type a message, and the agent wakes up, writes Python, executes it, observes the results, and replies.
 
 ### What just happened?
 
@@ -141,6 +155,22 @@ graph TD
 **The Ping-Pong protocol** is the fixed contract inside Cell. The Kernel renders the namespace into a **Ping** (system prompt + frame history + signals) and sends it to the LLM. The LLM returns a **Pong** (reasoning trace + Python code + optional assertion). The Kernel executes the code and records the result. The protocol never changes — Skills extend capabilities, models can be swapped, but every frame follows this same structure.
 
 The three together form **ARK** (Agent Runtime Kit). Vessal is a distribution built on ARK: the base system plus standard Skills plus defaults.
+
+
+## Context Scaling
+
+Every agent framework eventually hits the same wall: the frame log keeps growing, and no context window is large enough. Chopping the oldest frames off the front is the easy answer — and the wrong one. It destroys the prefix cache that inference engines rely on, and it silently loses the continuity the agent needs to stay coherent over long sessions.
+
+Vessal's frame stream is built for the long run. Compression runs automatically inside the Kernel on two clocks. **Mechanical stripping** peels fields off aging frames on a fixed schedule — `think`, then `signals`, then `expect`, then `observation` — each removed at a bucket boundary, with zero LLM calls involved. **Semantic summarization** fires at layer boundaries: once a bucket of stripped frames fills, the model folds it into a structured record and promotes it to the next layer. Layers compound: four frames collapse into one L₀ record, four L₀ records into one L₁, and so on. The structure is LSM-tree compaction applied to a context window.
+
+```mermaid
+flowchart LR
+    B0["B_0<br/>raw"] --> B1["B_1<br/>−think"] --> B2["B_2<br/>−signals"] --> B3["B_3<br/>−expect"] --> B4["B_4<br/>−obs"] --> CZ["compression<br/>zone"]
+    CZ -.->|"LLM, async"| L0["L_0"]
+    L0 -->|"full"| L1["L_1"] -->|"full"| LN["..."]
+```
+
+Amortized cost is O(1) per frame, capacity grows logarithmically, and ten million frames fit in eight to ten layers. Every raw frame is also appended to static storage as it is produced, so nothing is ever lost — compression only shapes the active working window. The derivation and cache economics live in [whitepaper §6.4.2](references/whitepaper/06-cache.md).
 
 
 ## Skills
@@ -289,8 +319,6 @@ These commands are for programmatic access — shell scripts, CI pipelines, or o
 
 | Command | Description |
 |---------|-------------|
-| `vessal send <message>` | Post a message to the agent's chat inbox |
-| `vessal read` | Poll the agent's chat outbox for replies |
 | `vessal status` | Query agent state (idle/active, frame count) |
 | `vessal once --goal "..."` | Single-run mode: inject goal, run one cycle, exit |
 
@@ -323,7 +351,6 @@ max_tokens = 4096
 [hull]
 skills = ["tasks", "pin", "chat", "heartbeat"]
 skill_paths = ["skills/bundled", "skills/hub", "skills/local"]
-# compress_threshold = 50     # Context pressure signal threshold (%)
 
 [gates]
 # Safety gate configuration (see Gates section below)

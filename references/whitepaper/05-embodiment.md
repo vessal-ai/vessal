@@ -1,5 +1,7 @@
 # 5. Embodiment and Evolution
 
+> **TL;DR.** Earlier chapters assumed the operating system away. This one models it explicitly: Shell plays the same role as a container runtime, Skills are organs that reach into hardware, and the long arc runs from user-space process, through containerization, toward an agent that owns its OS.
+
 The first four chapters established the cognitive architecture of an Agent: Cell computes, Hull orchestrates, Shell provides boundaries, Skills extend capabilities, and frames drive execution. But all of this rests on a hidden assumption: the runtime environment is transparent.
 
 The OS provides processes, a filesystem, a network stack, and hardware access. Every layer of this whitepaper consumes those capabilities, yet nowhere has the OS's role been explicitly modeled. This chapter closes that gap.

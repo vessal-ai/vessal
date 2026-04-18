@@ -34,6 +34,9 @@ class FrameHooks:
     before_frame: Callable[[], None] | None = None
     """Called before each frame. Hull uses it to re-fill runtime-owned variables."""
 
+    after_frame: Callable[[], None] | None = None
+    """Called after each successful frame. Hull uses it to drain compaction results."""
+
     snapshot: Callable[[], None] | None = None
     """Called after each wake cycle ends. Hull uses it to save a snapshot."""
 
@@ -153,12 +156,14 @@ class EventLoop:
             result = self._cell.step(self._tracer)
 
             if result.protocol_error is None:
-                frame_log = self._cell.get("_frame_log", [])
-                if frame_log:
-                    last_frame = frame_log[-1]
+                fs = self._cell.get("_frame_stream")
+                last_frame = fs._hot[0][-1] if (fs is not None and fs._hot[0]) else None
+                if last_frame is not None:
                     if frame_logger is not None:
                         frame_logger.write_frame(last_frame)
                     print_frame_line(last_frame)
+                if hooks.after_frame is not None:
+                    hooks.after_frame()
             else:
                 logger.error(
                     "protocol error at frame %d: %s",

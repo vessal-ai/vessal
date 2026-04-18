@@ -1,15 +1,14 @@
-"""_frame_render.py — Frame stream rendering (FrameRecord projection + hard frame deletion).
+"""_frame_render.py — Frame stream rendering (FrameRecord projection + budget trimming).
 
 render_frame_stream(ns, budget_tokens) -> tuple[str, int]
-    Render the frame stream text for all frames; physically deletes the oldest frames
-    when over budget.
+    Render the frame stream text from FrameStream (cold zone + hot buckets).
+    Drops oldest hot buckets when over budget; cold zone is never dropped.
     Returns (frame_stream_text, dropped_count).
     frame_stream_text does not include the "══════ frame stream ══════" header
     (that is concatenated by renderer.py).
 
 project_frame_dict(frame_dict, include_think) -> str
-    Project a frame dict (element of _frame_log) into a frame stream text block.
-    Retained for dict-based projection scenarios.
+    Project a frame dict into a frame stream text block.
 
 project_frame(frame, include_think) -> str
     Project a FrameRecord into human-readable text.
@@ -146,49 +145,63 @@ def project_frame(frame: "FrameRecord", include_think: bool = True) -> str:
 
 
 def render_frame_stream(ns: dict, budget_tokens: int) -> tuple[str, int]:
-    """Render frame stream text, physically deleting the oldest frames when over budget.
+    """Render cold zone + hot buckets, trimming oldest hot buckets to budget.
 
-    Unlike the old render trimming approach, this method directly modifies ns["_frame_log"] —
-    deleted frames are unrecoverable (cold storage was already written to JSONL by FrameLogger
-    at frame execution time).
+    Cold zone is never dropped — if cold alone exceeds budget, a warning line
+    is prepended and the full cold text returned. Returns (text, dropped_count)
+    where dropped_count = number of hot frames removed to fit budget.
 
     Args:
-        ns:            Kernel namespace; reads and may modify _frame_log (list[dict]).
+        ns:            Kernel namespace; reads ns["_frame_stream"] (FrameStream).
         budget_tokens: Upper limit on tokens available for the frame stream.
 
     Returns:
         (frame_stream_text, dropped_count) 2-tuple.
-        frame_stream_text does not include the "══════ frame stream ══════" header
-        (the caller renderer concatenates it).
+        frame_stream_text does not include the "══════ frame stream ══════" header.
     """
-    frame_log = ns.get("_frame_log", [])
-    if not frame_log:
+    from vessal.ark.shell.hull.cell.kernel.render._cold_render import render_cold_zone
+
+    fs = ns.get("_frame_stream")
+    if fs is None:
         return "", 0
+    view = fs.project_render()
+    cold_text = render_cold_zone(view["cold"])
 
-    rendered = [project_frame_dict(f) for f in frame_log]
-    full_text = "\n\n".join(rendered)
-    if estimate_tokens(full_text) <= budget_tokens:
-        return full_text, 0
+    # Hot buckets oldest-first (B_4..B_0); each bucket has strip level already applied
+    hot_texts: list[str] = []
+    hot_counts: list[int] = []
+    for bucket in view["hot"]:
+        frames_text = "\n\n".join(project_frame_dict(f) for f in bucket)
+        hot_texts.append(frames_text)
+        hot_counts.append(len(bucket))
 
-    return _hard_delete_and_render(frame_log, budget_tokens)
+    full_hot = "\n\n".join(t for t in hot_texts if t)
+    if cold_text and full_hot:
+        combined = cold_text + "\n\n" + full_hot
+    elif full_hot:
+        combined = full_hot
+    else:
+        combined = cold_text
 
+    if estimate_tokens(combined) <= budget_tokens:
+        return combined, 0
 
-def _hard_delete_and_render(
-    frame_log: list[dict], budget_tokens: int
-) -> tuple[str, int]:
-    """Physically delete the oldest frames until the frame stream is within budget. Retains at least 1 frame."""
+    # Over budget: flatten hot frames oldest-first, drop from front until within budget (keep >= 1).
     dropped = 0
+    hot_frames: list[dict] = []
+    for bucket in view["hot"]:
+        hot_frames.extend(bucket)
 
-    while len(frame_log) > 1:
-        rendered = [project_frame_dict(f) for f in frame_log]
-        text = "\n\n".join(rendered)
-        if estimate_tokens(text) <= budget_tokens:
+    while len(hot_frames) > 1:
+        candidate_hot = "\n\n".join(project_frame_dict(f) for f in hot_frames)
+        full = (cold_text + "\n\n" + candidate_hot) if (cold_text and candidate_hot) else candidate_hot
+        if estimate_tokens(full) <= budget_tokens:
             break
-        frame_log.pop(0)
+        hot_frames.pop(0)
         dropped += 1
 
-    rendered = [project_frame_dict(f) for f in frame_log]
-    result = "\n\n".join(rendered)
+    full_hot = "\n\n".join(project_frame_dict(f) for f in hot_frames)
+    combined = (cold_text + "\n\n" + full_hot) if (cold_text and full_hot) else (full_hot or cold_text)
     if dropped > 0:
-        result = f"[{dropped} earlier frame(s) dropped, cold storage intact]\n\n" + result
-    return result, dropped
+        combined = f"[{dropped} hot frame(s) dropped over budget, cold intact]\n\n" + combined
+    return combined, dropped

@@ -103,10 +103,20 @@ def test_persistence_corrupted_file(tmp_path):
 
 
 class TestDrop:
-    """memory.drop(n) physically deletes the oldest n frames from _frame_log."""
+    """memory.drop(n) physically deletes the oldest n frames from the hot zone."""
 
     def _make_ns_with_frames(self, n_frames: int, tmp_path=None) -> dict:
-        ns = {"_frame_log": [{"number": i} for i in range(n_frames)]}
+        from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
+        fs = FrameStream(k=16, n=8)
+        for i in range(n_frames):
+            fs.commit_frame({
+                "schema_version": 7,
+                "number": i,
+                "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
+                "pong": {"think": "", "action": {"operation": "", "expect": ""}},
+                "observation": {"stdout": "", "diff": "", "error": None, "verdict": None},
+            })
+        ns = {"_frame_stream": fs}
         if tmp_path:
             ns["_data_dir"] = str(tmp_path)
         return ns
@@ -115,20 +125,19 @@ class TestDrop:
         ns = self._make_ns_with_frames(5)
         m = Memory(ns=ns)
         m.drop(2)
-        assert len(ns["_frame_log"]) == 3
-        assert ns["_frame_log"][0]["number"] == 2
+        assert ns["_frame_stream"].hot_frame_count() == 3
 
     def test_drop_zero_is_noop(self):
         ns = self._make_ns_with_frames(3)
         m = Memory(ns=ns)
         m.drop(0)
-        assert len(ns["_frame_log"]) == 3
+        assert ns["_frame_stream"].hot_frame_count() == 3
 
     def test_drop_more_than_available_keeps_one(self):
         ns = self._make_ns_with_frames(3)
         m = Memory(ns=ns)
         m.drop(100)
-        assert len(ns["_frame_log"]) >= 1
+        assert ns["_frame_stream"].hot_frame_count() >= 1
 
     def test_drop_without_ns_raises(self):
         m = Memory()

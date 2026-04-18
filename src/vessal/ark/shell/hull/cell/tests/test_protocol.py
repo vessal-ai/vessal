@@ -127,8 +127,8 @@ class TestStepResult:
 
 
 class TestFrameRecord:
-    def test_schema_version_is_6(self):
-        assert FRAME_SCHEMA_VERSION == 6
+    def test_schema_version_is_7(self):
+        assert FRAME_SCHEMA_VERSION == 7
 
     def _make_record(self, number: int = 1) -> FrameRecord:
         ping = Ping(system_prompt="sys", state=State(frame_stream="fs", signals="sig"))
@@ -153,7 +153,7 @@ class TestFrameRecord:
         ping = Ping(system_prompt="sys", state=State(frame_stream="fs", signals="sig"))
         fr = FrameRecord(number=3, ping=ping, pong=pong, observation=obs)
         d = fr.to_dict()
-        assert d["schema_version"] == 6
+        assert d["schema_version"] == 7
         assert d["number"] == 3
         assert d["ping"]["system_prompt"] == "sys"
         assert d["ping"]["state"]["signals"] == "sig"
@@ -208,9 +208,44 @@ class TestFrameRecord:
         obs = Observation(stdout="", diff="+ x: 1", error=None, verdict=None)
         record = FrameRecord(number=1, ping=ping, pong=pong, observation=obs)
         d = record.to_dict()
-        assert d["schema_version"] == 6
+        assert d["schema_version"] == 7
         assert d["ping"]["system_prompt"] == "sys"
         assert d["ping"]["state"]["signals"] == "sig"
+
+
+def test_compaction_record_roundtrip():
+    from vessal.ark.shell.hull.cell.protocol import CompactionRecord
+    rec = CompactionRecord(
+        range=(0, 15),
+        intent="implement login",
+        operations=("call A", "call B"),
+        outcomes="created session token",
+        artifacts=("auth.py",),
+        notable="used bcrypt not argon2",
+        layer=0,
+        compacted_at=16,
+    )
+    d = rec.to_dict()
+    assert d["schema_version"] == 7
+    assert d["range"] == [0, 15]
+    assert d["operations"] == ["call A", "call B"]
+    restored = CompactionRecord.from_dict(d)
+    assert restored == rec
+
+
+def test_compaction_record_empty_fields():
+    from vessal.ark.shell.hull.cell.protocol import CompactionRecord
+    rec = CompactionRecord(
+        range=(10, 15),
+        intent="",
+        operations=(),
+        outcomes="",
+        artifacts=(),
+        notable="",
+        layer=1,
+        compacted_at=32,
+    )
+    assert CompactionRecord.from_dict(rec.to_dict()) == rec
 
 
 class TestFromDictRoundtrips:

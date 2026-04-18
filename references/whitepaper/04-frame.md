@@ -1,5 +1,7 @@
 # 4. Frame Protocol
 
+> **TL;DR.** A frame is the atom of Agent execution: one Ping from the runtime, one Pong from the model, one `exec()` of the code inside. The chapter specifies the protocol end to end, and shows how signals, sleep, and compression fit inside a structure that never changes.
+
 This chapter describes the smallest unit of system operation: the frame. A frame is the atom of Agent execution.
 
 
@@ -155,36 +157,38 @@ flowchart TD
 
 ## 4.5 Compression
 
-The frame log grows with each frame, consuming tokens. The Kernel trims the oldest frames when rendering exceeds the context budget — but mechanical truncation loses information. The right response is semantic compression: extracting the important content before the frames are gone.
+The frame log grows with every frame, and eventually no window is large enough to hold it. Truncation drops information; semantic compression keeps the important parts and discards the rest. In Vessal, compression is a Kernel-internal concern: it runs automatically on the clock of the frame stream, driven by the structure of the log itself rather than by Agent reasoning.
 
-**Trigger.** Hull reads `compress_threshold` from the `[hull]` section of `hull.toml` (default: `50`) and writes it to the namespace as `_compress_threshold`. After each render, the Kernel writes the current context fill percentage to `_context_pct`. The Memory skill's `_signal()` reads both values every frame. When `_context_pct >= _compress_threshold`, the signal emits a warning:
+**Two stages, two cadences.**
 
-```
-⚠ Context 62% — consider summarizing old frames then memory.drop(n)
-```
+The Kernel separates compression into two mechanisms that never collide:
 
-This warning appears in the next frame's Ping, where the Agent can see it and act.
+- **Mechanical stripping.** Zero LLM calls. As a frame ages through fixed-size buckets in the hot zone, the Kernel strips fields on a fixed schedule — `think` first, then `signals`, then `expect`, then `observation` — until only the operation code remains. Every step is deterministic and happens at a bucket boundary, so bytes only shift at moments the cache is already invalidating anyway.
+- **Semantic summarization.** One LLM call per batch. When a full bucket of stripped frames reaches the compression zone, the Kernel submits them to the LLM, which produces a structured summary under a fixed schema. That summary enters the cold zone as a new `L_0` record. When `L_0` itself fills, its contents collapse into an `L_1` record. The cascade continues for as many layers as the session needs.
 
-**Agent response.** When the Agent receives the context pressure warning, it follows a two-step procedure using the Memory skill:
+The two stages are orthogonal. Mechanical stripping deals with information decay inside the hot zone; semantic summarization extracts patterns across buckets once the hot zone has nothing more to discard.
 
-1. **Save key information.** Call `memory.save(key, value)` to persist important findings, decisions, or context from the oldest frames into cross-session storage.
-2. **Drop the summarized frames.** Call `memory.drop(n)` to physically remove the oldest `n` frames from the in-memory frame stream. The `drop()` call prints a confirmation prompt before executing. Cold storage (the JSONL log) is unaffected — full history is preserved on disk.
+**Kernel-autonomous, main loop never blocks.**
 
-After `drop(n)`, the frame stream is shorter. On the next render, `_context_pct` drops naturally, and the warning clears.
+Compression is an async task. The SORA loop does not wait for it and does not even see it. Buckets are Kernel namespace variables; when a summarization returns, the Kernel reassigns the variables and the next frame renders against the new layout. If the LLM is slow, new frames pile up in `B_0`, which is allowed to exceed its nominal size; shifts resume the moment the compression zone clears.
+
+No `compress_threshold`, no context-pressure signal, no Agent-visible compression procedure. The Agent does not need to know compression is happening any more than a programmer needs to think about L1 cache eviction.
 
 ```mermaid
-flowchart TD
-    Render["render → _context_pct written"] --> Check{"_context_pct >=\n_compress_threshold?"}
-    Check -->|no| Normal["normal frame — no warning"]
-    Check -->|yes| Warn["Memory signal: ⚠ Context N%\nconsider summarizing + drop(n)"]
-    Warn --> Agent["Agent sees warning in Ping"]
-    Agent --> Save["memory.save(key, facts)"]
-    Save --> Drop["memory.drop(n)"]
-    Drop --> Lower["frame stream shorter\n_context_pct drops next render"]
+flowchart LR
+    NEW["new frame"] --> B0["B_0 full"]
+    B0 -->|shift| B1["B_1 — think"]
+    B1 -->|shift| B2["B_2 — signals"]
+    B2 -->|shift| B3["B_3 — expect"]
+    B3 -->|shift| B4["B_4 — obs"]
+    B4 -->|shift| CZ["compression zone"]
+    CZ -.->|LLM, async| L0["L_0 record"]
+    L0 -->|k full| L1["L_1"]
+    L1 -->|k full| LDOT["..."]
 ```
 
-**Only the LLM can perform semantic compression; the runtime can only do mechanical truncation.**
+**Why an LLM at all.** Mechanical stripping can only remove what a schema tells it to remove. It cannot tell that three consecutive attempts at a task should collapse into one line ("three tries to connect; DNS resolution was the problem"). That kind of cross-frame induction requires a model. The design rule: **only the LLM does semantic compression; the runtime does mechanical truncation and nothing else.**
 
-This model places the compression decision inside the Agent's own frame loop, requiring no special frame type or system prompt switch. The Agent compresses when it decides to — prompted by a signal, using the same code-execution mechanism as all other actions.
+**Static storage.** Every raw frame is appended to disk as it is produced. "Not forgotten" means recoverable from static storage, not present in the Ping. Compression is about the working window, not about permanence.
 
-**Forward reference.** Chapter 6 examines the cache economics of this approach and develops the preferred strategy: three-segment reverse compression, where the oldest frames are kept as original text (protecting the KV cache prefix), a middle segment is compressed into summaries, and the most recent frames are kept verbatim as working memory. That design preserves cache hit rate while recovering token budget — a significant improvement over naive front-truncation.
+**Forward reference.** Chapter 6 develops the full hierarchical compaction model — why physical position is allowed to diverge from logical time, how layers rewrite on a binary-counter cadence, and why the whole structure has O(1) amortized cost per frame and covers ten million frames in 8-10 layers.
