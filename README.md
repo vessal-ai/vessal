@@ -13,31 +13,27 @@ An agent runtime where Python is the only way to act.
 [Quick Start](#quick-start) · [Architecture](#architecture) · [Context Scaling](#context-scaling) · [Skills](#skills) · [SkillHub](#skillhub) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment) · [HTTP API](#http-api)
 
 
-## The Problem
+## 🎯 The Problem
 
 Every major agent framework gives the LLM a menu of functions and lets it pick. When the agent needs composition, conditionals, or loops, the framework discovers that tool-calling cannot express basic program logic — so it reinvents `if`, `for`, and `def` in its own ad-hoc way. The gap between a finite automaton and a Turing machine cannot be crossed by adding more menu items.
 
 **Vessal's answer: give the agent a Code, not a Menu.** Python is the sole action mechanism — not "a code interpreter among other tools," but the *only* way to act. The upper bound of what the agent can do is the programs the model can write. That bound rises with every generation of LLMs. The framework itself never becomes the bottleneck.
 
 
-## 60-Second First Agent
+## ⚡ 60-Second First Agent
 
 ```bash
 pip install vessal
-vessal create                  # 6-question wizard (Enter × 6 to accept defaults)
-cd my-agent && vessal          # bare vessal = interactive TUI picker
-# pick "Run dev" → Console opens at http://127.0.0.1:8420/console/
+vessal create                  # interactive wizard — Enter to accept defaults
+cd my-agent && vessal start
+# Console opens at http://127.0.0.1:8420/console/
 ```
 
-That's it. Chat with the agent in the left pane; watch its thinking in
-the right pane (collapsible for non-developers). Edit `SOUL.md` and the
-next turn picks it up without restart. Edit `skills/*.py` and the
-affected skill reloads in place. Changes to `hull.toml` surface as an
-yellow "restart required" banner in the Console top bar.
+That's it. Open the Console in your browser, chat in the left pane, watch the agent's current frame in the right pane (collapsible). Edit `SOUL.md` and the next turn picks it up without restart. Edit `skills/*.py` and the affected skill reloads in place. Changes to `hull.toml` surface as a yellow "restart required" banner in the Console top bar.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
@@ -58,21 +54,17 @@ pipx install vessal
 ### Create a new agent
 
 ```bash
-vessal create        # interactive 6-question wizard (Enter × 6 to accept defaults)
+vessal create
 cd my-agent
 ```
 
-`vessal create` runs a wizard that scaffolds the project, sets up `.env`, and gitignores your secrets. For a non-interactive scaffold, `vessal init my-agent` also works and accepts `--no-venv` to skip virtual-env creation.
+`vessal create` runs an interactive wizard that scaffolds the project, sets up `.env`, and gitignores your secrets. For a non-interactive scaffold, `vessal init my-agent` also works and accepts `--no-venv` to skip virtual-env creation.
 
 > **Tip:** `vs` is a shorthand for `vessal`. All commands work with either name — `vs start`, `vs stop`, `vs skill init`, etc.
 
 ### Configure the LLM
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your provider details:
+If you didn't fill the three LLM values during `vessal create`, edit `.env` directly (the wizard writes it with English placeholders):
 
 ```
 OPENAI_API_KEY=sk-...
@@ -97,8 +89,9 @@ vessal start
 You'll see:
 
 ```
-Shell server started: http://127.0.0.1:8420
+Vessal agent running.
   Console: http://127.0.0.1:8420/console/
+  Stop:    vessal stop
 ```
 
 **Open the Console in your browser** — that's your unified interface. The left pane is chat; the right pane shows the agent's current frame (collapsible). Type a message, and the agent wakes up, writes Python, executes it, observes the results, and replies.
@@ -115,7 +108,7 @@ Vessal runs in a loop called **SORA** (State, Observation, Reasoning, Action):
 Each cycle is one **frame**. The agent keeps running frames until it decides to sleep. Your next message wakes it again. See the [whitepaper](references/whitepaper/) for the full derivation.
 
 
-## Architecture
+## 🏗️ Architecture
 
 Three layers. Strict one-way dependency.
 
@@ -157,7 +150,7 @@ graph TD
 The three together form **ARK** (Agent Runtime Kit). Vessal is a distribution built on ARK: the base system plus standard Skills plus defaults.
 
 
-## Context Scaling
+## 📈 Context Scaling
 
 Every agent framework eventually hits the same wall: the frame log keeps growing, and no context window is large enough. Chopping the oldest frames off the front is the easy answer — and the wrong one. It destroys the prefix cache that inference engines rely on, and it silently loses the continuity the agent needs to stay coherent over long sessions.
 
@@ -173,7 +166,7 @@ flowchart LR
 Amortized cost is O(1) per frame, capacity grows logarithmically, and ten million frames fit in eight to ten layers. Every raw frame is also appended to static storage as it is produced, so nothing is ever lost — compression only shapes the active working window. The derivation and cache economics live in [whitepaper §6.4.2](references/whitepaper/06-cache.md).
 
 
-## Skills
+## 🧩 Skills
 
 All agent capabilities come from Skills. ARK provides only the execution mechanism. What the agent can do — and what it can *see* — is determined by its loaded Skills.
 
@@ -278,7 +271,7 @@ To publish to SkillHub: `vessal skill publish <path>`
 The agent can also create Skills for itself at runtime using the `skill_creator` Skill. See [Chapter 3 of the whitepaper](references/whitepaper/03-skills.md) for the full Skill model.
 
 
-## CLI Reference
+## 📋 CLI Reference
 
 ### Essential
 
@@ -287,6 +280,9 @@ The agent can also create Skills for itself at runtime using the `skill_creator`
 | `vessal init <name>` | Scaffold a new agent project |
 | `vessal start` | Start the agent server (Shell + Hull + companions) |
 | `vessal stop` | Stop the agent |
+| `vessal --version` | Print installed version |
+| `vessal check-update` | Check PyPI for a newer release |
+| `vessal upgrade` | Upgrade vessal (auto-detects uv / pipx / pip) |
 
 ### Skill Development
 
@@ -325,7 +321,7 @@ These commands are for programmatic access — shell scripts, CI pipelines, or o
 All commands accept `--port <N>` (default: 8420) and `--dir <path>` (default: current directory).
 
 
-## Configuration
+## ⚙️ Configuration
 
 ### hull.toml
 
@@ -392,7 +388,7 @@ Safety hooks that review code before execution and state before sending. Generat
 - `gates/state_gate.py` — Inspects rendered state before sending to the LLM. Return `(False, "reason")` to block.
 
 
-## Container Deployment
+## 🐳 Container Deployment
 
 ```bash
 # Build a Docker image (reads agent name from hull.toml)
@@ -412,7 +408,7 @@ vessal run my-agent -e OPENAI_API_KEY=sk-... -e OPENAI_BASE_URL=https://api.open
 The agent's `data/` directory is persisted in a Docker named volume — container restarts do not lose state.
 
 
-## HTTP API
+## 🌐 HTTP API
 
 A running agent exposes these endpoints on its port (default 8420):
 
@@ -428,11 +424,11 @@ A running agent exposes these endpoints on its port (default 8420):
 | `GET /skills/chat/outbox` | Retrieve agent replies |
 
 
-## Documentation
+## 📚 Documentation
 
 - [Whitepaper](references/whitepaper/) — The SORA model, three-layer architecture, Skill model, Frame protocol, cache coordination, and training theory, derived from first principles
 
 
-## License
+## 📄 License
 
 Apache License 2.0. See [LICENSE](LICENSE).
