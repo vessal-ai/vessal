@@ -42,18 +42,19 @@ def start(hull_api, skill=None) -> None:
     _hull_api = hull_api
     _skill = skill
 
-    index_path = Path(__file__).parent / "index.html"
+    ui_dir = Path(__file__).parent / "ui"
+    index_path = ui_dir / "index.html"
     if index_path.exists():
         _index_html = index_path.read_bytes()
 
     from vessal.ark.shell.hull.hull_api import StaticResponse
     for static_file in ("style.css", "app.js", "render.js"):
-        file_path = Path(__file__).parent / static_file
+        file_path = ui_dir / static_file
         if file_path.exists():
             _static_cache[static_file] = StaticResponse.from_file(file_path)
-        hull_api.register_route("GET", f"/{static_file}", _make_static_handler(static_file))
+        hull_api.register_route("GET", f"/ui/{static_file}", _make_static_handler(static_file))
 
-    hull_api.register_route("GET", "/", _handle_index)
+    hull_api.register_route("GET", "/ui/index.html", _handle_index)
     hull_api.register_route("POST", "/inbox", _handle_inbox)
     hull_api.register_route("GET", "/outbox", _handle_outbox)
     hull_api.register_route("GET", "/history", _handle_history)
@@ -63,12 +64,12 @@ def stop() -> None:
     """Hull-managed shutdown. Unregisters routes."""
     global _hull_api, _skill
     if _hull_api is not None:
-        _hull_api.unregister_route("/")
+        _hull_api.unregister_route("/ui/index.html")
         _hull_api.unregister_route("/inbox")
         _hull_api.unregister_route("/outbox")
         _hull_api.unregister_route("/history")
         for static_file in ("style.css", "app.js", "render.js"):
-            _hull_api.unregister_route(f"/{static_file}")
+            _hull_api.unregister_route(f"/ui/{static_file}")
         _static_cache.clear()
         _hull_api = None
         _skill = None

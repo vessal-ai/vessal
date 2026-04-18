@@ -12,13 +12,13 @@ def mock_hull_api():
 
 
 def test_start_registers_static_routes(mock_hull_api):
-    """start() registers style.css / app.js / render.js routes."""
+    """start() registers style.css / app.js / render.js routes under /ui/."""
     from vessal.skills.chat.server import start
     start(mock_hull_api)
     registered_paths = [call[0][1] for call in mock_hull_api.register_route.call_args_list]
-    assert "/style.css" in registered_paths
-    assert "/app.js" in registered_paths
-    assert "/render.js" in registered_paths
+    assert "/ui/style.css" in registered_paths
+    assert "/ui/app.js" in registered_paths
+    assert "/ui/render.js" in registered_paths
 
 
 def test_static_handler_returns_css(tmp_path, monkeypatch):
