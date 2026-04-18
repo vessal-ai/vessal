@@ -83,8 +83,11 @@ def main() -> None:
         help="Skip virtual environment creation and dependency installation"
     )
 
+    # vessal check-update
+    subparsers.add_parser("check-update", help="Check PyPI for a newer version")
+
     # vessal create (interactive wizard)
-    create_parser = subparsers.add_parser("create", help="Interactive 6-question new-project wizard")
+    create_parser = subparsers.add_parser("create", help="Interactive new-project wizard")
     create_parser.add_argument("name", nargs="?", default=None, help="Project name (skipped in wizard if provided)")
 
     # vessal skill
@@ -140,6 +143,8 @@ def main() -> None:
         _cmd_container_run(args)
     elif args.command == "init":
         _cmd_init(args)
+    elif args.command == "check-update":
+        _cmd_check_update()
     elif args.command == "create":
         from vessal.ark.shell.tui.create_wizard import run as wizard_run
         sys.exit(wizard_run(Path.cwd()))
@@ -288,6 +293,60 @@ def _cmd_skill_list(args: argparse.Namespace) -> None:
 def _cmd_skill_publish(args: argparse.Namespace) -> None:
     from vessal.ark.shell.cli import _cmd_skill_publish as shell_skill_publish
     shell_skill_publish(args)
+
+
+def _cmd_check_update() -> None:
+    """Check PyPI for a newer vessal version."""
+    from importlib import metadata
+    from vessal.ark.shell import upgrade
+
+    current = metadata.version("vessal")
+    try:
+        latest = upgrade.check_pypi_latest("vessal")
+    except Exception as e:
+        print(f"Error: could not reach PyPI ({e})", file=sys.stderr)
+        sys.exit(1)
+
+    if upgrade.is_newer(latest, current=current):
+        print(f"Update available: {current} -> {latest}")
+        print(f"Run 'vessal upgrade' to install.")
+    else:
+        print(f"vessal {current} is up to date.")
+
+
+def _cmd_upgrade(args: argparse.Namespace) -> None:
+    """Detect installer (uv / pipx / pip) and run the matching upgrade command."""
+    import subprocess
+    from importlib import metadata
+    from vessal.ark.shell import upgrade
+
+    current = metadata.version("vessal")
+    try:
+        latest = upgrade.check_pypi_latest("vessal")
+    except Exception as e:
+        print(f"Error: could not reach PyPI ({e})", file=sys.stderr)
+        sys.exit(1)
+
+    if not upgrade.is_newer(latest, current=current):
+        print(f"vessal {current} is up to date.")
+        return
+
+    installer = upgrade.detect_installer()
+    cmd = upgrade.build_upgrade_cmd(installer)
+    print(f"Upgrading vessal {current} -> {latest} (via {installer}):")
+    print(f"  $ {' '.join(cmd)}")
+
+    if not args.yes:
+        try:
+            ans = input("Proceed? [Y/n] ").strip().lower()
+        except EOFError:
+            ans = ""
+        if ans in ("n", "no"):
+            print("Aborted.")
+            return
+
+    result = subprocess.run(cmd)
+    sys.exit(result.returncode)
 
 
 if __name__ == "__main__":
