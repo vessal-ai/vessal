@@ -1,107 +1,5 @@
-/**
- * app.js — Application logic: polling, toggle state, chat send/receive.
- *
- * Depends on: render.js (renderFrame function)
- * Data sources: /frames (frame data), /status (agent status), /skills/chat/* (chat)
- */
-
 const SKILL_API = window.location.origin + '/skills/chat';
 const SYSTEM_API = window.location.origin;
-
-// ── Section definitions ──
-
-const SECTIONS = [
-  { key: 'system_prompt', label: 'System Prompt', defaultOn: false },
-  { key: 'frame_stream',  label: 'Frame Stream',  defaultOn: true },
-  { key: 'signals',       label: 'Signals',       defaultOn: false },
-  { key: 'think',         label: 'Think',      defaultOn: true },
-  { key: 'operation',     label: 'Operation',  defaultOn: true },
-  { key: 'expect',        label: 'Expect',     defaultOn: true },
-  { key: 'stdout',        label: 'Stdout',     defaultOn: true },
-  { key: 'diff',          label: 'Diff',       defaultOn: true },
-  { key: 'error',         label: 'Error',      defaultOn: true },
-  { key: 'verdict',       label: 'Verdict',    defaultOn: true },
-];
-
-const STORAGE_KEY = 'vessal_visible_sections';
-
-// ── Toggle state management ──
-
-function loadVisibleSections() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return new Set(JSON.parse(stored));
-  } catch {}
-  return new Set(SECTIONS.filter(s => s.defaultOn).map(s => s.key));
-}
-
-function saveVisibleSections(visible) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...visible]));
-}
-
-let visibleSections = loadVisibleSections();
-
-function initToggleBar() {
-  const bar = document.getElementById('toggleBar');
-  for (const s of SECTIONS) {
-    const label = document.createElement('label');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = visibleSections.has(s.key);
-    cb.addEventListener('change', () => {
-      if (cb.checked) visibleSections.add(s.key);
-      else visibleSections.delete(s.key);
-      saveVisibleSections(visibleSections);
-      rerenderAllFrames();
-    });
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(s.label));
-    bar.appendChild(label);
-  }
-}
-
-// ── Frame polling + rendering ──
-
-let frames = [];
-let lastFrameNumber = 0;
-let isTailing = true;
-const frameList = document.getElementById('frameList');
-
-async function pollFrames() {
-  try {
-    const resp = await fetch(`${SYSTEM_API}/frames?after=${lastFrameNumber}`);
-    const data = await resp.json();
-    const newFrames = data.frames || [];
-    for (const f of newFrames) {
-      frames.push(f);
-      if ((f.number || 0) > lastFrameNumber) lastFrameNumber = f.number;
-      appendFrameCard(f);
-    }
-    if (newFrames.length > 0 && isTailing) {
-      frameList.scrollTop = frameList.scrollHeight;
-    }
-    document.getElementById('frameStats').textContent = `${frames.length} frames`;
-  } catch {}
-}
-
-function appendFrameCard(frame) {
-  const div = document.createElement('div');
-  div.innerHTML = renderFrame(frame, visibleSections);
-  const card = div.firstElementChild;
-  if (card) frameList.appendChild(card);
-}
-
-function rerenderAllFrames() {
-  frameList.innerHTML = '';
-  for (const f of frames) appendFrameCard(f);
-  if (isTailing) frameList.scrollTop = frameList.scrollHeight;
-}
-
-// Detect manual scroll — disable tailing when more than 100px from the bottom
-frameList.addEventListener('scroll', () => {
-  const atBottom = frameList.scrollHeight - frameList.scrollTop - frameList.clientHeight < 100;
-  isTailing = atBottom;
-});
 
 // ── Agent status polling ──
 
@@ -179,9 +77,6 @@ async function pollOutbox() {
 
 // ── Initialization ──
 
-initToggleBar();
 loadHistory().then(() => setInterval(pollOutbox, 2000));
-pollFrames();
-setInterval(pollFrames, 1500);
 pollStatus();
 setInterval(pollStatus, 2000);
