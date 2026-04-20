@@ -30,9 +30,9 @@ Default RenderConfig instance used by Kernel when no explicit config is supplied
 
 Renderer configuration.
 
-### render(ns: dict[str, Any]) -> str
+### render(ns: dict, config: RenderConfig) -> Ping
 
-Renders validation result section.
+Renderer main entry point. Assembles a Ping from the namespace: `system_prompt` (stripped from `ns["_system_prompt"]`), `frame_stream` (recent frame history trimmed to token budget), and `signals` (concatenated `_signal_outputs`). Writes `_context_pct`, `_budget_total`, `_dropped_frame_count` back into `ns` as side effects.
 
 
 ## Tests
