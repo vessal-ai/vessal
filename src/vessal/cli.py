@@ -152,8 +152,13 @@ def main() -> None:
     elif args.command == "upgrade":
         _cmd_upgrade(args)
     elif args.command == "create":
+        from vessal.ark.shell.errors import CliUserError
         from vessal.ark.shell.tui.create_wizard import run as wizard_run
-        sys.exit(wizard_run(Path.cwd()))
+        try:
+            sys.exit(wizard_run(Path.cwd()))
+        except CliUserError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
     elif args.command == "skill":
         if args.skill_command == "init":
             _cmd_skill_init(args)
