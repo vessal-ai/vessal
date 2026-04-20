@@ -50,13 +50,15 @@ Periodic heartbeat wake-up Skill, paired with server.py timer to prevent Agent f
 
 ## Tests
 
-_No test directory._
+- `test_heartbeat.py` — Skill attributes and server lifecycle/wake-cadence tests.
+
+Run: `uv run pytest src/vessal/skills/heartbeat/tests/`
 
 
 ## Status
 
 ### TODO
-- [ ] 2026-04-09: Write initial heartbeat Skill tests
+None.
 
 ### Known Issues
 None.
