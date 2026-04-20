@@ -81,7 +81,7 @@ Run: `uv run pytest src/vessal/ark/shell/hull/cell/core/tests/`
 None.
 
 ### Known Issues
-- 2026-04-09: core/tests/test_core.py is currently 505 lines, exceeding the 500-line convention — due to high test case density, not splitting for now
+None.
 
 ### Active
 None.

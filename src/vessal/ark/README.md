@@ -85,7 +85,7 @@ _No test directory._
 ## Status
 
 ### TODO
-- [ ] 2026-04-09: Create independent CONTEXT.md for each sub-layer (Shell, Hull, Cell, Util)
+None.
 
 ### Known Issues
 None.

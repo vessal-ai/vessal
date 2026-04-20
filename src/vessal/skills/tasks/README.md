@@ -77,4 +77,4 @@ None.
 None.
 
 ### Active
-- 2026-04-13: tasks API redesign — cut from 6-method footgun to 4-method minimal API
+None.

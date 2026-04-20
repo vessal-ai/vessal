@@ -58,4 +58,4 @@ None.
 None.
 
 ### Active
-- 2026-04-13: Initial implementation
+None.

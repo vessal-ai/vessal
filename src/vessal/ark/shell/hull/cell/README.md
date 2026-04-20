@@ -90,8 +90,7 @@ Run: `uv run pytest src/vessal/ark/shell/hull/cell/tests/`
 None.
 
 ### Known Issues
-- 2026-04-09: tests/test_cell.py is currently 581 lines, exceeding the 500-line convention — due to high test case density, not splitting for now
+None.
 
 ### Active
-- 2026-04-09: FrameRecord schema v6 landed, added ping field (Ping.to_dict/from_dict), from_dict is compatible with v5.
-- 2026-04-13: Core.run() returns (Pong, prompt_tokens, completion_tokens) tuple; Cell.step() overwrites _context_pct with real API token data (_actual_tokens_in/_actual_tokens_out); protocol exceptions written to _errors (ErrorRecord).
+None.

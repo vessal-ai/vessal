@@ -125,18 +125,10 @@ Run: `uv run pytest src/vessal/ark/shell/hull/tests/`
 ## Status
 
 ### TODO
-None.
+- [ ] 2026-04-09: hull.py exceeds the 500-line convention; needs splitting — suggest extracting internal utility functions such as `_load_gate_files`, `_activate_venv`, `_restore_latest_snapshot` into `hull_init.py`
 
 ### Known Issues
-- 2026-04-09: hull.py is currently 556 lines, exceeding the 500-line convention; needs splitting — suggest extracting internal utility functions such as `_load_gate_files`, `_activate_venv`, `_restore_latest_snapshot` into `hull_init.py`
-- 2026-04-09: Skill protocol field `summary` has been renamed to `description` (SkillBase class attribute + SKILL.md frontmatter + SkillManager.list() output); the old name is no longer valid
-- 2026-04-12: SkillsManager rename complete — name changed from `_meta` to `skills`, methods `load_skill/unload_skill` changed to `load/unload`, `query_guide` deleted, namespace injection key changed from `_meta` to `skills`
+None.
 
 ### Active
-- 2026-04-10: Signal protocol migration from _signal_output side effect to _signal() -> (title, body) tuple return value; renderer handles delimiter wrapping uniformly
-- 2026-04-13: Output logger.warning when hull.toml does not configure [cell].context_budget (default 128000), prompting users to set it according to model window size
-- 2026-04-12: _prompt() cognitive protocol — Skills can inject (condition, methodology) into system prompt via _prompt()
-- 2026-04-12: Skill UX spec implementation — three-layer information distribution (_prompt/guide/_signal) written into SkillBase docstring and Hull CONTEXT.md
-
-### Completed
-- 2026-04-10: Hull process isolation — Hull runs in a subprocess (subprocess.Popen hull_runner.py), Shell main process acts as gateway and guardian
+None.

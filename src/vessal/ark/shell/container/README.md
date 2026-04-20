@@ -61,7 +61,3 @@ None.
 
 ### Active
 None.
-
-### Completed
-- 2026-04-13: Parameter signature alignment — `_respond()` and `_respond_json()` changed to `(data, status=200)` format, consistent with `hull_runner._HullHandler`
-- 2026-04-14: Volume persistence fix — mount point expanded from /app/agent/data to /app/agent; added `sync_image_to_volume` to handle image → volume file sync

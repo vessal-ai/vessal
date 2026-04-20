@@ -68,11 +68,7 @@ Run: `uv run pytest src/vessal/ark/shell/tests/`
 - [ ] 2026-04-09: The companion process startup logic in `_cmd_start` in cli.py is too long; consider extracting
 
 ### Known Issues
-- 2026-04-09: cli.py is currently 739 lines, exceeding the 500-line convention (not set as a hard constraint because the centralized CLI entry design requires a longer file)
-- 2026-04-10: Daemon lifecycle identity model rebuild — PID file replaced with flock (data/vessal.lock); see flock identity model plan
+None.
 
 ### Active
-- 2026-04-10: Refactor start/stop to flock identity model: foreground by default, --daemon optional for background, stop waits for process exit
-
-### Completed
-- 2026-04-10: Shell-Hull process isolation — Hull runs in a subprocess (subprocess.Popen hull_runner.py), Shell main process acts as HTTP gateway and guardian, including crash detection and auto-restart
+None.

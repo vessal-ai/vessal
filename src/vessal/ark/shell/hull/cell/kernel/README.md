@@ -121,7 +121,6 @@ Run: `uv run pytest src/vessal/ark/shell/hull/cell/kernel/tests/`
 
 ### Known Issues
 - 2026-04-09: snapshot restore may fail after module path changes (cloudpickle module references are bound to the path at serialization time)
-- ~~2026-04-09: Constraint #8 violation — hull.py directly imports kernel.render.RenderConfig; pin/skill.py directly imports kernel.describe.render_value~~ [Fixed 2026-04-09: RenderConfig and render_value are now re-exported from kernel/__init__.py; external code updated to import from kernel package top level]
 
 ### Active
-- 2026-04-13: _init_namespace() adds two namespace keys: _protected_keys (list of all keys at initialization time, executor uses this to restore builtins deleted by agent); _errors (list[ErrorRecord], executor and Cell append at runtime/protocol errors). _actual_tokens_in/_actual_tokens_out initialized to None, written by Cell with real values when API returns usage.
+None.
