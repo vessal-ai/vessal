@@ -14,6 +14,22 @@ Shell has three orthogonal responsibilities. Keep them in separate subdirectorie
 
 Plus carrier-agnostic plumbing: `http_server.py` (stdlib `HTTPServer` base with quiet disconnect policy), `protocol.py` (`handle()` type definitions), `events.py`.
 
+```mermaid
+flowchart LR
+    User["User / Docker"] --> Entry["Entry\ncli/ + tui/"]
+    Entry --> Supervisor["Supervisor\nserver.py"]
+    Supervisor -->|subprocess mode| Runtime["Runtime\nsubprocess_mode.py"]
+    Entry -->|container mode| Runtime2["Runtime\ncontainer_mode.py"]
+    Runtime --> Hull["Hull"]
+    Runtime2 --> Hull
+    subgraph Shell["Shell — Agent Carrier Layer"]
+        Entry
+        Supervisor
+        Runtime
+        Runtime2
+    end
+```
+
 ## Responsible for
 
 - Hosting the Hull subprocess (subprocess mode) or Hull in-process (container mode)
@@ -25,7 +41,7 @@ Plus carrier-agnostic plumbing: `http_server.py` (stdlib `HTTPServer` base with 
 
 - Business logic (Hull)
 - Frame execution (Cell)
-- Skill management (Hull; `shell/hull/hub/` is Hull's installation infrastructure)
+- Skill management (Hull)
 - Heartbeat scheduling (handled by the `heartbeat` skill)
 
 ## Design

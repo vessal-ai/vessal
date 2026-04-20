@@ -8,7 +8,7 @@ Shell has three subdomains:
 
 | Subdomain | Purpose | Files |
 |-----------|---------|-------|
-| Entry | How a user interacts with Vessal | `cli/` (process/skill/init subcommands) + `tui/` |
+| Entry | How a user interacts with Vessal | `cli/` (process/skill/init subcommands — currently `cli.py`; `cli/` subpackage is a P5 deliverable) + `tui/` |
 | Runtime | Which process carries the Hull | `runtime/` — Hull runtime carriers (subprocess + container) |
 | Supervisor | The HTTP proxy + crash-restart watchdog that wraps subprocess mode | `server.py` |
 
@@ -27,7 +27,7 @@ Plus carrier-agnostic plumbing:
 Not responsible for:
 - Business logic (Hull)
 - Frame execution (Cell)
-- Skill management (Hull; `shell/hull/hub/` is Hull's installation infrastructure)
+- Skill management (Hull)
 - Heartbeat scheduling (handled by the `heartbeat` skill)
 
 ## Constraints
