@@ -20,6 +20,7 @@ def validate_project_name(name: str, cwd: Path) -> str | None:
         return f"{target} already exists. Pick another name."
     return None
 
+
 DEFAULT_ANSWERS = {
     "name": "my-agent",
     "api_key": "",
