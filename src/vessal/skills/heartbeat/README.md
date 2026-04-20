@@ -48,20 +48,6 @@ Relationship with Hull: Hull calls server.start(hull_api), passing the hull_api 
 Periodic heartbeat wake-up Skill, paired with server.py timer to prevent Agent from sleeping indefinitely.
 
 
-## File Structure
-
-```
-__init__.py          heartbeat — periodic heartbeat wake-up Skill.
-server.py            heartbeat server — heartbeat timer.
-skill.py             heartbeat skill — periodic heartbeat wake-up.
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.hull_api`
-- `vessal.ark.shell.hull.skill`
-
-
 ## Tests
 
 _No test directory._

@@ -26,21 +26,9 @@ flowchart LR
 
 ## Public Interface
 
-### Skill
+### class Audio
 
-_Definition not found._
-
-
-## File Structure
-
-```
-__init__.py          audio — audio-to-text Skill.
-skill.py             Audio transcription via 302AI GLM-ASR-2512.
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.skill`
+Audio transcription via 302AI GLM-ASR-2512.
 
 
 ## Tests

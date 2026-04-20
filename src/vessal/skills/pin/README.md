@@ -47,20 +47,6 @@ Relationship with Cell/Kernel: depends on kernel.describe.render_value for rende
 Variable fixed-observation Skill.
 
 
-## File Structure
-
-```
-__init__.py          pin — variable fixed-observation Skill.
-skill.py             pin Skill — variable fixed-observation.
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull`
-- `vessal.ark.shell.hull.skill`
-
-
 ## Tests
 
 - `test_pin_skill.py` — test_pin_skill — Pin Skill class-based API tests.

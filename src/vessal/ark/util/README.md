@@ -35,22 +35,6 @@ Adjacent relationships: used by Hull for context window budget management, used 
 _No public interface declared._
 
 
-## File Structure
-
-```
-__init__.py          __init__.py — Util subpackage public interface (currently no exports; modules imported directly as needed).
-logging/  ARK observability subsystem. Provides four independent modules for frame log writing, reading, HTML viewer, tracing, and terminal output.
-tests/
-token_util.py        token_util.py — Token count estimation.
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.cell.protocol`
-- `vessal.ark.util.logging.frame_logger`
-- `vessal.ark.util.logging.tracer`
-
-
 ## Tests
 
 - `test_token_util.py` — test_token_util.py — estimate_tokens unit tests.

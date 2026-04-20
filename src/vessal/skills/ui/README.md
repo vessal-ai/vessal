@@ -39,26 +39,6 @@ Frontend plays CSS idle animation during thinking (between frames). Body actions
 Cyber-embodiment Skill — Agent's body and environment.
 
 
-## File Structure
-
-```
-__init__.py          ui — cyber-embodiment Skill.
-body.py              body.py — Agent avatar control.
-components.py        components.py — UI component factory methods.
-server.py            ui Skill HTTP routes.
-skill.py             ui Skill — cyber-embodiment Agent.
-static/
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.hull_api`
-- `vessal.ark.shell.hull.skill`
-- `vessal.skills.ui`
-- `vessal.skills.ui.body`
-
-
 ## Tests
 
 - `test_body.py` — Body unit tests — avatar action queue and serialization.

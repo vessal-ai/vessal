@@ -73,50 +73,6 @@ Stateful single-frame execution engine. Step-based, does not auto-loop.
 Return value of Cell.step().
 
 
-## File Structure
-
-```
-__init__.py          __init__.py — Cell public interface: stateful execution engine and frame protocol data structures.
-cell.py              cell.py — Stateful execution engine: Kernel + Core + single-frame step(), no automatic looping.
-core/  LLM inference interface. Converts Ping into OpenAI-compatible messages, calls model API, parses response into Pong.
-gate/  Safety gate module before action / state execution. Provides ActionGate (before code execution) and StateGate (before LLM call) as two independent gates.
-kernel/  Agent execution kernel. Holds namespace dict, coordinates code execution, assertion evaluation, and state rendering; the complete determinant of Agent behavior.
-protocol.py          protocol.py — v4 Cell Protocol data structures: Ping/Pong/FrameRecord and all sub-structures.
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.cell.cell`
-- `vessal.ark.shell.hull.cell.core`
-- `vessal.ark.shell.hull.cell.core.core`
-- `vessal.ark.shell.hull.cell.core.parser`
-- `vessal.ark.shell.hull.cell.core.retry`
-- `vessal.ark.shell.hull.cell.gate`
-- `vessal.ark.shell.hull.cell.gate.action_gate`
-- `vessal.ark.shell.hull.cell.gate.rules`
-- `vessal.ark.shell.hull.cell.gate.state_gate`
-- `vessal.ark.shell.hull.cell.kernel`
-- `vessal.ark.shell.hull.cell.kernel.describe`
-- `vessal.ark.shell.hull.cell.kernel.describe.binary`
-- `vessal.ark.shell.hull.cell.kernel.describe.callables`
-- `vessal.ark.shell.hull.cell.kernel.describe.collections`
-- `vessal.ark.shell.hull.cell.kernel.describe.instances`
-- `vessal.ark.shell.hull.cell.kernel.describe.primitives`
-- `vessal.ark.shell.hull.cell.kernel.executor`
-- `vessal.ark.shell.hull.cell.kernel.expect`
-- `vessal.ark.shell.hull.cell.kernel.kernel`
-- `vessal.ark.shell.hull.cell.kernel.render`
-- `vessal.ark.shell.hull.cell.kernel.render._frame_render`
-- `vessal.ark.shell.hull.cell.kernel.render._prompt_render`
-- `vessal.ark.shell.hull.cell.kernel.render._signal_render`
-- `vessal.ark.shell.hull.cell.kernel.render.renderer`
-- `vessal.ark.shell.hull.cell.kernel.render.signals`
-- `vessal.ark.shell.hull.cell.protocol`
-- `vessal.ark.util.logging`
-- `vessal.ark.util.token_util`
-
-
 ## Tests
 
 - `test_auxiliary.py`

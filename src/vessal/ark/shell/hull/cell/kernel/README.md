@@ -97,40 +97,6 @@ Renderer configuration.
 Renders a Python object to text at the specified detail level.
 
 
-## File Structure
-
-```
-__init__.py          __init__.py — Kernel public interface: execution kernel and code execution result types.
-describe/
-executor.py          executor.py — Code execution engine: safely executes Agent-generated code in sandbox namespace.
-expect.py            expect.py — expect assertion validation and evaluation: AST safety checking and per-assertion evaluation, returns Verdict.
-kernel.py            kernel.py — Kernel main class: Agent execution kernel, holds namespace and coordinates rendering and execution.
-render/
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.cell.kernel.describe`
-- `vessal.ark.shell.hull.cell.kernel.describe.binary`
-- `vessal.ark.shell.hull.cell.kernel.describe.callables`
-- `vessal.ark.shell.hull.cell.kernel.describe.collections`
-- `vessal.ark.shell.hull.cell.kernel.describe.instances`
-- `vessal.ark.shell.hull.cell.kernel.describe.primitives`
-- `vessal.ark.shell.hull.cell.kernel.executor`
-- `vessal.ark.shell.hull.cell.kernel.expect`
-- `vessal.ark.shell.hull.cell.kernel.kernel`
-- `vessal.ark.shell.hull.cell.kernel.render`
-- `vessal.ark.shell.hull.cell.kernel.render._frame_render`
-- `vessal.ark.shell.hull.cell.kernel.render._prompt_render`
-- `vessal.ark.shell.hull.cell.kernel.render._signal_render`
-- `vessal.ark.shell.hull.cell.kernel.render.renderer`
-- `vessal.ark.shell.hull.cell.kernel.render.signals`
-- `vessal.ark.shell.hull.cell.protocol`
-- `vessal.ark.util.logging`
-- `vessal.ark.util.token_util`
-
-
 ## Tests
 
 - `test_compressed_history.py` — test_compressed_history — compressed history built-in signal tests.

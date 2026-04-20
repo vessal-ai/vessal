@@ -27,21 +27,9 @@ flowchart LR
 
 ## Public Interface
 
-### Skill
+### class Vision
 
-_Definition not found._
-
-
-## File Structure
-
-```
-__init__.py          vision — image understanding Skill.
-skill.py             Image understanding via Qwen3 VL.
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.skill`
+Image understanding via Qwen3 VL.
 
 
 ## Tests

@@ -61,7 +61,7 @@ graph TD
 
 ### class Cell
 
-Stateful state machine (v4 Protocol).
+Stateful single-frame execution engine. Step-based, does not auto-loop.
 
 ### class Core
 
@@ -70,67 +70,6 @@ LLM call pipeline. Ping → LLM API → parse → Pong.
 ### class Hull
 
 Agent runtime orchestrator: reads hull.toml, configures Cell, drives the event loop.
-
-
-## File Structure
-
-```
-__init__.py          vessal — LLM-driven Agent runtime public interface.
-__main__.py          __main__.py — supports python -m vessal entry point (for internal daemon calls).
-ark/  Agent Runtime Kit. Mechanism base for the three-layer concentric architecture (Shell → Hull → Cell); provides execution environment without business policy.
-cli.py               cli.py — Vessal framework-level CLI entry point.
-skills/
-```
-
-## Dependencies
-
-- `vessal.ark`
-- `vessal.ark.shell.cli`
-- `vessal.ark.shell.container.build`
-- `vessal.ark.shell.hull`
-- `vessal.ark.shell.hull.cell`
-- `vessal.ark.shell.hull.cell.cell`
-- `vessal.ark.shell.hull.cell.core`
-- `vessal.ark.shell.hull.cell.core.core`
-- `vessal.ark.shell.hull.cell.core.parser`
-- `vessal.ark.shell.hull.cell.core.retry`
-- `vessal.ark.shell.hull.cell.gate`
-- `vessal.ark.shell.hull.cell.gate.action_gate`
-- `vessal.ark.shell.hull.cell.gate.rules`
-- `vessal.ark.shell.hull.cell.gate.state_gate`
-- `vessal.ark.shell.hull.cell.kernel`
-- `vessal.ark.shell.hull.cell.kernel.describe`
-- `vessal.ark.shell.hull.cell.kernel.describe.binary`
-- `vessal.ark.shell.hull.cell.kernel.describe.callables`
-- `vessal.ark.shell.hull.cell.kernel.describe.collections`
-- `vessal.ark.shell.hull.cell.kernel.describe.instances`
-- `vessal.ark.shell.hull.cell.kernel.describe.primitives`
-- `vessal.ark.shell.hull.cell.kernel.executor`
-- `vessal.ark.shell.hull.cell.kernel.expect`
-- `vessal.ark.shell.hull.cell.kernel.kernel`
-- `vessal.ark.shell.hull.cell.kernel.render`
-- `vessal.ark.shell.hull.cell.kernel.render._frame_render`
-- `vessal.ark.shell.hull.cell.kernel.render._prompt_render`
-- `vessal.ark.shell.hull.cell.kernel.render._signal_render`
-- `vessal.ark.shell.hull.cell.kernel.render.prompt`
-- `vessal.ark.shell.hull.cell.kernel.render.renderer`
-- `vessal.ark.shell.hull.cell.kernel.render.signals`
-- `vessal.ark.shell.hull.cell.protocol`
-- `vessal.ark.shell.hull.event_loop`
-- `vessal.ark.shell.hull.hull`
-- `vessal.ark.shell.hull.hull_api`
-- `vessal.ark.shell.hull.skill`
-- `vessal.ark.shell.hull.skill_manager`
-- `vessal.ark.shell.hull.skills_manager`
-- `vessal.ark.shell.server`
-- `vessal.ark.util.logging`
-- `vessal.ark.util.logging.console`
-- `vessal.ark.util.logging.frame_logger`
-- `vessal.ark.util.logging.tracer`
-- `vessal.ark.util.token_util`
-- `vessal.cli`
-- `vessal.skills.ui`
-- `vessal.skills.ui.body`
 
 
 ## Tests

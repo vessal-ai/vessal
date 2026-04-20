@@ -61,19 +61,6 @@ Current task = the first leaf node with status != "done", sorted by number. Agen
 Hierarchical task management Skill.
 
 
-## File Structure
-
-```
-__init__.py          tasks — hierarchical task management Skill.
-skill.py             tasks Skill — hierarchical task management.
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.skill`
-
-
 ## Tests
 
 - `test_tasks.py` — test_tasks — Tasks Skill redesign tests.

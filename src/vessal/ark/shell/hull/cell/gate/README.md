@@ -81,23 +81,6 @@ Safety gate before state string is sent to LLM.
 Gate check result.
 
 
-## File Structure
-
-```
-__init__.py          gate — safety gate module before action / state execution.
-action_gate.py       action_gate.py — safety gate before action execution.
-rules.py             rules.py — built-in safety rule set.
-state_gate.py        state_gate.py — gate before state is sent to LLM.
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.cell.gate.action_gate`
-- `vessal.ark.shell.hull.cell.gate.rules`
-- `vessal.ark.shell.hull.cell.gate.state_gate`
-
-
 ## Tests
 
 - `test_gate.py` — tests/unit/test_gate.py — ActionGate / StateGate unit tests.

@@ -28,21 +28,9 @@ flowchart LR
 
 ## Public Interface
 
-### Skill
+### class Search
 
-_Definition not found._
-
-
-## File Structure
-
-```
-__init__.py          search — web search and web page reading Skill.
-skill.py             Web search and page reading via 302AI API.
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.skill`
+Web search and page reading via 302AI API.
 
 
 ## Tests

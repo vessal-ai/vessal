@@ -65,24 +65,6 @@ JSONL frame log writer. All runs append to the same frames.jsonl.
 Trace log manager.
 
 
-## File Structure
-
-```
-__init__.py          __init__.py — Logging subpackage public interface: FrameLogger and Tracer.
-console.py           console.py — Real-time terminal frame output formatting; writes per-frame summary and run totals to sys.stderr.
-frame_logger.py      frame_logger.py — JSONL frame log writer; all runs append to the same frames.jsonl.
-reader.py            reader.py — Canonical JSONL log reading; parses frame records written by FrameLogger.
-tests/
-tracer.py            tracer.py — Records Agent execution phase entry/exit timestamps; outputs to .trace.log file.
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.cell.protocol`
-- `vessal.ark.util.logging.frame_logger`
-- `vessal.ark.util.logging.tracer`
-
-
 ## Tests
 
 - `test_console.py`

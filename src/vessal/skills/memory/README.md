@@ -40,19 +40,6 @@ flowchart LR
 Cross-session key-value memory. Agent calls save/get/delete to manage memory entries.
 
 
-## File Structure
-
-```
-__init__.py          memory — cross-session key-value memory Skill.
-skill.py             skill — Memory Skill implementation.
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.skill`
-
-
 ## Tests
 
 - `test_memory.py` — test_memory — Memory Skill tests.

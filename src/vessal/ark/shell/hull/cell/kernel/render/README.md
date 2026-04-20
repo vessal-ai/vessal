@@ -24,7 +24,7 @@ Frame stream budget trimming is the core algorithm: context_budget - max_tokens 
 
 ### DEFAULT_CONFIG
 
-_Definition not found._
+Default RenderConfig instance used by Kernel when no explicit config is supplied.
 
 ### class RenderConfig
 
@@ -33,28 +33,6 @@ Renderer configuration.
 ### render(ns: dict[str, Any]) -> str
 
 Renders validation result section.
-
-
-## File Structure
-
-```
-__init__.py          __init__.py — render subsystem public interface: renders namespace to LLM message sequence.
-_frame_render.py     _frame_render.py — frame stream rendering (FrameRecord projection + budget trimming).
-_signal_render.py    _signal_render.py — signal assembly (pure function).
-prompt.py            prompt.py — modular system_prompt assembly.
-renderer.py          renderer.py — renderer main entry point.
-signals/  Kernel base signal module. Provides BASE_SIGNALS — signal function list that always exists and does not depend on any Skill.
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.cell.kernel.describe`
-- `vessal.ark.shell.hull.cell.kernel.render._frame_render`
-- `vessal.ark.shell.hull.cell.kernel.render._signal_render`
-- `vessal.ark.shell.hull.cell.kernel.render.renderer`
-- `vessal.ark.shell.hull.cell.kernel.render.signals`
-- `vessal.ark.shell.hull.cell.protocol`
-- `vessal.ark.util.token_util`
 
 
 ## Tests

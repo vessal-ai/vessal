@@ -42,21 +42,6 @@ graph LR
 _No public interface declared._
 
 
-## File Structure
-
-```
-__init__.py          __init__.py — Container public interface: Docker container mode entry point.
-build.py             build.py — Core logic for vessal build + vessal run.
-entry.py             entry.py — Container entry point. Docker ENTRYPOINT calls this module.
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.hull`
-- `vessal.ark.shell.hull.hull_api`
-
-
 ## Tests
 
 - `test_build.py` — test_build.py — vessal build context assembly tests.

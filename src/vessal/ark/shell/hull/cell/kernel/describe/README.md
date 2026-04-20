@@ -26,26 +26,6 @@ Type dispatch is implemented via an explicit isinstance chain rather than a regi
 Renders a Python object to text at the specified detail level.
 
 
-## File Structure
-
-```
-__init__.py          describe — namespace variable value rendering system.
-binary.py            binary.py — bytes and module type rendering.
-callables.py         callables.py — function and class rendering.
-collections.py       collections.py — collection type rendering (list, dict, set, tuple).
-instances.py         instances.py — instance, IO object, and connection-like object rendering.
-primitives.py        primitives.py — primitive type rendering (int, float, bool, None, str).
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.cell.kernel.describe.binary`
-- `vessal.ark.shell.hull.cell.kernel.describe.callables`
-- `vessal.ark.shell.hull.cell.kernel.describe.collections`
-- `vessal.ark.shell.hull.cell.kernel.describe.instances`
-- `vessal.ark.shell.hull.cell.kernel.describe.primitives`
-
-
 ## Tests
 
 _No test directory._

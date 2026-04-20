@@ -60,21 +60,6 @@ Relationship with server.py: in Hull-hosted mode, server.py holds a reference to
 Human bidirectional communication Skill.
 
 
-## File Structure
-
-```
-__init__.py          chat — human interaction Skill.
-server.py            chat Skill HTTP routes.
-skill.py             chat Skill — human bidirectional communication.
-tests/
-```
-
-## Dependencies
-
-- `vessal.ark.shell.hull.hull_api`
-- `vessal.ark.shell.hull.skill`
-
-
 ## Tests
 
 - `test_chat.py` — test_chat — Chat Skill tests.
