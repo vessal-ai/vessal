@@ -133,57 +133,58 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.command == "start":
-        _cmd_start(args)
-    elif args.command == "stop":
-        _cmd_stop(args)
-    elif args.command == "status":
-        _cmd_status(args)
-    elif args.command == "once":
-        _cmd_once(args)
-    elif args.command == "build":
-        _cmd_build(args)
-    elif args.command == "run":
-        _cmd_container_run(args)
-    elif args.command == "init":
-        _cmd_init(args)
-    elif args.command == "check-update":
-        _cmd_check_update()
-    elif args.command == "upgrade":
-        _cmd_upgrade(args)
-    elif args.command == "create":
-        from vessal.ark.shell.errors import CliUserError
-        from vessal.ark.shell.tui.create_wizard import run as wizard_run
-        try:
+    from vessal.ark.shell.errors import CliUserError
+
+    try:
+        if args.command == "start":
+            _cmd_start(args)
+        elif args.command == "stop":
+            _cmd_stop(args)
+        elif args.command == "status":
+            _cmd_status(args)
+        elif args.command == "once":
+            _cmd_once(args)
+        elif args.command == "build":
+            _cmd_build(args)
+        elif args.command == "run":
+            _cmd_container_run(args)
+        elif args.command == "init":
+            _cmd_init(args)
+        elif args.command == "check-update":
+            _cmd_check_update()
+        elif args.command == "upgrade":
+            _cmd_upgrade(args)
+        elif args.command == "create":
+            from vessal.ark.shell.tui.create_wizard import run as wizard_run
             sys.exit(wizard_run(Path.cwd()))
-        except CliUserError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            sys.exit(1)
-    elif args.command == "skill":
-        if args.skill_command == "init":
-            _cmd_skill_init(args)
-        elif args.skill_command == "check":
-            _cmd_skill_check(args)
-        elif args.skill_command == "install":
-            _cmd_skill_install(args)
-        elif args.skill_command == "uninstall":
-            _cmd_skill_uninstall(args)
-        elif args.skill_command == "update":
-            _cmd_skill_update(args)
-        elif args.skill_command == "search":
-            _cmd_skill_search(args)
-        elif args.skill_command == "list":
-            _cmd_skill_list(args)
-        elif args.skill_command == "publish":
-            _cmd_skill_publish(args)
+        elif args.command == "skill":
+            if args.skill_command == "init":
+                _cmd_skill_init(args)
+            elif args.skill_command == "check":
+                _cmd_skill_check(args)
+            elif args.skill_command == "install":
+                _cmd_skill_install(args)
+            elif args.skill_command == "uninstall":
+                _cmd_skill_uninstall(args)
+            elif args.skill_command == "update":
+                _cmd_skill_update(args)
+            elif args.skill_command == "search":
+                _cmd_skill_search(args)
+            elif args.skill_command == "list":
+                _cmd_skill_list(args)
+            elif args.skill_command == "publish":
+                _cmd_skill_publish(args)
+            else:
+                skill_parser.print_help()
+                sys.exit(1)
         else:
-            skill_parser.print_help()
+            if args.command is None:
+                from vessal.ark.shell.tui.picker import run as picker_run
+                sys.exit(picker_run(Path.cwd()))
+            parser.print_help()
             sys.exit(1)
-    else:
-        if args.command is None:
-            from vessal.ark.shell.tui.picker import run as picker_run
-            sys.exit(picker_run(Path.cwd()))
-        parser.print_help()
+    except CliUserError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
 
