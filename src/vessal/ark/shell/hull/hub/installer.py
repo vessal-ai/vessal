@@ -8,8 +8,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from vessal.ark.shell.hub.metadata import write_installed
-from vessal.ark.shell.hub.resolver import ResolvedSource
+from vessal.ark.shell.hull.hub.metadata import write_installed
+from vessal.ark.shell.hull.hub.resolver import ResolvedSource
 
 
 def locate_skill_in_repo(repo_dir: Path, subpath: str | None) -> Path:

@@ -1,7 +1,7 @@
 # src/vessal/ark/shell/hub/tests/test_metadata.py
 """Tests for .installed.toml metadata read/write."""
 from pathlib import Path
-from vessal.ark.shell.hub.metadata import write_installed, read_installed, is_hub_installed
+from vessal.ark.shell.hull.hub.metadata import write_installed, read_installed, is_hub_installed
 
 
 def test_write_and_read(tmp_path: Path):

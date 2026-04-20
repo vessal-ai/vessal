@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hub.installer import locate_skill_in_repo, copy_skill
-from vessal.ark.shell.hub.metadata import write_installed, read_installed, is_hub_installed
-from vessal.ark.shell.hub.registry import Registry
-from vessal.ark.shell.hub.resolver import resolve
+from vessal.ark.shell.hull.hub.installer import locate_skill_in_repo, copy_skill
+from vessal.ark.shell.hull.hub.metadata import write_installed, read_installed, is_hub_installed
+from vessal.ark.shell.hull.hub.registry import Registry
+from vessal.ark.shell.hull.hub.resolver import resolve
 
 
 def _make_skill_repo(base: Path, name: str = "test_skill") -> Path:

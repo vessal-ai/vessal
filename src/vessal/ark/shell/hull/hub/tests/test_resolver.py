@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hub.resolver import ResolvedSource, resolve
+from vessal.ark.shell.hull.hub.resolver import ResolvedSource, resolve
 
 
 SAMPLE_TOML = """\

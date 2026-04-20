@@ -873,8 +873,8 @@ def _cmd_skill_check(args: argparse.Namespace) -> None:
 
 def _cmd_skill_install(args: argparse.Namespace) -> None:
     """Install a Skill from SkillHub (by name) or from a Git URL."""
-    from vessal.ark.shell.hub.resolver import resolve
-    from vessal.ark.shell.hub.installer import install
+    from vessal.ark.shell.hull.hub.resolver import resolve
+    from vessal.ark.shell.hull.hub.installer import install
 
     source = args.source
     global_install = getattr(args, "global_install", False)
@@ -919,7 +919,7 @@ def _cmd_skill_uninstall(args: argparse.Namespace) -> None:
         print(f"Error: Skill '{name}' not found at {skill_dir}", file=sys.stderr)
         sys.exit(1)
 
-    from vessal.ark.shell.hub.metadata import is_hub_installed
+    from vessal.ark.shell.hull.hub.metadata import is_hub_installed
     if not is_hub_installed(skill_dir) and not global_install:
         print(f"Error: '{name}' is not a hub-installed skill (no .installed.toml)", file=sys.stderr)
         sys.exit(1)
@@ -930,9 +930,9 @@ def _cmd_skill_uninstall(args: argparse.Namespace) -> None:
 
 def _cmd_skill_update(args: argparse.Namespace) -> None:
     """Update hub-installed Skills by re-fetching from their original source."""
-    from vessal.ark.shell.hub.metadata import read_installed
-    from vessal.ark.shell.hub.resolver import resolve
-    from vessal.ark.shell.hub.installer import install
+    from vessal.ark.shell.hull.hub.metadata import read_installed
+    from vessal.ark.shell.hull.hub.resolver import resolve
+    from vessal.ark.shell.hull.hub.installer import install
     from vessal.ark.shell.hull.skill_manager import _parse_skill_md
 
     hub_dir = Path.cwd() / "skills" / "hub"
@@ -980,7 +980,7 @@ def _cmd_skill_update(args: argparse.Namespace) -> None:
 
 def _cmd_skill_search(args: argparse.Namespace) -> None:
     """Search the SkillHub registry by keyword."""
-    from vessal.ark.shell.hub.registry import Registry
+    from vessal.ark.shell.hull.hub.registry import Registry
 
     try:
         registry = Registry.fetch()
@@ -1006,7 +1006,7 @@ def _cmd_skill_search(args: argparse.Namespace) -> None:
 
 def _cmd_skill_list(args: argparse.Namespace) -> None:
     """List available Skills, grouped by source directory."""
-    from vessal.ark.shell.hub.metadata import read_installed
+    from vessal.ark.shell.hull.hub.metadata import read_installed
     from vessal.ark.shell.hull.skill_manager import _parse_skill_md
 
     cwd = Path.cwd()
