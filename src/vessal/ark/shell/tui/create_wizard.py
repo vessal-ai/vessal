@@ -3,6 +3,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from vessal.ark.shell.errors import CliUserError
+
+
+def validate_project_name(name: str, cwd: Path) -> str | None:
+    """Return an error string if the name is unusable, else None.
+
+    Rules:
+      1. Non-empty after strip.
+      2. The resolved path cwd/name must not already exist.
+    """
+    if not name.strip():
+        return "Project name cannot be empty."
+    target = cwd / name
+    if target.exists():
+        return f"{target} already exists. Pick another name."
+    return None
+
 DEFAULT_ANSWERS = {
     "name": "my-agent",
     "api_key": "",
@@ -53,7 +70,11 @@ def run(cwd: Path | None = None) -> int:
     print()
 
     # 1. Project name
-    answers["name"] = ask_text("Project name", default=DEFAULT_ANSWERS["name"])
+    answers["name"] = ask_text(
+        "Project name",
+        default=DEFAULT_ANSWERS["name"],
+        validator=lambda value: validate_project_name(value, cwd),
+    )
 
     # 2. LLM configuration (entire step may be skipped by pressing Enter through all three).
     print()
@@ -84,7 +105,7 @@ def _scaffold(target: Path, answers: dict) -> None:
     import sys
 
     if target.exists():
-        raise FileExistsError(f"{target} already exists")
+        raise CliUserError(f"{target} already exists")
 
     subprocess.check_call(
         [sys.executable, "-m", "vessal.cli", "init", answers["name"], "--no-venv"],

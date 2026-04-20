@@ -43,3 +43,24 @@ def test_finalize_answers_defaults_applied():
     merged = finalize_answers({"name": "my-agent"})
     assert merged["name"] == "my-agent"
     assert merged["dockerize"] is False
+
+
+def test_validate_project_name_rejects_existing_dir(tmp_path):
+    from vessal.ark.shell.tui.create_wizard import validate_project_name
+    (tmp_path / "agent_test").mkdir()
+    error = validate_project_name("agent_test", tmp_path)
+    assert error is not None
+    assert "agent_test" in error
+    assert "exists" in error.lower()
+
+
+def test_validate_project_name_accepts_unused_name(tmp_path):
+    from vessal.ark.shell.tui.create_wizard import validate_project_name
+    assert validate_project_name("fresh-agent", tmp_path) is None
+
+
+def test_validate_project_name_rejects_empty():
+    from vessal.ark.shell.tui.create_wizard import validate_project_name
+    from pathlib import Path
+    error = validate_project_name("", Path("/tmp"))
+    assert error is not None
