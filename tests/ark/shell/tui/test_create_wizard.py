@@ -59,8 +59,8 @@ def test_validate_project_name_accepts_unused_name(tmp_path):
     assert validate_project_name("fresh-agent", tmp_path) is None
 
 
-def test_validate_project_name_rejects_empty():
+def test_validate_project_name_rejects_empty(tmp_path):
     from vessal.ark.shell.tui.create_wizard import validate_project_name
-    from pathlib import Path
-    error = validate_project_name("", Path("/tmp"))
+    error = validate_project_name("", tmp_path)
     assert error is not None
+    assert "empty" in error.lower()
