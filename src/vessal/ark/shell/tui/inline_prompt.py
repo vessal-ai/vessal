@@ -22,7 +22,7 @@ def ask_text(
 
     Renders: ``<question> [default]: `` and returns the user's input.
     Empty input returns the default. If ``validator`` is provided, it is called
-    with the candidate value; when it returns a non-empty string (error hint)
+    with the candidate value; when it returns a non-``None`` string (error hint)
     the hint is printed and the prompt is re-issued until validation passes.
     """
     suffix = f" [{default}]" if default else ""
