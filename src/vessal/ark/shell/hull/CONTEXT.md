@@ -23,7 +23,7 @@ Not responsible for:
 
 ## Design
 
-Hull runs in an independent subprocess (started by the Shell main process via `subprocess.Popen` running `hull_runner.py` with `sys.executable`). All Agent state — namespace, skill instances, frame loop — lives in this subprocess. `exec(code, ns)` operates directly on the namespace dict within this subprocess; skill methods are called directly in memory with no cross-process serialization. Database connections, file handles, imported modules, and other non-serializable objects persist normally across frames. When the subprocess crashes, Shell automatically restarts it and restores from a snapshot.
+Hull runs in an independent subprocess (started by the Shell main process via `subprocess.Popen` running `runtime/subprocess_mode.py` with `sys.executable`). All Agent state — namespace, skill instances, frame loop — lives in this subprocess. `exec(code, ns)` operates directly on the namespace dict within this subprocess; skill methods are called directly in memory with no cross-process serialization. Database connections, file handles, imported modules, and other non-serializable objects persist normally across frames. When the subprocess crashes, Shell automatically restarts it and restores from a snapshot.
 
 Hull exists to centralize the configuration work of turning a "generic Cell" into a "specific Agent". Cell is a pure engine that knows nothing about hull.toml, Skill paths, system prompts, or log directories. Without Hull, Shell would have to take on all initialization work, but Shell's responsibility is only the HTTP gateway and guardian; mixing the two would scatter startup logic everywhere.
 
@@ -116,6 +116,6 @@ None.
 - 2026-04-12: Skill UX spec implementation — three-layer information distribution (_prompt/guide/_signal) written into SkillBase docstring and Hull CONTEXT.md
 
 ### Completed
-- 2026-04-10: Hull process isolation — Hull runs in a subprocess (subprocess.Popen hull_runner.py), Shell main process acts as gateway and guardian
+- 2026-04-10: Hull process isolation — Hull runs in a subprocess (subprocess.Popen runtime/subprocess_mode.py), Shell main process acts as gateway and guardian
 - 2026-04-14: SOUL.md hot reload — mtime detection each frame; changes take effect in the next frame after Agent modifies the file at runtime (hull.py _init_prompts + _rewrite_runtime_owned)
 - 2026-04-14: Context lifecycle refactor — removed compression frame mechanism (event_loop/hull/prompts/tests), render trimming changed to physical frame deletion, Memory skill adds drop(n) + context pressure signal, hull.toml [cell].compress_threshold config (default 50)
