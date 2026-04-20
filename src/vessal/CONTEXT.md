@@ -80,7 +80,7 @@ flowchart TB
     subgraph SubProcess["Subprocess — agent/.venv/bin/python"]
         Hull["Hull Orchestrator"]
         EL["EventLoop\nevent loop"]
-        SM["SkillManager\ndiscovery + loading"]
+        SM["SkillLoader\ndiscovery + loading"]
         Cell["Cell\nsingle-frame execution"]
         Kernel["Kernel\nnamespace + exec()"]
         Gate["Gate\nstate/action validation"]

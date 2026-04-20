@@ -18,7 +18,7 @@ from vessal.ark.shell.hull.cell import Cell
 from vessal.ark.shell.hull.cell.kernel.compression_parser import CompactionParseError, parse_compaction_json
 from vessal.ark.shell.hull.event_loop import EventLoop, FrameHooks
 from vessal.ark.shell.hull.skills_manager import SkillsManager
-from vessal.ark.shell.hull.skill_manager import SkillManager
+from vessal.ark.shell.hull.skill_loader import SkillLoader
 from vessal.ark.shell.hull.cell.kernel import RenderConfig
 from vessal.ark.shell.hull.cell.kernel.render.prompt import Section, SystemPromptBuilder, render_capabilities
 from vessal.ark.util.logging import Tracer
@@ -42,7 +42,7 @@ class Hull:
     Attributes:
         _cell: Cell instance — the Agent's frame execution engine.
         _event_loop: EventLoop instance — drives the sleep/wake lifecycle.
-        _skill_manager: SkillManager instance — manages Skill discovery and loading.
+        _skill_manager: SkillLoader instance — manages Skill discovery and loading.
         _tracer: Tracer instance — records frame execution trace logs.
         _routes: Dynamic route table registered by Skill servers via HullApi.
     """
@@ -131,11 +131,11 @@ class Hull:
         self._cell.set("_compression_prompt", self._compression_prompt)
 
     def _init_skills(self, hull_cfg: dict) -> None:
-        """Phase 3: SkillManager, SkillsManager, route table, pre-load Skills, start servers."""
+        """Phase 3: SkillLoader, SkillsManager, route table, pre-load Skills, start servers."""
         skill_paths = hull_cfg.get("skill_paths", [])
         resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
 
-        self._skill_manager = SkillManager(skill_paths=resolved_paths)
+        self._skill_manager = SkillLoader(skill_paths=resolved_paths)
         self._cell.set("_builtin_names", ["skills"])
 
         _skills = SkillsManager(self)
@@ -280,7 +280,7 @@ class Hull:
         self._stop_skill_server(name)
 
     def unload_skill_from_manager(self, name: str) -> None:
-        """Unload a Skill from the SkillManager registry."""
+        """Unload a Skill from the SkillLoader registry."""
         self._skill_manager.unload(name)
 
     def reload_soul(self) -> None:
@@ -296,7 +296,7 @@ class Hull:
 
     def reload_skill(self, name: str) -> bool:
         """Reload a skill by name. Returns True if the skill was reloaded."""
-        # NOTE: loaded_names is a @property on SkillManager (no parens).
+        # NOTE: loaded_names is a @property on SkillLoader (no parens).
         if name not in self._skill_manager.loaded_names:
             return False
         try:

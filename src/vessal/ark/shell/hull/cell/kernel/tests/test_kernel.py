@@ -19,7 +19,7 @@ from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, attach_source, execute, _compress_traceback, _maybe_capture_last_expr
 from vessal.ark.shell.hull.cell.kernel.render import render
-from vessal.ark.shell.hull.skill_manager import SkillManager
+from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
 # ─────────────────────────────────────────────
@@ -749,7 +749,7 @@ class TestKernel:
         skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
-            sm = SkillManager(skill_paths=[skills_root])
+            sm = SkillLoader(skill_paths=[skills_root])
             k.ns["_builtin_names"] = []
 
             skill_cls = sm.load("tasks")
@@ -771,7 +771,7 @@ class TestKernel:
         skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
-            sm = SkillManager(skill_paths=[skills_root])
+            sm = SkillLoader(skill_paths=[skills_root])
             k.ns["_builtin_names"] = []
 
             TasksCls = sm.load("tasks")
@@ -827,7 +827,7 @@ class TestKernel:
         skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
-            sm = SkillManager(skill_paths=[skills_root])
+            sm = SkillLoader(skill_paths=[skills_root])
             k.ns["_builtin_names"] = []
 
             TasksCls = sm.load("tasks")

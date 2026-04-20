@@ -88,7 +88,7 @@ def install(
     Returns:
         Success message string.
     """
-    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+    from vessal.ark.shell.hull.skill_loader import _parse_skill_md
 
     if not resolved.verified:
         print(

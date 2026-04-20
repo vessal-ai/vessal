@@ -1,4 +1,4 @@
-"""skill_manager.py — Skill lifecycle management: discovery, loading, and unloading of Skill packages."""
+"""skill_loader.py — Skill lifecycle management: discovery, loading, and unloading of Skill packages."""
 from __future__ import annotations
 
 import importlib
@@ -80,7 +80,7 @@ def _parse_skill_md(path: Path) -> tuple[dict, str]:
     return meta, body
 
 
-class SkillManager:
+class SkillLoader:
     """Skill lifecycle manager: discovers, loads, and unloads Skill packages.
 
     Attributes:

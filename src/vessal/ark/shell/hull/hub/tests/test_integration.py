@@ -84,7 +84,7 @@ def test_registry_search(tmp_path: Path):
 
 def test_v1_frontmatter_parsing(tmp_path: Path):
     """Test: SKILL.md v1 frontmatter parsed correctly."""
-    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+    from vessal.ark.shell.hull.skill_loader import _parse_skill_md
 
     md = tmp_path / "SKILL.md"
     md.write_text(

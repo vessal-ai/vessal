@@ -1,10 +1,10 @@
-"""test_skill_loading — SkillManager + builtins integration tests."""
+"""test_skill_loading — SkillLoader + builtins integration tests."""
 import sys
 from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.skill_manager import SkillManager
+from vessal.ark.shell.hull.skill_loader import SkillLoader
 from vessal.ark.shell.hull.skill import SkillBase
 
 
@@ -32,19 +32,19 @@ def skill_env(tmp_path):
 
 
 def test_load_returns_skillbase_subclass(skill_env):
-    sm = SkillManager(skill_paths=[str(skill_env)])
+    sm = SkillLoader(skill_paths=[str(skill_env)])
     cls = sm.load("test_skill")
     assert issubclass(cls, SkillBase)
 
 
 def test_load_sets_guide(skill_env):
-    sm = SkillManager(skill_paths=[str(skill_env)])
+    sm = SkillLoader(skill_paths=[str(skill_env)])
     cls = sm.load("test_skill")
     assert "Test guide body." in cls.guide
 
 
 def test_instance_signal(skill_env):
-    sm = SkillManager(skill_paths=[str(skill_env)])
+    sm = SkillLoader(skill_paths=[str(skill_env)])
     cls = sm.load("test_skill")
     instance = cls()
     result = instance._signal()
@@ -52,13 +52,13 @@ def test_instance_signal(skill_env):
 
 
 def test_list_skills(skill_env):
-    sm = SkillManager(skill_paths=[str(skill_env)])
+    sm = SkillLoader(skill_paths=[str(skill_env)])
     result = sm.list()
     assert any(s["name"] == "test_skill" for s in result)
 
 
 def test_unload_cleans_sys_modules(skill_env):
-    sm = SkillManager(skill_paths=[str(skill_env)])
+    sm = SkillLoader(skill_paths=[str(skill_env)])
     sm.load("test_skill")
     assert "test_skill" in sys.modules
     sm.unload("test_skill")
@@ -66,7 +66,7 @@ def test_unload_cleans_sys_modules(skill_env):
 
 
 def test_load_not_found():
-    sm = SkillManager(skill_paths=[])
+    sm = SkillLoader(skill_paths=[])
     with pytest.raises(RuntimeError, match="not found"):
         sm.load("nonexistent")
 
@@ -75,7 +75,7 @@ def test_isinstance_scan_integration(skill_env):
     """End-to-end: load class → instantiate → kernel scans → signal collected."""
     from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
 
-    sm = SkillManager(skill_paths=[str(skill_env)])
+    sm = SkillLoader(skill_paths=[str(skill_env)])
     cls = sm.load("test_skill")
     k = Kernel()
     k.ns["ts"] = cls()

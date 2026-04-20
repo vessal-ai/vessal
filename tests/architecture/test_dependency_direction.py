@@ -84,7 +84,7 @@ def test_cell_imports_no_hull_or_shell():
     violations = _scan_imports(
         str(_REPO_ROOT / "src/vessal/ark/shell/hull/cell"),
         ["vessal.ark.shell.hull.hull", "vessal.ark.shell.hull.event_loop",
-         "vessal.ark.shell.hull.skill_manager",
+         "vessal.ark.shell.hull.skill_loader",
          "vessal.ark.shell.hull.skill",
          "vessal.ark.shell.server", "vessal.ark.shell.cli",
          "vessal.hull", "vessal.shell"],

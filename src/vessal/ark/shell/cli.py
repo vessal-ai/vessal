@@ -729,7 +729,7 @@ def _cmd_skill_check(args: argparse.Namespace) -> None:
     import importlib
     import subprocess
 
-    from vessal.ark.shell.hull.skill_manager import _parse_skill_md as parse_skill_md
+    from vessal.ark.shell.hull.skill_loader import _parse_skill_md as parse_skill_md
 
     skill_dir = Path(args.path).resolve()
     name = skill_dir.name
@@ -933,7 +933,7 @@ def _cmd_skill_update(args: argparse.Namespace) -> None:
     from vessal.ark.shell.hull.hub.metadata import read_installed
     from vessal.ark.shell.hull.hub.resolver import resolve
     from vessal.ark.shell.hull.hub.installer import install
-    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+    from vessal.ark.shell.hull.skill_loader import _parse_skill_md
 
     hub_dir = Path.cwd() / "skills" / "hub"
     if not hub_dir.is_dir():
@@ -1007,7 +1007,7 @@ def _cmd_skill_search(args: argparse.Namespace) -> None:
 def _cmd_skill_list(args: argparse.Namespace) -> None:
     """List available Skills, grouped by source directory."""
     from vessal.ark.shell.hull.hub.metadata import read_installed
-    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+    from vessal.ark.shell.hull.skill_loader import _parse_skill_md
 
     cwd = Path.cwd()
     sections = []
@@ -1068,7 +1068,7 @@ def _cmd_skill_publish(args: argparse.Namespace) -> None:
     """Guide user to submit a Skill to the SkillHub curated registry."""
     import webbrowser
 
-    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+    from vessal.ark.shell.hull.skill_loader import _parse_skill_md
 
     skill_dir = Path(args.path).resolve()
     skill_md = skill_dir / "SKILL.md"
