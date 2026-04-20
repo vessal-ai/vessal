@@ -79,7 +79,7 @@ def test_create_class_name_camelcase(creator, tmp_path):
 
 
 def test_create_generates_context_md(creator, tmp_path):
-    """create() generates a CONTEXT.md Formalin contract framework."""
+    """create() generates a CONTEXT.md boundary contract framework."""
     creator.create("code_review", "code review tool")
     path = tmp_path / "code_review" / "CONTEXT.md"
     assert path.exists()

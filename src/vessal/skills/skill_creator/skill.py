@@ -26,7 +26,7 @@ class SkillCreator(SkillBase):
         """Create a Skill directory scaffold (7 files) under skill_paths[0].
 
         Generated files: __init__.py, skill.py (with full protocol comments), SKILL.md (guide template),
-        CONTEXT.md (Formalin contract), REFERENCE.md (reference docs),
+        CONTEXT.md (boundary contract), REFERENCE.md (reference docs),
         tests/__init__.py, tests/test_{name}.py (test scaffold).
 
         Args:
@@ -172,7 +172,7 @@ class SkillCreator(SkillBase):
             encoding="utf-8",
         )
 
-        # CONTEXT.md — Formalin contract framework
+        # CONTEXT.md — boundary contract framework
         title = " ".join(part.capitalize() for part in name.split("_"))
         (base / "CONTEXT.md").write_text(
             f"# {title}\n"
@@ -295,7 +295,7 @@ class SkillCreator(SkillBase):
             "    __init__.py     exports Skill class\n"
             "    skill.py        Skill class (SOP + Tool + Signal)\n"
             "    SKILL.md        Guide text\n"
-            "    CONTEXT.md      Formalin contract\n"
+            "    CONTEXT.md      Boundary contract\n"
             "    REFERENCE.md    this file (reference docs)\n"
             "    server.py       Server code (optional)\n"
             "    tests/          test directory\n"

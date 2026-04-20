@@ -18,7 +18,7 @@ skill_creator.create(name, description) — Create a scaffold directory
   __init__.py       Exports the Skill class
   skill.py          Full protocol comments + skeleton code
   SKILL.md          Guide template
-  CONTEXT.md        Formalin contract framework
+  CONTEXT.md        Boundary contract framework
   REFERENCE.md      Reference docs (whitepaper excerpts + example source)
   tests/
     __init__.py
