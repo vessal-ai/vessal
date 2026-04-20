@@ -9,7 +9,7 @@ Shell has three orthogonal responsibilities. Keep them in separate subdirectorie
 | Subdomain | Purpose | Files |
 |-----------|---------|-------|
 | Entry | How a user interacts with Vessal | `cli/` (process/skill/init subcommands) + `tui/` |
-| Runtime | Which process carries the Hull | `hull_runner.py` (Popen'd by `ShellServer`) + `container/entry.py` (Docker `ENTRYPOINT`) — moves to `runtime/` in P4 |
+| Runtime | Which process carries the Hull | `runtime/subprocess_mode.py` (Popen'd by `ShellServer`) + `runtime/container_mode.py` (Docker `ENTRYPOINT`) |
 | Supervisor | The HTTP proxy + crash-restart watchdog that wraps subprocess mode | `server.py` |
 
 Plus carrier-agnostic plumbing: `http_server.py` (stdlib `HTTPServer` base with quiet disconnect policy), `protocol.py` (`handle()` type definitions), `events.py`.
@@ -18,8 +18,8 @@ Plus carrier-agnostic plumbing: `http_server.py` (stdlib `HTTPServer` base with 
 flowchart LR
     User["User / Docker"] --> Entry["Entry\ncli/ + tui/"]
     Entry --> Supervisor["Supervisor\nserver.py"]
-    Supervisor -->|subprocess mode| Runtime["Subprocess carrier\n(hull_runner.py)"]
-    Entry -->|container mode| Runtime2["Container carrier\n(container/entry.py)"]
+    Supervisor -->|subprocess mode| Runtime["Subprocess carrier\n(runtime/subprocess_mode.py)"]
+    Entry -->|container mode| Runtime2["Container carrier\n(runtime/container_mode.py)"]
     Runtime --> Hull["Hull"]
     Runtime2 --> Hull
     subgraph Shell["Shell — Agent Carrier Layer"]
@@ -46,9 +46,9 @@ flowchart LR
 
 ## Design
 
-Subprocess mode = foreground + `--daemon` CLI. The main process runs `ShellServer` (HTTP proxy + `_ProxyHandler` + watchdog thread); it `subprocess.Popen`s `hull_runner.py` (current path; moves to `runtime/subprocess_mode.py` in P4) which creates `Hull`, binds 127.0.0.1 on an internal port, and forwards each request through `SubprocessHullHandler` (a subclass of `HullHttpHandlerBase`). Crash isolation: native-library segfaults kill only the Hull child; the supervisor restarts it and returns HTTP 503 in the interim.
+Subprocess mode = foreground + `--daemon` CLI. The main process runs `ShellServer` (HTTP proxy + `_ProxyHandler` + watchdog thread); it `subprocess.Popen`s `runtime/subprocess_mode.py` which creates `Hull`, binds 127.0.0.1 on an internal port, and forwards each request through `SubprocessHullHandler` (a subclass of `HullHttpHandlerBase`). Crash isolation: native-library segfaults kill only the Hull child; the supervisor restarts it and returns HTTP 503 in the interim.
 
-Container mode = Docker `ENTRYPOINT`. There is no `ShellServer` — the container itself *is* the supervisor (restarts are Docker's job). `container/entry.py` (current path; moves to `runtime/container_mode.py` in P4) directly constructs `Hull`, binds 0.0.0.0, and runs `ContainerHullHandler` (also a subclass of `HullHttpHandlerBase`) on the user-visible port. A `SIGTERM` handler shuts Hull down gracefully; `/healthz` is a handler-level bypass for Docker's HEALTHCHECK. A first-boot step (`sync_image_to_volume`) seeds the volume from the baked `/opt/agent-image/`.
+Container mode = Docker `ENTRYPOINT`. There is no `ShellServer` — the container itself *is* the supervisor (restarts are Docker's job). `runtime/container_mode.py` directly constructs `Hull`, binds 0.0.0.0, and runs `ContainerHullHandler` (also a subclass of `HullHttpHandlerBase`) on the user-visible port. A `SIGTERM` handler shuts Hull down gracefully; `/healthz` is a handler-level bypass for Docker's HEALTHCHECK. A first-boot step (`sync_image_to_volume`) seeds the volume from the baked `/opt/agent-image/`.
 
 The two carriers share exactly one base class (`HullHttpHandlerBase`) that owns `do_GET`, `do_POST`, `_read_json`, and `_respond`. Differences between carriers are declared by subclass overrides (HOST, healthz path, logging, lifecycle hooks) — nothing is duplicated.
 

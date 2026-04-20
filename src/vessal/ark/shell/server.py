@@ -319,7 +319,7 @@ class ShellServer:
         cmd = [
             sys.executable,
             "-m",
-            "vessal.ark.shell.hull_runner",
+            "vessal.ark.shell.runtime.subprocess_mode",
             "--dir",
             self._project_dir,
             "--port",

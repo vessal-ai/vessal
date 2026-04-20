@@ -38,7 +38,7 @@ graph LR
     Util["util/ — shared utilities (importable by both processes)"]
 
     ShellHTTP -->|"reverse proxy"| HullHTTP
-    Monitor -->|"subprocess.Popen\nhull_runner.py"| SubProcess
+    Monitor -->|"subprocess.Popen\nruntime/subprocess_mode.py"| SubProcess
     HullCore --> CellCore --> KernelCore
     MainProcess -.-> Util
     SubProcess -.-> Util

@@ -17,7 +17,7 @@ Not responsible for:
 
 ## Design
 
-Hull runs in an independent subprocess (started by the Shell main process via `subprocess.Popen` running `hull_runner.py` with `sys.executable`). All Agent state — namespace, skill instances, frame loop — lives in this subprocess. `exec(code, ns)` operates directly on the namespace dict within this subprocess; skill methods are called directly in memory with no cross-process serialization. Database connections, file handles, imported modules, and other non-serializable objects persist normally across frames. When the subprocess crashes, Shell automatically restarts it and restores from a snapshot.
+Hull runs in an independent subprocess (started by the Shell main process via `subprocess.Popen` running `runtime/subprocess_mode.py` with `sys.executable`). All Agent state — namespace, skill instances, frame loop — lives in this subprocess. `exec(code, ns)` operates directly on the namespace dict within this subprocess; skill methods are called directly in memory with no cross-process serialization. Database connections, file handles, imported modules, and other non-serializable objects persist normally across frames. When the subprocess crashes, Shell automatically restarts it and restores from a snapshot.
 
 Hull exists to centralize the configuration work of turning a "generic Cell" into a "specific Agent". Cell is a pure engine that knows nothing about hull.toml, Skill paths, system prompts, or log directories. Without Hull, Shell would have to take on all initialization work, but Shell's responsibility is only the HTTP gateway and guardian; mixing the two would scatter startup logic everywhere.
 
@@ -112,7 +112,7 @@ Renders a Python object as text at the specified level of detail.
 - `test_handle.py` — Test Hull.handle() single-method HTTP interface.
 - `test_hull_api.py` — Test HullApi interface for skill servers.
 - `test_hull_public_api.py` — test_hull_public_api — Hull public interface unit tests.
-- `test_hull_runner.py` — test_hull_runner.py — Unit tests for the Hull subprocess entry module.
+- `test_subprocess_mode.py` — Unit tests for the Hull subprocess carrier.
 - `test_skill_base.py` — test_skill_base — SkillBase abstract interface contract.
 - `test_skill_loader.py` — test_skill_loader — SkillLoader lifecycle tests.
 - `test_skill_ux_rules.py` — test_skill_ux_rules — Verifies that all built-in Skills follow UX guidelines.
