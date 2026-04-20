@@ -1,11 +1,11 @@
 """skills — UI-only Skill exposing a management view for installed Skills."""
+from __future__ import annotations
+
+from vessal.ark.shell.hull.skill import SkillBase
 
 
-class Skills:
+class Skills(SkillBase):
+    """Inventory and management UI for installed Skills. UI-only; no agent tools."""
+
     name = "skills"
-    summary = "Inventory and management UI for installed Skills."
-    guide = None
-    tools: list[str] = []
-
-    def __init__(self, data_dir=None):
-        self._data_dir = data_dir
+    description = "skill inventory"
