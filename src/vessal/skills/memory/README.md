@@ -35,9 +35,9 @@ flowchart LR
 
 ## Public Interface
 
-### Skill
+### class Memory
 
-_Definition not found._
+Cross-session key-value memory. Agent calls save/get/delete to manage memory entries.
 
 
 ## File Structure

@@ -246,8 +246,12 @@ This creates a scaffold in `skills/local/my-skill/`:
 
 ```
 skills/local/my-skill/
-    __init__.py     Skill class (tools + signals)
-    SKILL.md        Usage guide for the LLM (v1 frontmatter)
+    __init__.py           Re-exports the Skill class
+    skill.py              SkillBase subclass with protocol conventions
+    SKILL.md              Usage guide for the LLM (v1 frontmatter)
+    requirements.txt      Skill-local Python dependencies
+    tests/__init__.py
+    tests/test_my-skill.py  Placeholder test
 ```
 
 The generated `SKILL.md` uses the v1 frontmatter format:
@@ -416,7 +420,6 @@ A running agent exposes these endpoints on its port (default 8420):
 |----------|-------------|
 | `GET /status` | Agent state (idle/sleeping, frame count, wake reason) |
 | `GET /frames?after=N` | Frame stream as JSON (incremental) |
-| `GET /logs` | Frame log viewer (HTML) |
 | `POST /wake` | Inject a wake event |
 | `POST /stop` | Graceful shutdown |
 | `GET /skills/chat/` | Chat web UI |

@@ -78,7 +78,7 @@ Known scale issue: kernel.py is close to the 400-line limit; describe/ + render/
 
 ### DEFAULT_CONFIG
 
-_Definition not found._
+Default RenderConfig instance used by Kernel when no explicit config is supplied.
 
 ### class ExecResult
 
