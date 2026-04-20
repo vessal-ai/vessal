@@ -38,9 +38,9 @@ Not responsible for:
 
 ## Design
 
-Subprocess mode = foreground + `--daemon` CLI. The main process runs `ShellServer` (HTTP proxy + `_ProxyHandler` + watchdog thread); it `subprocess.Popen`s `python -m vessal.ark.shell.runtime.subprocess_mode` which creates `Hull`, binds 127.0.0.1 on an internal port, and forwards each request through `SubprocessHullHandler` (a subclass of `HullHttpHandlerBase`). Crash isolation: native-library segfaults kill only the Hull child; the supervisor restarts it and returns HTTP 503 in the interim.
+Subprocess mode = foreground + `--daemon` CLI. The main process runs `ShellServer` (HTTP proxy + `_ProxyHandler` + watchdog thread); it `subprocess.Popen`s `hull_runner.py` (current path; moves to `runtime/subprocess_mode.py` in P4) which creates `Hull`, binds 127.0.0.1 on an internal port, and forwards each request through `SubprocessHullHandler` (a subclass of `HullHttpHandlerBase`). Crash isolation: native-library segfaults kill only the Hull child; the supervisor restarts it and returns HTTP 503 in the interim.
 
-Container mode = Docker `ENTRYPOINT`. There is no `ShellServer` — the container itself is the supervisor (restarts are Docker's job). `python -m vessal.ark.shell.runtime.container_mode` directly constructs `Hull`, binds 0.0.0.0, and runs `ContainerHullHandler` (also a subclass of `HullHttpHandlerBase`) on the user-visible port. A `SIGTERM` handler shuts Hull down gracefully; `/healthz` is a handler-level bypass for Docker's HEALTHCHECK. A first-boot step (`sync_image_to_volume`) seeds the volume from the baked `/opt/agent-image/`.
+Container mode = Docker `ENTRYPOINT`. There is no `ShellServer` — the container itself is the supervisor (restarts are Docker's job). `container/entry.py` (current path; moves to `runtime/container_mode.py` in P4) directly constructs `Hull`, binds 0.0.0.0, and runs `ContainerHullHandler` (also a subclass of `HullHttpHandlerBase`) on the user-visible port. A `SIGTERM` handler shuts Hull down gracefully; `/healthz` is a handler-level bypass for Docker's HEALTHCHECK. A first-boot step (`sync_image_to_volume`) seeds the volume from the baked `/opt/agent-image/`.
 
 The two carriers share exactly one base class (`HullHttpHandlerBase`) that owns `do_GET`, `do_POST`, `_read_json`, and `_respond`. Differences between carriers are declared by subclass overrides (HOST, healthz path, logging, lifecycle hooks) — nothing is duplicated.
 
@@ -59,4 +59,4 @@ Shell depends on Hull; Hull does not know Shell exists. `TYPE_CHECKING` blocks a
 - 2026-04-10: Refactor start/stop to flock identity model: foreground by default, --daemon optional for background, stop waits for process exit
 
 ### Completed
-- 2026-04-10: Shell-Hull process isolation — Hull runs in a subprocess (subprocess.Popen runtime/subprocess_mode.py), Shell main process acts as HTTP gateway and guardian, including crash detection and auto-restart
+- 2026-04-10: Shell-Hull process isolation — Hull runs in a subprocess (subprocess.Popen hull_runner.py; moves to runtime/subprocess_mode.py in P4), Shell main process acts as HTTP gateway and guardian, including crash detection and auto-restart
