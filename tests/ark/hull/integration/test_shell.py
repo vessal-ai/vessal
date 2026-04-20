@@ -13,8 +13,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vessal.ark.shell.cli import main
-from vessal.ark.shell.cli import _is_project_running, _read_lock_port, _read_lock_pid, _is_port_in_use
+from vessal.ark.shell.cli.__main__ import main
+from vessal.ark.shell.cli.process_utils import _is_project_running, _read_lock_port, _read_lock_pid, _is_port_in_use
 
 
 # ============================================================
@@ -714,7 +714,7 @@ class TestStartForegroundLock:
         """_start_foreground creates data/vessal.lock, not a PID file."""
         import argparse
         from unittest.mock import patch
-        from vessal.ark.shell.cli import _start_foreground
+        from vessal.ark.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj"
         project_dir.mkdir()
@@ -754,7 +754,7 @@ class TestStartForegroundLock:
         """_start_foreground creates data/vessal.lock and writes the port number."""
         import argparse
         from unittest.mock import patch
-        from vessal.ark.shell.cli import _start_foreground
+        from vessal.ark.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj2"
         project_dir.mkdir()
@@ -794,7 +794,7 @@ class TestStartForegroundLock:
         """When shell.start() raises RuntimeError, the lock file is released and exits with code 1."""
         import argparse
         import threading
-        from vessal.ark.shell.cli import _start_foreground
+        from vessal.ark.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj3"
         project_dir.mkdir()
@@ -843,7 +843,7 @@ class TestStopCommand:
     def test_stop_reports_not_running_when_no_lock(self, tmp_path, capsys):
         """Reports Agent is not running when no lock file exists."""
         import argparse
-        from vessal.ark.shell.cli import _cmd_stop
+        from vessal.ark.shell.cli.process_cmds import _cmd_stop
 
         (tmp_path / "data").mkdir()
         args = argparse.Namespace(dir=str(tmp_path), port=8420)
@@ -854,7 +854,7 @@ class TestStopCommand:
     def test_stop_reports_not_running_when_no_data_dir(self, tmp_path, capsys):
         """Reports Agent is not running when data/ directory does not exist."""
         import argparse
-        from vessal.ark.shell.cli import _cmd_stop
+        from vessal.ark.shell.cli.process_cmds import _cmd_stop
 
         args = argparse.Namespace(dir=str(tmp_path), port=8420)
         _cmd_stop(args)
