@@ -17,7 +17,6 @@ def safe_classes():
 
 
 def _dummy_instance(cls):
-    """Build an instance without running __init__ (we only exercise handle_error)."""
     return cls.__new__(cls)
 
 

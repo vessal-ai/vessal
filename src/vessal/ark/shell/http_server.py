@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import http.server
 import logging
+import sys
 
 _logger = logging.getLogger("vessal.shell.http")
 
@@ -39,9 +40,7 @@ class _HandleErrorMixin:
     """Shared ``handle_error`` policy for the Vessal HTTP server family."""
 
     def handle_error(self, request, client_address):  # type: ignore[override]
-        import sys as _sys
-
-        exc = _sys.exc_info()[1]
+        exc = sys.exc_info()[1]
         if isinstance(exc, _QUIET_EXCEPTIONS):
             _logger.debug(
                 "client disconnected (%s) from %s",
