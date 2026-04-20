@@ -737,7 +737,7 @@ class TestStartForegroundLock:
                 lock_file_created["exists"] = True
             raise KeyboardInterrupt
 
-        with patch("vessal.ark.shell.cli.ShellServer") as MockShell:
+        with patch("vessal.ark.shell.server.ShellServer") as MockShell:
             mock_shell = MockShell.return_value
             mock_shell.start.return_value = None
             mock_shell.serve_forever.side_effect = capture_serve_forever
@@ -776,7 +776,7 @@ class TestStartForegroundLock:
                 lock_contents["data"] = lock_path.read_text()
             raise KeyboardInterrupt
 
-        with patch("vessal.ark.shell.cli.ShellServer") as MockShell:
+        with patch("vessal.ark.shell.server.ShellServer") as MockShell:
             mock_shell = MockShell.return_value
             mock_shell.start.return_value = None
             mock_shell.serve_forever.side_effect = capture_serve_forever
@@ -823,7 +823,7 @@ class TestStartForegroundLock:
             def shutdown(self):
                 pass
 
-        monkeypatch.setattr("vessal.ark.shell.cli.ShellServer", FakeShellServer)
+        monkeypatch.setattr("vessal.ark.shell.server.ShellServer", FakeShellServer)
 
         args = argparse.Namespace(dir=str(project_dir), port=9001, daemon=False)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from unittest.mock import patch
 
-from vessal.ark.shell import upgrade
+from vessal.ark.shell.cli import upgrade
 
 
 def test_check_pypi_latest_parses_info_version():
