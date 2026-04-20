@@ -13,7 +13,7 @@ _SHELL_ROOT = Path(__file__).resolve().parents[2] / "src" / "vessal" / "ark" / "
 _FORBIDDEN = re.compile(r"\bvessal\.ark\.shell\.hub\b")
 
 
-def test_hull_does_not_import_shell_hub() -> None:
+def test_shell_does_not_import_retired_hub_path() -> None:
     """No file under shell/ may import the retired shell.hub path."""
     offenders = []
     for py in _SHELL_ROOT.rglob("*.py"):

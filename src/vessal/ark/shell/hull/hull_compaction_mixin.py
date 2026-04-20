@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from vessal.ark.shell.hull.cell import Cell
     from vessal.ark.shell.hull.cell.core import Core
     from vessal.ark.shell.hull.cell.kernel import RenderConfig
+    from vessal.ark.shell.hull.cell.protocol import Ping
     from vessal.ark.shell.hull.cell.kernel.render.prompt import SystemPromptBuilder
     from vessal.ark.shell.hull.event_loop import EventLoop
     from vessal.ark.shell.hull.hull_api import HullApi

@@ -26,7 +26,7 @@ def test_top_level_help() -> None:
 def test_start_help() -> None:
     r = _run("start", "--help")
     assert r.returncode == 0, r.stderr
-    assert "--dir" in r.stdout
+    assert "--dir" in r.stdout and "--port" in r.stdout and "--daemon" in r.stdout
 
 
 def test_stop_help() -> None:

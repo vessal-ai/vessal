@@ -8,7 +8,7 @@ Shell has three subdomains:
 
 | Subdomain | Purpose | Files |
 |-----------|---------|-------|
-| Entry | How a user interacts with Vessal | `cli/` (process/skill/init subcommands — currently `cli.py`; `cli/` subpackage is a P5 deliverable) + `tui/` |
+| Entry | How a user interacts with Vessal | `cli/` (process/skill/init subcommands) + `tui/` |
 | Runtime | Which process carries the Hull | `runtime/` — Hull runtime carriers (subprocess + container) |
 | Supervisor | The HTTP proxy + crash-restart watchdog that wraps subprocess mode | `server.py` |
 
@@ -49,10 +49,10 @@ Shell depends on Hull; Hull does not know Shell exists. `TYPE_CHECKING` blocks a
 ## Status
 
 ### TODO
-- [ ] 2026-04-09: The companion process startup logic in `_cmd_start` in cli.py is too long; consider extracting
+- [ ] 2026-04-09: The companion process startup logic in `_cmd_start` in cli/process_cmds.py is too long; consider extracting
 
 ### Known Issues
-- 2026-04-09: cli.py is currently 739 lines, exceeding the 500-line convention (not set as a hard constraint because the centralized CLI entry design requires a longer file)
+- 2026-04-20: cli/ subpackage split complete; cli.py removed. Largest module is cli/skill_cmds.py (~405 lines).
 - 2026-04-10: Daemon lifecycle identity model rebuild — PID file replaced with flock (data/vessal.lock); see flock identity model plan
 
 ### Active
