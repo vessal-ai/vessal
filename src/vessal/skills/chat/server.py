@@ -6,6 +6,8 @@ Standalone mode: python server.py --data-dir <path> runs independently.
 import argparse
 import http.server
 import json
+
+from vessal.ark.shell.http_server import SafeHTTPServer
 import time
 import urllib.error
 import urllib.request
@@ -282,7 +284,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-class _ReusableHTTPServer(http.server.HTTPServer):
+class _ReusableHTTPServer(SafeHTTPServer):
     allow_reuse_address = True
 
 
