@@ -1,7 +1,7 @@
 """hull_compaction_mixin.py — Frame-stream compaction + snapshots for Hull.
 
 Part of the Hull class via multiple-inheritance composition (see hull.py).
-Methods here may assume the attributes set by Hull.__init__ (see `_HullAttrs` TYPE_CHECKING block).
+Methods here may assume the attributes set by Hull.__init__ are available via self.
 """
 from __future__ import annotations
 

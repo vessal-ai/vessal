@@ -1,7 +1,7 @@
 """hull_skills_mixin.py — Skill load/unload/reload + server lifecycle for Hull.
 
 Part of the Hull class via multiple-inheritance composition (see hull.py).
-Methods here may assume the attributes set by Hull.__init__ (see `_HullAttrs` TYPE_CHECKING block).
+Methods here may assume the attributes set by Hull.__init__ are available via self.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ class HullSkillsMixin:
 
     def loaded_skill_names(self) -> list[str]:
         """Return names of currently loaded Skills."""
-        return self._skill_manager.loaded_names()
+        return self._skill_manager.loaded_names
 
     def available_skills(self) -> list[dict]:
         """Return list of available Skills (name + description)."""
