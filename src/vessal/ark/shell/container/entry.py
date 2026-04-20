@@ -32,6 +32,8 @@ import sys
 import threading
 from pathlib import Path
 
+from vessal.ark.shell.http_server import SafeHTTPServer
+
 logger = logging.getLogger("vessal.container")
 
 
@@ -230,7 +232,7 @@ def main() -> None:
     hull = Hull(str(project_dir))
 
     # HTTP server — bind 0.0.0.0 (container port)
-    http_server = http.server.HTTPServer(("0.0.0.0", args.port), _ContainerHandler)
+    http_server = SafeHTTPServer(("0.0.0.0", args.port), _ContainerHandler)
     http_server.hull = hull
     http_thread = threading.Thread(
         target=http_server.serve_forever, daemon=True, name="container-http",
