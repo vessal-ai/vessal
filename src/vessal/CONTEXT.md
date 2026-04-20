@@ -206,7 +206,7 @@ stateDiagram-v2
 ## Status
 
 ### TODO
-- [ ] 2026-04-09: Add complete Formalin annotation spec to `__init__.py` and `cli.py`
+None.
 
 ### Known Issues
 None.

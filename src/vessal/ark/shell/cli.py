@@ -620,22 +620,21 @@ Load and call via example.word_count() etc.
     print(f"  vessal start")
 
 
-def _cmd_skill_init(args: argparse.Namespace) -> None:
-    """Create a Skill scaffold directory.
+_DEFAULT_DESCRIPTION = "(functional description, ≤15 words)"
 
-    Args:
-        args: argparse result; args.name is the Skill name.
-    Side effects:
-        Creates <name>/ scaffold directory in the current directory.
+
+def write_skill_scaffold(base: Path, skill_name: str, description: str = _DEFAULT_DESCRIPTION) -> None:
+    """Write a Skill scaffold into `base` with Python identifier `skill_name`.
+
+    Creates: __init__.py, skill.py, SKILL.md, requirements.txt, tests/__init__.py,
+    tests/test_{skill_name}.py. Shared between the `vessal skill init` CLI and the
+    `skill_creator` Skill.
     """
-    name = args.name
-    base = Path(name)
-    skill_name = base.name  # leaf directory name, used as Python identifier and Skill name
     class_name = "".join(part.capitalize() for part in skill_name.split("_"))
     (base / "tests").mkdir(parents=True, exist_ok=True)
 
     (base / "__init__.py").write_text(
-        f'"""{skill_name} — (one-line description)"""\n'
+        f'"""{skill_name} — {description}"""\n'
         f'from .skill import {class_name} as Skill\n\n'
         f'__all__ = ["Skill"]\n',
         encoding="utf-8",
@@ -649,7 +648,7 @@ def _cmd_skill_init(args: argparse.Namespace) -> None:
         f'\n'
         f'class {class_name}(SkillBase):\n'
         f'    name = "{skill_name}"\n'
-        f'    description = "(functional description, ≤15 words)"\n'
+        f'    description = "{description}"\n'
         f'\n'
         f'    # ── Protocol conventions ──\n'
         f'    # 1. description ≤15 words, describe function not method names\n'
@@ -677,7 +676,7 @@ def _cmd_skill_init(args: argparse.Namespace) -> None:
         f'---\n'
         f'name: {skill_name}\n'
         f'version: "0.1.0"\n'
-        f'description: "(functional description, ≤15 words)"\n'
+        f'description: "{description}"\n'
         f'author: ""\n'
         f'license: "Apache-2.0"\n'
         f'requires:\n'
@@ -703,6 +702,20 @@ def _cmd_skill_init(args: argparse.Namespace) -> None:
         f'    pass\n',
         encoding="utf-8",
     )
+
+
+def _cmd_skill_init(args: argparse.Namespace) -> None:
+    """Create a Skill scaffold directory.
+
+    Args:
+        args: argparse result; args.name is the Skill name.
+    Side effects:
+        Creates <name>/ scaffold directory in the current directory.
+    """
+    name = args.name
+    base = Path(name)
+    skill_name = base.name  # leaf directory name, used as Python identifier and Skill name
+    write_skill_scaffold(base, skill_name)
     print(f"Skill '{skill_name}' scaffold created at ./{name}/")
 
 

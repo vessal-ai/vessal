@@ -32,7 +32,7 @@ Container is a direct container wrapper around Hull — it only does initializat
 2. **Signal handling**: hull_runner prints READY after handling SIGTERM, Container calls Hull.stop() directly
 3. **Log output**: hull_runner outputs the READY signal to stdout for Shell to parse, Container outputs logs to docker logs
 
-`_ContainerHandler.do_GET()` and `do_POST()` call `Hull.handle()`, which returns a `(status, data)` pair, then call `_respond()` or `_respond_json()` to serialize. The signatures of the two response methods follow Formalin DTC: data first, status optional (default 200).
+`_ContainerHandler.do_GET()` and `do_POST()` call `Hull.handle()`, which returns a `(status, data)` pair, then call `_respond()` or `_respond_json()` to serialize. Both response methods share the signature `(data, status=200)`.
 
 ```mermaid
 graph LR

@@ -17,7 +17,6 @@ HTTP boundary layer. Parses external HTTP requests and proxies them to Hull, the
 - Response serialization (JSON or StaticResponse returned as-is)
 - Hull subprocess guardianship (crash detection + auto-restart + returning "agent restarting" during restart)
 - CLI entry point (vessal start / stop / send / status / read / init / skill)
-- /logs endpoint (via Hull built-in routing): GET /logs → viewer.html, GET /logs/raw → JSONL content of the current run
 
 Not responsible for:
 - Business logic (handled by Hull)

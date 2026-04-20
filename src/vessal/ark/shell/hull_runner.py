@@ -20,6 +20,8 @@ import sys
 import threading
 from pathlib import Path
 
+from vessal.ark.shell.http_server import SafeHTTPServer
+
 
 class _HullHandler(http.server.BaseHTTPRequestHandler):
     """HTTP handler: forwards requests to Hull.handle(), consistent with Shell's legacy _Handler logic.
@@ -106,7 +108,7 @@ def main() -> None:
     hull = Hull(str(project_dir))
 
     # Internal HTTP server
-    http_server = http.server.HTTPServer(("127.0.0.1", args.port), _HullHandler)
+    http_server = SafeHTTPServer(("127.0.0.1", args.port), _HullHandler)
     http_server.hull = hull
     http_thread = threading.Thread(
         target=http_server.serve_forever, daemon=True, name="hull-http"

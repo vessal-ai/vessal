@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.4] - 2026-04-18
+
+### Console Redesign
+
+- Launcher is now a generic UI shell; the only hard-coded view is `frames`.
+- Every other UI (chat, skills management) is provided by a Skill and loaded as an iframe tab via `/skills/ui` discovery.
+- Data plane contract: every `GET /<domain>` accepts `?after=<cursor>`; frontend state is append-only.
+- Retired: `src/vessal/ark/util/logging/viewer.html`, `/logs`, `/logs/raw`.
+- Terminology: `● idle` → `● sleep` in the status indicator.
+- Fixes (as side effects of the migration): user chat messages no longer disappear on poll; Current Frame no longer blank after tab switch; Logs view no longer a placeholder.
+
+### Governance
+
+- Added Anti-Rot Governance section to CLAUDE.md (R1–R5).
+- Added `references/whitepaper/08-console.md` — Console and the User-Facing Data Plane.
+
 ## [0.0.3] - 2026-04-18
 
 ### Added

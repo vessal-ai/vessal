@@ -1,0 +1,7 @@
+body { font-family: system-ui, sans-serif; padding: 16px; margin: 0; }
+.skill-list { list-style: none; padding: 0; }
+.skill-list li { display: flex; gap: 12px; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+.skill-list strong { min-width: 120px; }
+.summary { flex: 1; color: #555; }
+.flag { color: #2a7; font-weight: bold; min-width: 30px; }
+button { padding: 4px 12px; cursor: pointer; }

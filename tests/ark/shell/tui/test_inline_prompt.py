@@ -74,3 +74,47 @@ def test_ask_yes_no_n(fake_prompt):
 def test_ask_yes_no_empty_returns_default(fake_prompt):
     fake_prompt([""])
     assert inline_prompt.ask_yes_no("Dockerize?", default=True) is True
+
+
+def test_ask_text_validator_accepts_first_try(fake_prompt):
+    fake_prompt(["good-name"])
+    result = inline_prompt.ask_text(
+        "Project name",
+        default="my-agent",
+        validator=lambda v: None,
+    )
+    assert result == "good-name"
+
+
+def test_ask_text_validator_rejects_then_accepts(fake_prompt, capsys):
+    fake_prompt(["bad", "good"])
+    seen: list[str] = []
+
+    def validator(value: str) -> str | None:
+        seen.append(value)
+        return "already exists" if value == "bad" else None
+
+    result = inline_prompt.ask_text(
+        "Project name",
+        default="my-agent",
+        validator=validator,
+    )
+    assert result == "good"
+    assert seen == ["bad", "good"]
+    captured = capsys.readouterr()
+    assert "already exists" in captured.out
+
+
+def test_ask_text_validator_runs_against_default(fake_prompt):
+    """Validator must also check the default value when user presses Enter."""
+    fake_prompt(["", "my-agent"])
+
+    def validator(value: str) -> str | None:
+        return "default reserved" if value == "default-name" else None
+
+    result = inline_prompt.ask_text(
+        "Project name",
+        default="default-name",
+        validator=validator,
+    )
+    assert result == "my-agent"

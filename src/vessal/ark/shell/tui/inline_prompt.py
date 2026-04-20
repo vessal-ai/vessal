@@ -7,20 +7,34 @@ All three helpers accept a `default` parameter and return a native Python value.
 """
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Callable, Optional, Sequence
 
 from prompt_toolkit import prompt as _prompt
 
 
-def ask_text(question: str, *, default: str = "") -> str:
-    """Ask for a single line of free text.
+def ask_text(
+    question: str,
+    *,
+    default: str = "",
+    validator: Optional[Callable[[str], str | None]] = None,
+) -> str:
+    """Ask for a single line of free text, optionally validated with re-prompt.
 
-    Renders: "<question> [default]: " and returns the user's input.
-    Empty input returns the default.
+    Renders: ``<question> [default]: `` and returns the user's input.
+    Empty input returns the default. If ``validator`` is provided, it is called
+    with the candidate value; when it returns a non-``None`` string (error hint)
+    the hint is printed and the prompt is re-issued until validation passes.
     """
     suffix = f" [{default}]" if default else ""
-    raw = _prompt(f"{question}{suffix}: ")
-    return raw.strip() or default
+    while True:
+        raw = _prompt(f"{question}{suffix}: ")
+        value = raw.strip() or default
+        if validator is None:
+            return value
+        error = validator(value)
+        if error is None:
+            return value
+        print(f"  ! {error}")
 
 
 def ask_choice(

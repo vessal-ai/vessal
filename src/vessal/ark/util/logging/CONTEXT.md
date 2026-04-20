@@ -1,15 +1,15 @@
 # Logging
 
-ARK observability subsystem. Provides four independent modules for frame log writing, reading, HTML viewing, tracing, and terminal output.
+ARK observability subsystem. Provides four independent modules for frame log writing, reading, tracing, and terminal output.
 
 Responsible for:
 - Frame log writing (frame_logger.py) — appends to a single frames.jsonl, continuous across runs
 - Frame log reading (reader.py) — parses JSONL into a list of FrameRecords
-- HTML viewer (viewer.html) — self-contained in-browser viewer supporting live mode and standalone file mode
 - Execution phase tracing (tracer.py) — records phase entry/exit timestamps
 - Real-time terminal output (console.py) — per-frame summary and run totals
 
 Not responsible for:
+- HTML frame visualization — retired; frame visualization is now owned by the Launcher's built-in frames view
 - Markdown report generation (reporter.py deleted; replaced by HTML viewer)
 - General utilities outside of logging (in the util/ parent package)
 - Protocols with Shell, Hull, or Cell layers
@@ -24,11 +24,10 @@ Not responsible for:
 5. All terminal output writes to sys.stderr; stdout is not polluted
 6. All public functions must have complete docstrings and type annotations
 7. No single file exceeds 400 lines
-8. viewer.html must be self-contained (no external CDN dependencies), supporting offline use
 
 ## Design
 
-Logging exists to separate observability concerns from runtime logic. Hull's run() loop is only responsible for executing frames, not for understanding "what happened". Writing (frame_logger), reading (reader), HTML viewing (viewer.html), tracing (tracer), and terminal display (console) are each independent and can be replaced independently.
+Logging exists to separate observability concerns from runtime logic. Hull's run() loop is only responsible for executing frames, not for understanding "what happened". Writing (frame_logger), reading (reader), tracing (tracer), and terminal display (console) are each independent and can be replaced independently.
 
 ```mermaid
 graph LR
@@ -37,27 +36,19 @@ graph LR
         Reader["reader.py\nparses JSONL"]
         Tracer["tracer.py\nphase timing tracing"]
         Console["console.py\nreal-time terminal output (stderr)"]
-        Viewer["viewer.html\nself-contained browser viewer"]
     end
 
     Hull["Hull (caller)"]
-    Browser["Browser"]
     JSONL["logs/frames.jsonl"]
 
     Hull -->|"write each frame"| FL
     FL --> JSONL
     Reader -->|"parse"| JSONL
-    Viewer -->|"GET /logs/raw polling"| JSONL
-    Browser -->|"access /logs"| Viewer
     Hull -->|"phase timing"| Tracer
     Hull -->|"frame summary"| Console
 ```
 
-reporter.py was removed in v6 because Markdown reports are single-generation artifacts and do not support incremental viewing, live tracking, or filtering. The HTML viewer provides two functions via the `/logs` endpoint: live mode (polling `/logs/raw?after=N`) and standalone file mode (drag a local file:// JSONL into the browser). Both modes run in the browser with no build tools needed; viewer.html is the sole artifact.
-
-frame_logger.close() no longer generates report files (summary.md, detailed.md) and only closes the file handle. The dependency chain has changed from "write → report" to "write → HTTP viewer"; frame_logger's close() no longer has side effects, making test verification simpler.
-
-JSONL is the only persistence format. Immediate flush after each write is the foundation of crash safety — frames written before a mid-execution Agent crash are not lost. All runs append to the same `logs/frames.jsonl`; per-run timestamped subdirectories are no longer created. This keeps historical logs continuously queryable, and the `/logs/raw` endpoint always points to a fixed path.
+JSONL is the only persistence format. Immediate flush after each write is the foundation of crash safety — frames written before a mid-execution Agent crash are not lost. All runs append to the same `logs/frames.jsonl`; per-run timestamped subdirectories are no longer created.
 
 ```mermaid
 flowchart LR
@@ -67,15 +58,7 @@ flowchart LR
     Flush["immediate flush (crash-safe)"]
 
     Frame --> FL --> Flush --> JSONL
-
-    subgraph QueryPath["Query path"]
-        Raw["GET /logs/raw?after=N"]
-        Viewer["viewer.html (live mode)"]
-        JSONL --> Raw --> Viewer
-    end
 ```
-
-viewer.html supports both v5 (no ping field) and v6 (with ping field) formats for backward compatibility. The debug view shows full Ping+Pong; the behavior view shows only Action + State signals + Observation; system_prompt is collapsed by default.
 
 Invariants: All persisted data must be valid JSONL; calling write before open() on any write module must raise RuntimeError; terminal output writes only to stderr.
 
