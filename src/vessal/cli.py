@@ -236,7 +236,7 @@ def _cmd_once(args: argparse.Namespace) -> None:
 
 def _cmd_build(args: argparse.Namespace) -> None:
     """Build an Agent Docker image."""
-    from vessal.ark.shell.container.build import build_image
+    from vessal.ark.shell.runtime.container.build import build_image
 
     agent_dir = Path(args.agent_dir).resolve()
     if not (agent_dir / "hull.toml").exists():
@@ -248,7 +248,7 @@ def _cmd_build(args: argparse.Namespace) -> None:
 
 def _cmd_container_run(args: argparse.Namespace) -> None:
     """Start an Agent Docker container."""
-    from vessal.ark.shell.container.build import run_container
+    from vessal.ark.shell.runtime.container.build import run_container
 
     env = {}
     for item in args.env:
