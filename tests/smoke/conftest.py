@@ -34,6 +34,7 @@ def vessal_cli(tmp_path: Path):
             cwd=str(cwd or tmp_path),
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=timeout,
             env=env,
         )

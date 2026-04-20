@@ -2,7 +2,7 @@
 
 Regression: ``vessal create`` must not emit a Python traceback when the chosen
 project name collides with an existing directory.
-Issue: console/1-active/20260420-cli-traceback-noise.md (D1 reproducer #1)
+Issue: console/3-executing/20260420-cli-traceback-noise.md (D1 reproducer #1)
 """
 from __future__ import annotations
 
