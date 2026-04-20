@@ -160,6 +160,17 @@ Shell is to Hull as Docker is to the application running inside a container. The
 **Shell's replaceability.** The Docker analogy above is more than rhetoric — Shell *is* the container/OS itself, and the current Python implementation is just one incarnation of Shell. Shell's three responsibilities (isolation, gateway, guardian) are fulfilled by different technologies across deployment contexts: a Python subprocess in development, Docker namespaces when containerized, an RTOS in embedded deployments. Hull's `handle()` protocol stays constant; replace the entire Shell implementation and everything below Hull requires zero modification. Shell is the lowest-cost layer to replace in the entire architecture. Shell's embodiment implications and evolution path are detailed in chapter 5.
 
 
+### Shell Subdomains
+
+Shell has three subdomains, one per orthogonal axis:
+
+- **Entry** — how a user reaches Vessal. `cli/` command families and `tui/` wizard.
+- **Runtime** — which process runs Hull. `runtime/subprocess_mode.py` (`ShellServer` spawns it) and `runtime/container_mode.py` (Docker `ENTRYPOINT`). Both inherit a single HTTP bridge base class `HullHttpHandlerBase`.
+- **Supervisor** — `server.py`. Only subprocess mode needs one; in container mode Docker is the supervisor.
+
+The three subdomains matter because new carrier shapes arrive periodically (container mode was added after subprocess mode). Without named subdomains the new files land at the `shell/` top level and cross-reference each other, producing the duplication we saw before the 2026-04-20 refactor.
+
+
 ## 2.5 Containment Model
 
 The relationship among the three layers is containment: Shell contains Hull, Hull contains Cell. Containment means the outer layer creates, owns, and manages instances of the inner layer. Shell creates Hull on startup; Hull creates Cell on startup.

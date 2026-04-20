@@ -1,7 +1,7 @@
 """Tests for watchfiles-driven hot reload dispatch."""
 from pathlib import Path
 
-from vessal.ark.shell.hot_reload import classify_change
+from vessal.ark.shell.cli.hot_reload import classify_change
 
 
 def test_soul_md_classified_as_soul(tmp_path):

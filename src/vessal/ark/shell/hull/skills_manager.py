@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from vessal.ark.shell.hub.registry import Registry
+from vessal.ark.shell.hull.hub.registry import Registry
 
 if TYPE_CHECKING:
     from vessal.ark.shell.hull.hull import Hull
@@ -147,8 +147,8 @@ class SkillsManager:
         Returns:
             Result string (success or failure message).
         """
-        from vessal.ark.shell.hub.resolver import resolve
-        from vessal.ark.shell.hub.installer import install
+        from vessal.ark.shell.hull.hub.resolver import resolve
+        from vessal.ark.shell.hull.hub.installer import install
 
         skill_paths = self._hull.get_ns("skill_paths")
         if not skill_paths:

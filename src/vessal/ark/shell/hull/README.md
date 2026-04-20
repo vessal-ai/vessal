@@ -4,7 +4,7 @@ Agent runtime orchestrator. Reads hull.toml config, initializes Cell, manages Sk
 
 Responsible for:
 - hull.toml config parsing and Cell initialization
-- Skill discovery, loading, instantiation, and unloading (via SkillManager)
+- Skill discovery, loading, instantiation, and unloading (via SkillLoader)
 - Event loop driving (via EventLoop, wake/sleep lifecycle)
 - Meta-skill registration (SkillsManager, injected into namespace as `skills`; each frame outputs the available Skill list via _signal(), and injects the guide usage protocol via _prompt())
 - HTTP request routing (handle() is Shell's sole entry point)
@@ -17,18 +17,18 @@ Not responsible for:
 
 ## Design
 
-Hull runs in an independent subprocess (started by the Shell main process via `subprocess.Popen` running `hull_runner.py` with `sys.executable`). All Agent state — namespace, skill instances, frame loop — lives in this subprocess. `exec(code, ns)` operates directly on the namespace dict within this subprocess; skill methods are called directly in memory with no cross-process serialization. Database connections, file handles, imported modules, and other non-serializable objects persist normally across frames. When the subprocess crashes, Shell automatically restarts it and restores from a snapshot.
+Hull runs in an independent subprocess (started by the Shell main process via `subprocess.Popen` running `runtime/subprocess_mode.py` with `sys.executable`). All Agent state — namespace, skill instances, frame loop — lives in this subprocess. `exec(code, ns)` operates directly on the namespace dict within this subprocess; skill methods are called directly in memory with no cross-process serialization. Database connections, file handles, imported modules, and other non-serializable objects persist normally across frames. When the subprocess crashes, Shell automatically restarts it and restores from a snapshot.
 
 Hull exists to centralize the configuration work of turning a "generic Cell" into a "specific Agent". Cell is a pure engine that knows nothing about hull.toml, Skill paths, system prompts, or log directories. Without Hull, Shell would have to take on all initialization work, but Shell's responsibility is only the HTTP gateway and guardian; mixing the two would scatter startup logic everywhere.
 
-Hull's shape is "configuration layer + lifecycle manager", not a God Object. It holds references to Cell, EventLoop, SkillManager, and SkillsManager, but only operates through their public interfaces without crossing into their internals. This design rejected the alternative of "Hull directly manipulating Cell.ns for routing" — routes are maintained dynamically in a `_routes` dict, Skill servers register via HullApi, Hull.handle() dispatches by table lookup, and the routing table and routing logic are independent of each other.
+Hull's shape is "configuration layer + lifecycle manager", not a God Object. It holds references to Cell, EventLoop, SkillLoader, and SkillsManager, but only operates through their public interfaces without crossing into their internals. This design rejected the alternative of "Hull directly manipulating Cell.ns for routing" — routes are maintained dynamically in a `_routes` dict, Skill servers register via HullApi, Hull.handle() dispatches by table lookup, and the routing table and routing logic are independent of each other.
 
 ```mermaid
 graph LR
     Hull["Hull\n(orchestrator)"]
     Cell["Cell\n(single-frame execution)"]
     EL["EventLoop\n(frame scheduling)"]
-    SM["SkillManager\n(Skill discovery/loading)"]
+    SM["SkillLoader\n(Skill discovery/loading)"]
     Meta["SkillsManager\n(Agent's Skill management interface)"]
     HullApi["HullApi\n(Skill route registration)"]
 
@@ -47,7 +47,7 @@ There are three key internal decisions. First, runtime-owned variables (`_frame_
 sequenceDiagram
     participant Meta as SkillsManager.load()
     participant Hull
-    participant SM as SkillManager
+    participant SM as SkillLoader
     participant NS as Cell namespace
     participant Server as Skill server.py
 
@@ -112,9 +112,9 @@ Renders a Python object as text at the specified level of detail.
 - `test_handle.py` — Test Hull.handle() single-method HTTP interface.
 - `test_hull_api.py` — Test HullApi interface for skill servers.
 - `test_hull_public_api.py` — test_hull_public_api — Hull public interface unit tests.
-- `test_hull_runner.py` — test_hull_runner.py — Unit tests for the Hull subprocess entry module.
+- `test_subprocess_mode.py` — Unit tests for the Hull subprocess carrier.
 - `test_skill_base.py` — test_skill_base — SkillBase abstract interface contract.
-- `test_skill_manager.py` — test_skill_manager — SkillManager lifecycle tests.
+- `test_skill_loader.py` — test_skill_loader — SkillLoader lifecycle tests.
 - `test_skill_ux_rules.py` — test_skill_ux_rules — Verifies that all built-in Skills follow UX guidelines.
 - `test_skills_manager.py` — Test SkillsManager: list, load, unload (renamed from list_skills, load_skill, unload_skill).
 - `test_wake.py` — tests/hull/unit/test_wake.py — _wake variable injection tests.

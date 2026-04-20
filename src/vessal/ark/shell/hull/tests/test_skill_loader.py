@@ -1,11 +1,11 @@
-"""test_skill_manager — SkillManager lifecycle tests."""
+"""test_skill_loader — SkillLoader lifecycle tests."""
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from vessal.ark.shell.hull.skill_manager import SkillManager
+from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def tmp_skill(tmp_path):
 
 
 def test_list_skills(tmp_skill):
-    sm = SkillManager(skill_paths=[str(tmp_skill)])
+    sm = SkillLoader(skill_paths=[str(tmp_skill)])
     result = sm.list()
     assert len(result) == 1
     assert result[0]["name"] == "dummy"
@@ -37,7 +37,7 @@ def test_list_skills(tmp_skill):
 
 
 def test_load_returns_class(tmp_skill):
-    sm = SkillManager(skill_paths=[str(tmp_skill)])
+    sm = SkillLoader(skill_paths=[str(tmp_skill)])
     cls = sm.load("dummy")
     from vessal.ark.shell.hull.skill import SkillBase
     assert issubclass(cls, SkillBase)
@@ -46,19 +46,19 @@ def test_load_returns_class(tmp_skill):
 
 
 def test_load_sets_guide_from_skill_md(tmp_skill):
-    sm = SkillManager(skill_paths=[str(tmp_skill)])
+    sm = SkillLoader(skill_paths=[str(tmp_skill)])
     cls = sm.load("dummy")
     assert "Dummy guide body." in cls.guide
 
 
 def test_load_not_found():
-    sm = SkillManager(skill_paths=[])
+    sm = SkillLoader(skill_paths=[])
     with pytest.raises(RuntimeError, match="not found"):
         sm.load("nonexistent")
 
 
 def test_unload_cleans_sys_modules(tmp_skill):
-    sm = SkillManager(skill_paths=[str(tmp_skill)])
+    sm = SkillLoader(skill_paths=[str(tmp_skill)])
     sm.load("dummy")
     assert "dummy" in sys.modules
     sm.unload("dummy")
@@ -69,14 +69,14 @@ def test_load_installs_deps(tmp_skill):
     """load() calls install when requirements.txt exists."""
     req = tmp_skill / "dummy" / "requirements.txt"
     req.write_text("some-fake-package\n")
-    sm = SkillManager(skill_paths=[str(tmp_skill)])
-    with patch("vessal.ark.shell.hull.skill_manager._install_packages") as mock_install:
+    sm = SkillLoader(skill_paths=[str(tmp_skill)])
+    with patch("vessal.ark.shell.hull.skill_loader._install_packages") as mock_install:
         sm.load("dummy")
         mock_install.assert_called_once_with(["some-fake-package"])
 
 
 def test_loaded_names_tracks_loaded(tmp_skill):
-    sm = SkillManager(skill_paths=[str(tmp_skill)])
+    sm = SkillLoader(skill_paths=[str(tmp_skill)])
     assert sm.loaded_names == []
     sm.load("dummy")
     assert "dummy" in sm.loaded_names
@@ -87,7 +87,7 @@ def test_loaded_names_tracks_loaded(tmp_skill):
 # ---------------------------------------------------------------------------
 # _parse_skill_md unit tests
 # ---------------------------------------------------------------------------
-from vessal.ark.shell.hull.skill_manager import _parse_skill_md  # noqa: E402
+from vessal.ark.shell.hull.skill_loader import _parse_skill_md  # noqa: E402
 
 
 def test_parse_v0_format(tmp_path: Path):
@@ -198,14 +198,14 @@ def _make_skill_dir(base: Path, name: str, requires_skills: list[str] | None = N
 
 def test_load_skill_with_satisfied_deps(tmp_path: Path):
     """Loading a skill whose requires.skills are all loaded succeeds."""
-    from vessal.ark.shell.hull.skill_manager import SkillManager
+    from vessal.ark.shell.hull.skill_loader import SkillLoader
 
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()
     _make_skill_dir(skills_dir, "dep_a")
     _make_skill_dir(skills_dir, "dep_b", requires_skills=["dep_a"])
 
-    mgr = SkillManager(skill_paths=[str(skills_dir)])
+    mgr = SkillLoader(skill_paths=[str(skills_dir)])
     mgr.load("dep_a")
     cls = mgr.load("dep_b")
     assert cls.name == "dep_b"
@@ -213,25 +213,25 @@ def test_load_skill_with_satisfied_deps(tmp_path: Path):
 
 def test_load_skill_with_missing_deps(tmp_path: Path):
     """Loading a skill with unsatisfied requires.skills raises RuntimeError."""
-    from vessal.ark.shell.hull.skill_manager import SkillManager
+    from vessal.ark.shell.hull.skill_loader import SkillLoader
 
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()
     _make_skill_dir(skills_dir, "lonely", requires_skills=["nonexistent"])
 
-    mgr = SkillManager(skill_paths=[str(skills_dir)])
+    mgr = SkillLoader(skill_paths=[str(skills_dir)])
     with pytest.raises(RuntimeError, match="requires skill 'nonexistent'"):
         mgr.load("lonely")
 
 
 def test_load_skill_without_requires(tmp_path: Path):
     """Loading a skill without requires block succeeds (backward compat)."""
-    from vessal.ark.shell.hull.skill_manager import SkillManager
+    from vessal.ark.shell.hull.skill_loader import SkillLoader
 
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()
     _make_skill_dir(skills_dir, "simple")
 
-    mgr = SkillManager(skill_paths=[str(skills_dir)])
+    mgr = SkillLoader(skill_paths=[str(skills_dir)])
     cls = mgr.load("simple")
     assert cls.name == "simple"

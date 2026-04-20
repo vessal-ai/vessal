@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.container.entry import sync_image_to_volume
+from vessal.ark.shell.runtime.container_mode import sync_image_to_volume
 
 
 @pytest.fixture

@@ -1,21 +1,19 @@
-"""test_hull_runner.py — Unit tests for the Hull subprocess entry module."""
+"""test_subprocess_mode.py — Unit tests for the Hull subprocess carrier."""
 import http.server
 import json
 import threading
 import urllib.request
 
-import pytest
 
-
-def test_hull_handler_forwards_get():
-    """_HullHandler forwards GET requests to hull.handle()."""
-    from vessal.ark.shell.hull_runner import _HullHandler
+def test_subprocess_handler_forwards_get():
+    """SubprocessHullHandler forwards GET requests to hull.handle()."""
+    from vessal.ark.shell.runtime.subprocess_mode import SubprocessHullHandler
 
     class FakeHull:
         def handle(self, method, path, body):
             return 200, {"method": method, "path": path}
 
-    server = http.server.HTTPServer(("127.0.0.1", 0), _HullHandler)
+    server = http.server.HTTPServer(("127.0.0.1", 0), SubprocessHullHandler)
     server.hull = FakeHull()
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -29,15 +27,15 @@ def test_hull_handler_forwards_get():
         server.shutdown()
 
 
-def test_hull_handler_forwards_post():
-    """_HullHandler forwards POST requests to hull.handle()."""
-    from vessal.ark.shell.hull_runner import _HullHandler
+def test_subprocess_handler_forwards_post():
+    """SubprocessHullHandler forwards POST requests to hull.handle()."""
+    from vessal.ark.shell.runtime.subprocess_mode import SubprocessHullHandler
 
     class FakeHull:
         def handle(self, method, path, body):
             return 200, {"received": body}
 
-    server = http.server.HTTPServer(("127.0.0.1", 0), _HullHandler)
+    server = http.server.HTTPServer(("127.0.0.1", 0), SubprocessHullHandler)
     server.hull = FakeHull()
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -56,16 +54,16 @@ def test_hull_handler_forwards_post():
         server.shutdown()
 
 
-def test_hull_handler_static_response():
-    """_HullHandler correctly handles StaticResponse return values."""
+def test_subprocess_handler_static_response():
+    """SubprocessHullHandler correctly handles StaticResponse return values."""
     from vessal.ark.shell.hull.hull_api import StaticResponse
-    from vessal.ark.shell.hull_runner import _HullHandler
+    from vessal.ark.shell.runtime.subprocess_mode import SubprocessHullHandler
 
     class FakeHull:
         def handle(self, method, path, body):
             return 200, StaticResponse(b"<h1>hi</h1>", "text/html")
 
-    server = http.server.HTTPServer(("127.0.0.1", 0), _HullHandler)
+    server = http.server.HTTPServer(("127.0.0.1", 0), SubprocessHullHandler)
     server.hull = FakeHull()
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever, daemon=True)

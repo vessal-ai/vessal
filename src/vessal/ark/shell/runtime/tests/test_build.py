@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vessal.ark.shell.container.build import assemble_build_context, build_image
+from vessal.ark.shell.runtime.container.build import assemble_build_context, build_image
 
 
 @pytest.fixture
@@ -94,11 +94,11 @@ class TestReadAgentName:
     """_read_agent_name parses hull.toml correctly."""
 
     def test_reads_name(self, agent_dir):
-        from vessal.ark.shell.container.build import _read_agent_name
+        from vessal.ark.shell.runtime.container.build import _read_agent_name
         assert _read_agent_name(agent_dir) == "test-agent"
 
     def test_raises_if_no_hull_toml(self, tmp_path):
-        from vessal.ark.shell.container.build import _read_agent_name
+        from vessal.ark.shell.runtime.container.build import _read_agent_name
         with pytest.raises(FileNotFoundError):
             _read_agent_name(tmp_path)
 
@@ -109,7 +109,7 @@ class TestRunContainer:
     @patch("subprocess.run")
     def test_volume_mounts_whole_agent_dir(self, mock_run):
         mock_run.return_value = subprocess.CompletedProcess([], 0)
-        from vessal.ark.shell.container.build import run_container
+        from vessal.ark.shell.runtime.container.build import run_container
         run_container("test-agent", port=9999)
         # Find docker run call (second call — first is docker volume create)
         run_calls = [c for c in mock_run.call_args_list if c[0][0][1] == "run"]
@@ -124,7 +124,7 @@ class TestRunContainer:
     @patch("subprocess.run")
     def test_volume_name_uses_agent_suffix(self, mock_run):
         mock_run.return_value = subprocess.CompletedProcess([], 0)
-        from vessal.ark.shell.container.build import run_container
+        from vessal.ark.shell.runtime.container.build import run_container
         run_container("my-bot", port=8420)
         # docker volume create is the first subprocess.run call
         create_call = mock_run.call_args_list[0]

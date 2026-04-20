@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.cli import write_skill_scaffold
+from vessal.ark.shell.cli.scaffold import write_skill_scaffold
 from vessal.ark.shell.hull.skill import SkillBase
 
 

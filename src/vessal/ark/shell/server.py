@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from vessal.ark.shell.events import EventBus
-from vessal.ark.shell.hot_reload import HotReloader
+from vessal.ark.shell.cli.hot_reload import HotReloader
 from vessal.ark.shell.http_server import SafeThreadingHTTPServer
 
 _logger = logging.getLogger(__name__)
@@ -319,7 +319,7 @@ class ShellServer:
         cmd = [
             sys.executable,
             "-m",
-            "vessal.ark.shell.hull_runner",
+            "vessal.ark.shell.runtime.subprocess_mode",
             "--dir",
             self._project_dir,
             "--port",

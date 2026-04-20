@@ -1,4 +1,4 @@
-"""entry.py — Container entry point. Docker ENTRYPOINT calls this module.
+"""container_mode.py — Hull container carrier entry point (Docker ENTRYPOINT).
 
 In container mode, the Docker container itself is the Shell.
 This module is the startup sequence for Hull inside the container shell.
@@ -11,9 +11,9 @@ Responsibilities:
 - Handle SIGTERM for graceful shutdown
 
 Usage:
-    python -m vessal.ark.shell.container.entry [--dir /app/agent] [--port 8420]
+    python -m vessal.ark.shell.runtime.container_mode [--dir /app/agent] [--port 8420]
 
-Differences from the standalone adapter (hull_runner.py):
+Differences from subprocess_mode:
 - Binds 0.0.0.0 (container port), not 127.0.0.1 (internal port)
 - Handles SIGTERM (container shutdown signal), not READY signal
 - Provides /healthz (Docker HEALTHCHECK), no need to notify Shell
@@ -23,8 +23,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import http.server
-import json
 import logging
 import shutil
 import signal
@@ -33,89 +31,22 @@ import threading
 from pathlib import Path
 
 from vessal.ark.shell.http_server import SafeHTTPServer
+from vessal.ark.shell.runtime.hull_adapter import HullHttpHandlerBase
 
 logger = logging.getLogger("vessal.container")
 
 
-class _ContainerHandler(http.server.BaseHTTPRequestHandler):
-    """HTTP handler: forwards requests to Hull.handle().
-
-    /healthz returns 200 directly (bypasses Hull); all other requests are forwarded.
-    """
+class ContainerHullHandler(HullHttpHandlerBase):
+    """Adds /healthz bypass; forwards HTTP logs to vessal.container logger."""
 
     def do_GET(self) -> None:
-        path, body = self._parse_get()
+        path, _body = self._parse_get()
         if path == "/healthz":
-            self._respond_json({"status": "ok"}, 200)
+            self._respond({"status": "ok"}, 200)
             return
-        status, data = self.server.hull.handle("GET", path, body)
-        self._respond(data, status)
-
-    def do_POST(self) -> None:
-        path = self.path.split("?")[0]
-        body = self._read_json()
-        status, data = self.server.hull.handle("POST", path, body)
-        self._respond(data, status)
-
-    def _parse_get(self) -> tuple[str, dict | None]:
-        """Parse GET path and query params."""
-        if "?" not in self.path:
-            return self.path, None
-        path, qs = self.path.split("?", 1)
-        params = {}
-        for part in qs.split("&"):
-            if "=" in part:
-                k, v = part.split("=", 1)
-                try:
-                    params[k] = int(v)
-                except ValueError:
-                    params[k] = v
-        return path, params or None
-
-    def _read_json(self) -> dict | None:
-        """Read POST body and parse as dict."""
-        length = int(self.headers.get("Content-Length", 0))
-        if length == 0:
-            return None
-        try:
-            return json.loads(self.rfile.read(length))
-        except (json.JSONDecodeError, ValueError):
-            return None
-
-    def _respond(self, data: object, status: int = 200) -> None:
-        """Serialize handle() return value to HTTP response.
-
-        Args:
-            data: dict (JSON serialized) or StaticResponse (written as-is).
-            status: HTTP status code.
-        """
-        from vessal.ark.shell.hull.hull_api import StaticResponse
-
-        if isinstance(data, StaticResponse):
-            self.send_response(status)
-            self.send_header("Content-Type", data.content_type)
-            self.send_header("Content-Length", str(len(data.content)))
-            self.end_headers()
-            self.wfile.write(data.content)
-        else:
-            self._respond_json(data, status)
-
-    def _respond_json(self, data: dict, status: int = 200) -> None:
-        """JSON response.
-
-        Args:
-            data: dict to serialize as JSON.
-            status: HTTP status code.
-        """
-        body = json.dumps(data, ensure_ascii=False).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        super().do_GET()
 
     def log_message(self, fmt: str, *args: object) -> None:
-        """Forward to logger (instead of stderr)."""
         logger.debug(fmt, *args)
 
 
@@ -232,7 +163,7 @@ def main() -> None:
     hull = Hull(str(project_dir))
 
     # HTTP server — bind 0.0.0.0 (container port)
-    http_server = SafeHTTPServer(("0.0.0.0", args.port), _ContainerHandler)
+    http_server = SafeHTTPServer(("0.0.0.0", args.port), ContainerHullHandler)
     http_server.hull = hull
     http_thread = threading.Thread(
         target=http_server.serve_forever, daemon=True, name="container-http",

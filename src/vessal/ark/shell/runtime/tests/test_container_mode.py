@@ -1,7 +1,4 @@
-"""test_entry.py — Container adapter HTTP handler tests.
-
-Uses the same FakeHull pattern as hull/tests/test_hull_runner.py.
-"""
+"""test_container_mode.py — ContainerHullHandler HTTP handler tests."""
 import http.server
 import json
 import threading
@@ -41,14 +38,14 @@ def _start_server(handler_cls, hull):
     return server, port
 
 
-class TestContainerHandler:
-    """_ContainerHandler forwards HTTP to hull.handle()."""
+class TestContainerHullHandler:
+    """ContainerHullHandler forwards HTTP to hull.handle()."""
 
     def test_get_forwards_to_handle(self):
-        from vessal.ark.shell.container.entry import _ContainerHandler
+        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, {"status": "ok"}))
-        server, port = _start_server(_ContainerHandler, hull)
+        server, port = _start_server(ContainerHullHandler, hull)
         try:
             resp = urllib.request.urlopen(f"http://127.0.0.1:{port}/status")
             data = json.loads(resp.read())
@@ -58,10 +55,10 @@ class TestContainerHandler:
             server.shutdown()
 
     def test_post_forwards_json_body(self):
-        from vessal.ark.shell.container.entry import _ContainerHandler
+        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, {"received": True}))
-        server, port = _start_server(_ContainerHandler, hull)
+        server, port = _start_server(ContainerHullHandler, hull)
         try:
             payload = json.dumps({"msg": "hello"}).encode()
             req = urllib.request.Request(
@@ -79,10 +76,10 @@ class TestContainerHandler:
             server.shutdown()
 
     def test_healthz_does_not_hit_hull(self):
-        from vessal.ark.shell.container.entry import _ContainerHandler
+        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull()
-        server, port = _start_server(_ContainerHandler, hull)
+        server, port = _start_server(ContainerHullHandler, hull)
         try:
             resp = urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz")
             data = json.loads(resp.read())
@@ -93,10 +90,10 @@ class TestContainerHandler:
 
     def test_static_response(self):
         from vessal.ark.shell.hull.hull_api import StaticResponse
-        from vessal.ark.shell.container.entry import _ContainerHandler
+        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, StaticResponse(b"<h1>hi</h1>", "text/html")))
-        server, port = _start_server(_ContainerHandler, hull)
+        server, port = _start_server(ContainerHullHandler, hull)
         try:
             resp = urllib.request.urlopen(f"http://127.0.0.1:{port}/page")
             assert resp.headers["Content-Type"] == "text/html"
@@ -105,10 +102,10 @@ class TestContainerHandler:
             server.shutdown()
 
     def test_get_with_query_params(self):
-        from vessal.ark.shell.container.entry import _ContainerHandler
+        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, {"frames": []}))
-        server, port = _start_server(_ContainerHandler, hull)
+        server, port = _start_server(ContainerHullHandler, hull)
         try:
             resp = urllib.request.urlopen(f"http://127.0.0.1:{port}/frames?after=5")
             json.loads(resp.read())
@@ -119,10 +116,10 @@ class TestContainerHandler:
             server.shutdown()
 
     def test_post_empty_body(self):
-        from vessal.ark.shell.container.entry import _ContainerHandler
+        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, {"ok": True}))
-        server, port = _start_server(_ContainerHandler, hull)
+        server, port = _start_server(ContainerHullHandler, hull)
         try:
             req = urllib.request.Request(
                 f"http://127.0.0.1:{port}/stop",

@@ -36,6 +36,6 @@ EXPOSE 8420
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8420/healthz')"
 
-# tini as PID 1, entry.py as the container adapter
+# tini as PID 1, container_mode as the container carrier
 ENTRYPOINT ["tini", "--"]
-CMD ["python", "-m", "vessal.ark.shell.container.entry"]
+CMD ["python", "-m", "vessal.ark.shell.runtime.container_mode"]

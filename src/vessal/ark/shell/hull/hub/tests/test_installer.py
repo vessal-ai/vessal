@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hub.installer import locate_skill_in_repo, copy_skill
+from vessal.ark.shell.hull.hub.installer import locate_skill_in_repo, copy_skill
 
 
 def _make_single_skill(repo_dir: Path, name: str = "my_skill") -> None:

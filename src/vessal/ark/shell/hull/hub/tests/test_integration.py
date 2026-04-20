@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hub.installer import locate_skill_in_repo, copy_skill
-from vessal.ark.shell.hub.metadata import write_installed, read_installed, is_hub_installed
-from vessal.ark.shell.hub.registry import Registry
-from vessal.ark.shell.hub.resolver import resolve
+from vessal.ark.shell.hull.hub.installer import locate_skill_in_repo, copy_skill
+from vessal.ark.shell.hull.hub.metadata import write_installed, read_installed, is_hub_installed
+from vessal.ark.shell.hull.hub.registry import Registry
+from vessal.ark.shell.hull.hub.resolver import resolve
 
 
 def _make_skill_repo(base: Path, name: str = "test_skill") -> Path:
@@ -84,7 +84,7 @@ def test_registry_search(tmp_path: Path):
 
 def test_v1_frontmatter_parsing(tmp_path: Path):
     """Test: SKILL.md v1 frontmatter parsed correctly."""
-    from vessal.ark.shell.hull.skill_manager import _parse_skill_md
+    from vessal.ark.shell.hull.skill_loader import _parse_skill_md
 
     md = tmp_path / "SKILL.md"
     md.write_text(

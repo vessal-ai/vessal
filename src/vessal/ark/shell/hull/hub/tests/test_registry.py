@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hub.registry import Registry
+from vessal.ark.shell.hull.hub.registry import Registry
 
 SAMPLE_TOML = """\
 [browser]
