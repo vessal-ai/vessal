@@ -57,6 +57,7 @@ class HullInitMixin:
             core_max_retries=core_cfg.get("max_retries", 3),
             api_params=api_params,
         )
+        self._cell.set("_error_buffer_cap", cell_cfg.get("error_buffer_cap", 200))
 
         self._log_dir = str(self._project_dir / "logs")
         self._max_frames = cell_cfg.get("max_frames", 100)

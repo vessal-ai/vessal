@@ -18,6 +18,7 @@ from __future__ import annotations
 import time as _time
 from typing import Any
 
+from vessal.ark.shell.hull.cell._errors_helper import append_error
 from vessal.ark.shell.hull.cell.core import Core
 from vessal.ark.shell.hull.cell.gate import ActionGate, StateGate
 from vessal.ark.shell.hull.cell.kernel import Kernel
@@ -185,15 +186,10 @@ class Cell:
             )
         except Exception as e:
             self._kernel.ns["_error"] = f"Core error: {type(e).__name__}: {e}"
-            errors = self._kernel.ns.get("_errors", [])
-            errors.append(ErrorRecord(
+            append_error(self._kernel.ns, ErrorRecord(
                 "protocol", str(e),
                 self._kernel.ns.get("_frame", 0), _time.time(),
             ))
-            if len(errors) > 50:
-                self._kernel.ns["_errors"] = errors[-50:]
-            else:
-                self._kernel.ns["_errors"] = errors
             return StepResult(protocol_error=str(e))
 
         # Overwrite renderer's estimated _context_pct with real token data from the API response

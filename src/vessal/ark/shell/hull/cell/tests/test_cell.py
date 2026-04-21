@@ -683,9 +683,10 @@ class TestErrorRecord:
         assert errors[0].type == "protocol"
         assert "BadRequest" in errors[0].message
 
-    def test_errors_capped_at_50(self):
+    def test_errors_capped_at_configured_size(self):
         from vessal.ark.shell.hull.cell.protocol import ErrorRecord
         cell = _make_cell()
+        cell.ns["_error_buffer_cap"] = 50
         cell.ns["_errors"] = [
             ErrorRecord("runtime", f"err{i}", i, 0.0)
             for i in range(50)

@@ -35,6 +35,7 @@ from contextlib import redirect_stdout
 from dataclasses import dataclass
 from typing import Any
 
+from vessal.ark.shell.hull.cell._errors_helper import append_error
 from vessal.ark.shell.hull.cell.kernel.describe import render_value
 from vessal.ark.shell.hull.cell.protocol import ErrorRecord
 
@@ -140,12 +141,7 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
             error = _compress_traceback(traceback.format_exc())
         except Exception:
             error = traceback.format_exc()  # use raw traceback if compression itself fails
-        errors = ns.get("_errors", [])
-        errors.append(ErrorRecord("runtime", error, frame_number, _time.time()))
-        if len(errors) > 50:
-            ns["_errors"] = errors[-50:]
-        else:
-            ns["_errors"] = errors
+        append_error(ns, ErrorRecord("runtime", error, frame_number, _time.time()))
 
     # Step 4.5: if there is a bare expression result, append it to stdout
     expr_result = ns.pop("_expr_result", None)
@@ -176,15 +172,10 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
         warning = f"[system] The following variables were deleted by code and have been automatically restored: {', '.join(sorted(restored_keys))}\n"
         captured_stdout += warning
         ns["_stdout"] = captured_stdout
-        errors = ns.get("_errors", [])
-        errors.append(ErrorRecord(
+        append_error(ns, ErrorRecord(
             "builtin_restored", warning.strip(),
             frame_number, _time.time(),
         ))
-        if len(errors) > 50:
-            ns["_errors"] = errors[-50:]
-        else:
-            ns["_errors"] = errors
 
     # Step 6: attach the source of each newly defined function/class to the object's _source attribute
     # Use the original operation, not modified_operation, to ensure accurate source

@@ -48,6 +48,7 @@ language = "en"
 max_frames = 100
 # Context budget (token count), should match the model's actual window size
 # context_budget = 128000
+# error_buffer_cap = 200     # Maximum error records in ns["_errors"] (ring buffer)
 
 [core]
 timeout = 60
