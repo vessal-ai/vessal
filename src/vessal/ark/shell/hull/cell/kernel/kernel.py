@@ -106,7 +106,7 @@ class Kernel:
         ns["_compaction_n"] = 8                   # max cold-zone layers
 
         # Execution state
-        ns["_frame"] = 0                          # current frame number; set by executor before execution
+        ns["_frame"] = 0                          # last committed frame number; written by _commit_frame
         ns["_ns_meta"] = {}                       # variable usage tracking; rewritten by executor each frame
         ns["_frame_stream"] = FrameStream(
             k=ns["_compaction_k"],
@@ -164,7 +164,8 @@ class Kernel:
 
         Args:
             operation: Python code string to execute.
-            frame_number: Current frame number; written to ns["_frame"] and passed to _ns_meta.
+            frame_number: Current frame number; passed to executor for ErrorRecord/_ns_meta tracking.
+                          Not written to ns["_frame"] — that is _commit_frame's responsibility.
             tracer: Optional TracerLike for recording execution time.
 
         Returns:
@@ -390,6 +391,7 @@ class Kernel:
         pong: Pong,
         tracer: TracerLike | None = None,
         ping: "Ping | None" = None,
+        frame_number: int | None = None,
     ) -> None:
         """Single-frame execution: exec → expect → observation → frame → commit.
 
@@ -400,12 +402,15 @@ class Kernel:
         done by Cell at the start of the next frame via prepare().
 
         Args:
-            pong:   Control signal from the reasoner, containing action.operation / action.expect.
-            tracer: Optional TracerLike, forwarded to exec_operation and eval_expect.
-            ping:   Perceptual input seen by the model for this frame (optional;
-                    used to write into FrameRecord v6).
+            pong:         Control signal from the reasoner, containing action.operation / action.expect.
+            tracer:       Optional TracerLike, forwarded to exec_operation and eval_expect.
+            ping:         Perceptual input seen by the model for this frame (optional;
+                          used to write into FrameRecord v6).
+            frame_number: Frame sequence number. When None, computed from ns["_frame"] + 1
+                          (backward-compatibility guard for callers that do not pass it).
         """
-        frame_number = self.ns["_frame"] + 1
+        if frame_number is None:
+            frame_number = self.ns["_frame"] + 1
 
         exec_result = self.exec_operation(pong.action.operation, frame_number, tracer)
 
@@ -454,4 +459,5 @@ class Kernel:
             fs = FrameStream(k=ns.get("_compaction_k", 16), n=ns.get("_compaction_n", 8))
             ns["_frame_stream"] = fs
         fs.commit_frame(record.to_dict())
+        ns["_frame"] = frame_number
         ns["_verdict"] = observation.verdict

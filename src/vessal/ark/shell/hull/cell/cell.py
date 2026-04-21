@@ -177,9 +177,11 @@ class Cell:
 
         self._check_state_gate(self._ping)
 
+        frame_number = self._kernel.ns["_frame"] + 1
+
         try:
             self._pong, prompt_tokens, completion_tokens = self._core.run(
-                self._ping, tracer, self._kernel.ns["_frame"] + 1,
+                self._ping, tracer, frame_number,
             )
         except Exception as e:
             self._kernel.ns["_error"] = f"Core error: {type(e).__name__}: {e}"
@@ -207,7 +209,7 @@ class Cell:
         if self._check_action_gate(self._pong.action.operation) is None:
             return StepResult(protocol_error="Action gate blocked")
 
-        self._kernel.run(self._pong, tracer, ping=self._ping)
+        self._kernel.run(self._pong, tracer, ping=self._ping, frame_number=frame_number)
         return StepResult()
 
     def set_gate(self, gate_type: str, fn: Any) -> None:

@@ -108,18 +108,12 @@ class TestExecuteSideEffects:
         with pytest.raises(KeyboardInterrupt):
             execute("raise KeyboardInterrupt()", ns, frame_number=1)
 
-    def test_frame_set_before_execution(self):
-        """ns['_frame'] is set to frame_number before execution so operation code can read it."""
+    def test_frame_not_written_by_executor(self):
+        """execute() does not write ns['_frame']; that is _commit_frame's responsibility."""
         ns = _ns()
-        # code reads _frame and assigns it to seen_frame
-        execute("seen_frame = _frame", ns, frame_number=7)
-        assert ns["seen_frame"] == 7
-
-    def test_frame_number_reflected_in_ns(self):
-        """ns['_frame'] == frame_number after execute()."""
-        ns = _ns()
+        initial = ns["_frame"]
         execute("x = 1", ns, frame_number=42)
-        assert ns["_frame"] == 42
+        assert ns["_frame"] == initial
 
     def test_empty_action_returns_exec_result(self):
         """Empty operation also returns an ExecResult."""

@@ -394,11 +394,12 @@ class TestExecute:
         assert ns["_error"] is None
         assert ns["foo"] == 42
 
-    def test_frame_set_before_execution(self):
-        """ns['_frame'] is set to frame_number before execution; operation code can read it."""
+    def test_frame_not_written_by_execute(self):
+        """execute() does not write ns['_frame']; that is _commit_frame's responsibility."""
         ns = bare_ns()
-        execute("seen_frame = _frame", ns, frame_number=5)
-        assert ns["seen_frame"] == 5
+        initial = ns.get("_frame", 0)
+        execute("x = 1", ns, frame_number=5)
+        assert ns.get("_frame", 0) == initial
 
 
 # ─────────────────────────────────────────────
@@ -631,11 +632,12 @@ class TestKernel:
         assert isinstance(ping, Ping)
         assert ping.system_prompt == "You are an agent."
 
-    def test_exec_operation_sets_frame(self):
-        """exec_operation sets _frame to the passed frame_number."""
+    def test_exec_operation_does_not_set_frame(self):
+        """exec_operation does not write ns['_frame']; that is _commit_frame's responsibility."""
         k = Kernel()
+        initial = k.ns["_frame"]
         k.exec_operation("pass", frame_number=5)
-        assert k.ns["_frame"] == 5
+        assert k.ns["_frame"] == initial
 
     def test_exec_operation_does_not_append_frame_stream(self):
         """exec_operation does not commit to _frame_stream (Cell's responsibility, Phase 3)."""
@@ -904,7 +906,10 @@ class TestKernel:
         assert k.ns["x"] == 1
 
     def test_run_returns_none_and_commits_frame(self):
-        """run(Pong) returns None; _frame_stream gets one frame committed; _frame increments by 1."""
+        """run(Pong) returns None; _frame_stream gets one frame committed; _frame increments by 1.
+
+        ns["_frame"] is written by _commit_frame (not by exec_operation).
+        """
         from vessal.ark.shell.hull.cell.protocol import Action, Pong
         from vessal.ark.shell.hull.cell.kernel.executor import ExecResult
 
@@ -917,7 +922,7 @@ class TestKernel:
         mock_result = ExecResult(stdout="", diff="+x = 1", error=None)
 
         def _fake_exec(operation, frame_number, tracer=None):
-            k.ns["_frame"] = frame_number  # replicate the side effect of execute()
+            # exec_operation no longer writes ns["_frame"]; _commit_frame does
             return mock_result
 
         with patch.object(k, "exec_operation", side_effect=_fake_exec) as mock_exec:

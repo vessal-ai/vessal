@@ -2,12 +2,12 @@
 #   ExecResult                  operation execution result dataclass
 #   execute(operation, ns, frame_number) -> ExecResult
 #       Execute Python code in a namespace dict, return ExecResult.
-#       Sets ns["_frame"] = frame_number before execution.
 #       All side effects are written to ns system variables:
 #         _operation  the code that was executed
 #         _stdout     captured print output
 #         _error      exception info (None if no exception)
 #         _diff       change summary (added/modified/deleted user variables)
+#       Does NOT write ns["_frame"] — that is _commit_frame's responsibility.
 #       Does NOT write _frame_log or construct FrameRecord — that is Cell's responsibility.
 #       Exception tracebacks are intelligently compressed — user code frames and exception
 #       info are retained while library-internal frames are folded.
@@ -81,27 +81,23 @@ def is_user_var(name: str) -> bool:
 def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> ExecResult:
     """Execute operation code in the namespace.
 
-    frame_number: passed in by Cell; used to set ns["_frame"] (indicating which
-    frame is currently being executed). execute() is responsible for updating
-    _stdout/_diff/_error/_ns_meta and _operation.
+    frame_number: passed in by Cell via Kernel; used for ErrorRecord and _ns_meta tracking.
+    execute() is responsible for updating _stdout/_diff/_error/_ns_meta and _operation.
+    execute() must NOT write ns["_frame"] — that is _commit_frame's responsibility.
     execute() must NOT write _frame_log or construct FrameRecord.
 
     Args:
         operation: Python code string to execute. None or whitespace-only is treated as a no-op.
         ns: Agent's namespace dict; side effects are written directly to it.
-        frame_number: Current frame number; written to ns["_frame"] before execution.
+        frame_number: Current frame number; used for ErrorRecord and _ns_meta, not written to ns["_frame"].
 
     Returns:
         ExecResult containing stdout, diff, and error fields.
 
     Side effects:
-        ns["_frame"] is set to frame_number before execution.
         ns["_operation"], ns["_stdout"], ns["_error"], ns["_diff"] are updated after execution.
         ns["_ns_meta"] is updated with variable metadata after execution.
     """
-    # Step 0: set _frame before execution so operation code can read the current frame number
-    ns["_frame"] = frame_number
-
     # Step 1: return immediately for empty code, reset side-effect variables
     # Note: _ns_meta and _frame_log are not reset; empty operation produces no new frame data
     if not operation or not operation.strip():
