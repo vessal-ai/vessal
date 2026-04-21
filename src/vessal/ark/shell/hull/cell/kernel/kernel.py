@@ -352,13 +352,7 @@ class Kernel:
         fs = self.ns.get("_frame_stream")
         if fs is None:
             return ""
-        # Search all hot buckets newest-first: B_0 (newest) through B_4
-        for bucket in fs._hot:
-            for frame in reversed(bucket):
-                diff = frame.get("observation", {}).get("diff", "")
-                if f"+ {key}" in diff:
-                    return frame.get("pong", {}).get("action", {}).get("operation", "")
-        return ""
+        return fs.find_creation(key) or ""
 
     def _migrate_snapshot(self) -> None:
         """Clear per-run state whose schema version doesn't match.

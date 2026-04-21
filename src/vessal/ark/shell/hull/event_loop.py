@@ -157,7 +157,7 @@ class EventLoop:
 
             if result.protocol_error is None:
                 fs = self._cell.get("_frame_stream")
-                last_frame = fs._hot[0][-1] if (fs is not None and fs._hot[0]) else None
+                last_frame = fs.latest_hot_frame() if fs is not None else None
                 if last_frame is not None:
                     if frame_logger is not None:
                         frame_logger.write_frame(last_frame)
