@@ -6,11 +6,11 @@
 
 An agent runtime where Python is the only way to act.
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)[![Python](https://img.shields.io/badge/Python-%E2%89%A53.12-3776AB.svg)](https://python.org)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/Python-%E2%89%A53.12-3776AB.svg)](https://python.org)
 
 [Whitepaper](references/whitepaper/)
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Context Scaling](#context-scaling) · [Skills](#skills) · [SkillHub](#skillhub) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment) · [HTTP API](#http-api)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Context Scaling](#context-scaling) · [Skills](#skills) · [SkillHub](#skillhub) · [CLI Reference](#cli-reference) · [Configuration](#configuration) · [Container Deployment](#container-deployment)
 
 
 ## 🎯 The Problem
@@ -20,20 +20,16 @@ Every major agent framework gives the LLM a menu of functions and lets it pick. 
 **Vessal's answer: give the agent a Code, not a Menu.** Python is the sole action mechanism — not "a code interpreter among other tools," but the *only* way to act. The upper bound of what the agent can do is the programs the model can write. That bound rises with every generation of LLMs. The framework itself never becomes the bottleneck.
 
 
-## ⚡ 60-Second First Agent
+## 🚀 Quick Start
 
 ```bash
-uv tool install vessal         # or: pipx install vessal
-vessal create                  # interactive wizard — Enter to accept defaults
+uv tool install vessal
+vessal create                  # interactive wizard
 cd my-agent && vessal start
-# Console opens at http://127.0.0.1:8420/console/
+# Console at http://127.0.0.1:8420/console/
 ```
 
-That's it. Open the Console in your browser, chat in the left pane, watch the agent's current frame in the right pane (collapsible). Edit `SOUL.md` and the next turn picks it up without restart. Edit `skills/*.py` and the affected skill reloads in place. Changes to `hull.toml` surface as a yellow "restart required" banner in the Console top bar.
-
----
-
-## 🚀 Quick Start
+Open the Console in your browser, chat in the left pane, watch the agent's current frame in the right pane. Edit `SOUL.md` and the next turn picks it up without restart. Edit `skills/*.py` and the affected skill reloads in place. Changes to `hull.toml` surface a yellow "restart required" banner in the Console top bar.
 
 ### Prerequisites
 
@@ -60,13 +56,13 @@ cd my-agent
 
 `vessal create` runs an interactive wizard that scaffolds the project, sets up `.env`, and gitignores your secrets.
 
-> **Tip:** `vs` is a shorthand for `vessal`. All commands work with either name — `vs start`, `vs stop`, `vs skill init`, etc.
+> **Tip:** `vs` is a shorthand for `vessal`. All commands work with either name — `vs start`, `vs stop`, `vs skill create`, etc.
 
 ### Configure the LLM
 
 If you didn't fill the three LLM values during `vessal create`, edit `.env` directly (the wizard writes it with English placeholders):
 
-```
+```ini
 OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o
@@ -74,7 +70,7 @@ OPENAI_MODEL=gpt-4o
 
 Any OpenAI-compatible API works. For example, DeepSeek:
 
-```
+```ini
 OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.deepseek.com
 OPENAI_MODEL=deepseek-chat
@@ -170,11 +166,12 @@ Amortized cost is O(1) per frame, capacity grows logarithmically, and ten millio
 
 All agent capabilities come from Skills. ARK provides only the execution mechanism. What the agent can do — and what it can *see* — is determined by its loaded Skills.
 
-A Skill can have up to three layers:
+A Skill can have up to four layers:
 
 - **Methodology** — A `SKILL.md` guide the LLM reads on demand. Many Skills are pure methodology with no code.
 - **Code** — Python methods for things pure code generation can't do (network calls, database ops, hardware control).
 - **Perception** — A `_signal()` method that injects summary information into every frame. Load a task Skill and the agent sees task progress; unload it and that information disappears.
+- **UI** — An optional `ui/index.html` the Skill ships with. The Console Launcher discovers it via `/skills/ui` and mounts it as an iframe tab, giving the Skill its own user-facing surface alongside chat and frames.
 
 ### Built-in Skills
 
@@ -186,10 +183,6 @@ A Skill can have up to three layers:
 | `heartbeat` | Periodic wake-up timer | Yes |
 | `memory` | Cross-session key-value storage | |
 | `pip` | Install Python packages at runtime | |
-| `search` | Web search and page reading | |
-| `audio` | Audio-to-text transcription | |
-| `vision` | Image understanding | |
-| `ui` | Animated agent avatar and interactive page environment | |
 | `skill_creator` | Scaffold new Skills from within the agent | |
 
 Enable a Skill by adding it to `hull.toml`:
@@ -360,7 +353,7 @@ skill_paths = ["skills/bundled", "skills/hub", "skills/local"]
 
 API credentials. Supports any OpenAI-compatible provider:
 
-```
+```ini
 OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o
@@ -410,21 +403,6 @@ vessal run my-agent -e OPENAI_API_KEY=sk-... -e OPENAI_BASE_URL=https://api.open
 ```
 
 The agent's `data/` directory is persisted in a Docker named volume — container restarts do not lose state.
-
-
-## 🌐 HTTP API
-
-A running agent exposes these endpoints on its port (default 8420):
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /status` | Agent state (idle/sleeping, frame count, wake reason) |
-| `GET /frames?after=N` | Frame stream as JSON (incremental) |
-| `POST /wake` | Inject a wake event |
-| `POST /stop` | Graceful shutdown |
-| `GET /skills/chat/` | Chat web UI |
-| `POST /skills/chat/inbox` | Deliver a message to the agent |
-| `GET /skills/chat/outbox` | Retrieve agent replies |
 
 
 ## 📚 Documentation

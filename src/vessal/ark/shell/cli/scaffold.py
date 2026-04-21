@@ -402,7 +402,7 @@ def write_skill_scaffold(
             f'    }}\n'
             f'\n'
             f'    // ── Example: ping the /hello route ─────────────────────────────────\n'
-            f'    // The /hello route is defined in server.py. Its response is displayed here.\n'
+            f'    // The /hello route is defined in server.py and served at /skills/{skill_name}/hello.\n'
             f'    // This pattern — button click → fetch → display — is the basic building\n'
             f'    // block for every interaction in your UI.\n'
             f'    document.getElementById("ping-btn").addEventListener("click", async () => {{\n'
