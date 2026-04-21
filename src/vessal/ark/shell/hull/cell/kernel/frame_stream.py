@@ -82,7 +82,7 @@ class FrameStream:
             for frame in reversed(bucket):
                 diff = frame.get("observation", {}).get("diff", "")
                 if f"+ {key}" in diff:
-                    return frame.get("pong", {}).get("action", {}).get("operation")
+                    return frame.get("pong", {}).get("action", {}).get("operation", "")
         return None
 
     def commit_frame(self, frame: dict) -> None:

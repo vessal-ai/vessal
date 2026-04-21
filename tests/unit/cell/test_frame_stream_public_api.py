@@ -1,6 +1,7 @@
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
+from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
 
-_SCHEMA = 7
+_SCHEMA = FRAME_SCHEMA_VERSION
 
 
 def _frame(number: int, diff: str = "", operation: str = "") -> dict:
