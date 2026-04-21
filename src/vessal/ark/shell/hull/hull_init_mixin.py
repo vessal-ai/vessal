@@ -110,8 +110,7 @@ class HullInitMixin:
         self._cell.set("_compression_prompt", self._compression_prompt)
 
     def _init_skills(self, hull_cfg: dict) -> None:
-        """Phase 3: SkillLoader, SkillsManager, route table, pre-load Skills, start servers."""
-        from vessal.ark.shell.hull.skills_manager import SkillsManager
+        """Phase 3: SkillLoader, route table, pre-load Skills, start servers."""
         from vessal.ark.shell.hull.skill_loader import SkillLoader
         from vessal.ark.shell.hull.hull_api import HullApi
 
@@ -119,10 +118,8 @@ class HullInitMixin:
         resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
 
         self._skill_manager = SkillLoader(skill_paths=resolved_paths)
-        self._cell.set("_builtin_names", ["skills"])
+        self._cell.set("_builtin_names", [])
 
-        _skills = SkillsManager(self)
-        self._cell.set("skills", _skills)
         self._cell.set("skill_paths", resolved_paths)
         self._cell.set("_data_dir", str(self._project_dir / "data"))
         compress_threshold = hull_cfg.get("compress_threshold", 50)
