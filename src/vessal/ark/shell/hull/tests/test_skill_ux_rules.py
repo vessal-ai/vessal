@@ -3,7 +3,7 @@ import importlib
 import pytest
 
 
-BUILTIN_SKILLS = ["chat", "pin", "tasks", "memory", "heartbeat", "pip", "skill_creator"]
+BUILTIN_SKILLS = ["chat", "pin", "tasks", "memory", "heartbeat", "pip", "skill_creator", "skills"]
 
 # Forbidden method name patterns in signal output
 FORBIDDEN_IN_SIGNAL = [
