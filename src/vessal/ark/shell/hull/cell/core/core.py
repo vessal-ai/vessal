@@ -23,11 +23,6 @@ import os
 import time
 
 import openai
-from openai import (
-    AuthenticationError,
-    PermissionDeniedError,
-    BadRequestError,
-)
 
 from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
 from vessal.ark.shell.hull.cell.protocol import Ping, Pong
