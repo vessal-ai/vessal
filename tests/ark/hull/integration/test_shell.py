@@ -13,8 +13,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vessal.ark.shell.cli import main
-from vessal.ark.shell.cli import _is_project_running, _read_lock_port, _read_lock_pid, _is_port_in_use
+from vessal.ark.shell.cli.__main__ import main
+from vessal.ark.shell.cli.process_utils import _is_project_running, _read_lock_port, _read_lock_pid, _is_port_in_use
 
 
 # ============================================================
@@ -23,34 +23,22 @@ from vessal.ark.shell.cli import _is_project_running, _read_lock_port, _read_loc
 
 
 class TestInit:
-    """vessal init command: scaffold generation."""
+    """vessal create command: scaffold generation."""
 
-    def test_init_creates_project_directory(self, tmp_path, monkeypatch):
-        """vessal init name creates a project directory under the current directory."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_creates_project_directory(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         assert (tmp_path / "my-agent").is_dir()
 
-    def test_init_creates_hull_toml(self, tmp_path, monkeypatch):
-        """Generated hull.toml contains the project name."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_creates_hull_toml(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text()
         assert 'name = "my-agent"' in content
 
-    def test_init_creates_env_example_not_env(self, tmp_path, monkeypatch):
-        """Generates .env.example (with three OpenAI variables) instead of .env."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_creates_env_example_not_env(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         assert (tmp_path / "my-agent" / ".env.example").exists()
         assert not (tmp_path / "my-agent" / ".env").exists()
         content = (tmp_path / "my-agent" / ".env.example").read_text()
@@ -58,140 +46,90 @@ class TestInit:
         assert "OPENAI_BASE_URL" in content
         assert "OPENAI_MODEL" in content
 
-    def test_init_creates_gitignore(self, tmp_path, monkeypatch):
-        """Generates .gitignore that excludes .env and logs/."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_creates_gitignore(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / ".gitignore").read_text()
         assert ".env" in content
         assert "logs/" in content
 
-    def test_init_creates_skills_example(self, tmp_path, monkeypatch):
-        """Generates skills/local/example/ Skill package (with __init__.py and requirements.txt)."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_creates_skills_example(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         example_dir = tmp_path / "my-agent" / "skills" / "local" / "example"
         assert example_dir.is_dir()
         assert (example_dir / "__init__.py").exists()
         assert (example_dir / "requirements.txt").exists()
 
-    def test_init_example_skill_is_valid_package(self, tmp_path, monkeypatch):
-        """Example Skill package has module docstring and __all__, discoverable by search_skills."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_example_skill_is_valid_package(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         init_file = tmp_path / "my-agent" / "skills" / "local" / "example" / "__init__.py"
         content = init_file.read_text(encoding="utf-8")
-        assert '"""' in content          # has module docstring
-        assert "__all__" in content       # has public API declaration
-        assert "def " in content          # has function definitions
-        assert "__guide__" not in content # does not contain __guide__
-        assert "from pathlib import Path" not in content  # does not import Path
+        assert '"""' in content
+        assert "__all__" in content
+        assert "def " in content
+        assert "__guide__" not in content
+        assert "from pathlib import Path" not in content
 
-    def test_init_hull_toml_skills_uses_name_list(self, tmp_path, monkeypatch):
-        """Generated hull.toml skills field uses a name list (commented example), no glob."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_hull_toml_skills_uses_name_list(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text()
-        # New format: does not contain glob patterns (*.py)
         assert "*.py" not in content
-        # skill_paths should exist
         assert "skill_paths" in content
 
-    def test_init_fails_if_directory_exists(self, tmp_path, monkeypatch):
-        """Exits with non-zero status when the directory already exists."""
-        monkeypatch.chdir(tmp_path)
+    def test_init_fails_if_directory_exists(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
         (tmp_path / "my-agent").mkdir()
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-        assert exc_info.value.code == 1
+        with pytest.raises(FileExistsError):
+            write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
-    def test_init_hull_toml_has_all_sections(self, tmp_path, monkeypatch):
-        """Generated hull.toml contains [agent], [cell], [hull], and [gates] sections."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "test-proj"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_hull_toml_has_all_sections(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "test-proj", install_venv=False)
         content = (tmp_path / "test-proj" / "hull.toml").read_text()
         assert "[agent]" in content
         assert "[cell]" in content
         assert "[hull]" in content
         assert "[gates]" in content
 
-    def test_init_creates_pyproject_toml(self, tmp_path, monkeypatch):
-        """Generates pyproject.toml containing the project name and requires-python."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_creates_pyproject_toml(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "pyproject.toml").read_text()
         assert 'name = "my-agent"' in content
         assert "requires-python" in content
         assert '"vessal"' in content
 
-    def test_init_creates_venv(self, tmp_path, monkeypatch):
-        """vessal init calls python -m venv when uv is not available."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("shutil.which", return_value=None), \
-             patch("subprocess.run") as mock_run:
-            main()
-
+    def test_init_creates_venv(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        with patch("vessal.ark.shell.cli.project_scaffold.shutil.which", return_value=None), \
+             patch("vessal.ark.shell.cli.project_scaffold.subprocess.run") as mock_run:
+            write_project_scaffold(tmp_path / "my-agent", install_venv=True)
         all_args = [call[0][0] for call in mock_run.call_args_list]
-        assert any("-m" in a and "venv" in a for a in all_args)
+        assert any("venv" in str(a) for a in all_args)
 
-    def test_init_gitignore_includes_venv(self, tmp_path, monkeypatch):
-        """Generated .gitignore contains .venv/ entry."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_gitignore_includes_venv(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / ".gitignore").read_text()
         assert ".venv/" in content
 
-    def test_init_creates_soul_md(self, tmp_path, monkeypatch):
-        """Generates SOUL.md Agent identity definition file."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
+    def test_init_creates_soul_md(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
+        assert (tmp_path / "my-agent" / "SOUL.md").exists()
 
-        soul_path = tmp_path / "my-agent" / "SOUL.md"
-        assert soul_path.exists()
-
-    def test_init_soul_md_contains_project_name(self, tmp_path, monkeypatch):
-        """SOUL.md contains the project name."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_soul_md_contains_project_name(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "SOUL.md").read_text(encoding="utf-8")
         assert "my-agent" in content
 
-    def test_init_hull_toml_has_required_sections(self, tmp_path, monkeypatch):
-        """hull.toml contains currently required sections: [hull], [cell], [core], [gates]."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_hull_toml_has_required_sections(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "[hull]" in content
         assert "[cell]" in content
@@ -199,53 +137,41 @@ class TestInit:
         assert "[gates]" in content
         assert "[compression]" not in content
 
-    def test_init_hull_toml_has_context_budget_comment(self, tmp_path, monkeypatch):
-        """hull.toml contains context_budget comment."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
-
+    def test_init_hull_toml_has_context_budget_comment(self, tmp_path):
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "context_budget" in content
 
-    def test_init_hull_toml_has_core_section(self, tmp_path, monkeypatch):
+    def test_init_hull_toml_has_core_section(self, tmp_path):
         """Generated hull.toml contains [core] section."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "[core]" in content
         assert "timeout" in content
 
-    def test_init_hull_toml_has_core_timeout(self, tmp_path, monkeypatch):
+    def test_init_hull_toml_has_core_timeout(self, tmp_path):
         """hull.toml [core] section contains timeout configuration."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "timeout = 60" in content
 
-    def test_init_hull_toml_has_core_max_retries(self, tmp_path, monkeypatch):
+    def test_init_hull_toml_has_core_max_retries(self, tmp_path):
         """hull.toml [core] section contains max_retries configuration."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "max_retries = 3" in content
 
-    def test_init_example_skill_md_has_frontmatter(self, tmp_path, monkeypatch):
+    def test_init_example_skill_md_has_frontmatter(self, tmp_path):
         """Generated example SKILL.md contains YAML frontmatter."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         skill_md = tmp_path / "my-agent" / "skills" / "local" / "example" / "SKILL.md"
         content = skill_md.read_text(encoding="utf-8")
@@ -256,63 +182,61 @@ class TestInit:
         assert "tags:" in content
         assert "category:" in content
 
-    def test_init_copies_builtin_skills(self, tmp_path, monkeypatch):
-        """vessal init copies built-in Skills to skills/bundled/ (human is deprecated, not copied)."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
+    def test_init_copies_builtin_skills(self, tmp_path):
+        """vessal create copies built-in Skills to skills/bundled/; SkillHub skills are excluded."""
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         bundled_dir = tmp_path / "my-agent" / "skills" / "bundled"
         assert (bundled_dir / "chat" / "skill.py").exists()
         assert (bundled_dir / "tasks" / "skill.py").exists()
         assert (bundled_dir / "pin" / "skill.py").exists()
         assert not (bundled_dir / "human").exists()
+        # Migrated to SkillHub — must not be bundled
+        assert not (bundled_dir / "ui").exists()
+        assert not (bundled_dir / "search").exists()
+        assert not (bundled_dir / "audio").exists()
+        assert not (bundled_dir / "vision").exists()
 
-    def test_init_hull_toml_has_skill_paths(self, tmp_path, monkeypatch):
+    def test_init_hull_toml_has_skill_paths(self, tmp_path):
         """Generated hull.toml contains skill_paths configuration."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("subprocess.run"):
-            main()
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "skill_paths" in content
         assert "skills" in content
 
-    def test_init_no_venv_skips_subprocess(self, tmp_path, monkeypatch):
-        """--no-venv flag skips all subprocess calls."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent", "--no-venv"]), \
-             patch("subprocess.run") as mock_run:
-            main()
+    def test_init_no_venv_skips_subprocess(self, tmp_path):
+        """install_venv=False skips all subprocess calls."""
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        with patch("subprocess.run") as mock_run:
+            write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         mock_run.assert_not_called()
 
-    def test_init_uses_uv_sync_when_uv_available(self, tmp_path, monkeypatch):
-        """When uv is on PATH, init calls uv sync instead of python -m venv."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("shutil.which", return_value="/usr/bin/uv"), \
-             patch("subprocess.run") as mock_run:
-            main()
+    def test_init_uses_uv_sync_when_uv_available(self, tmp_path):
+        """When uv is on PATH, write_project_scaffold calls uv sync instead of python -m venv."""
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        with patch("vessal.ark.shell.cli.project_scaffold.shutil.which", return_value="/usr/bin/uv"), \
+             patch("vessal.ark.shell.cli.project_scaffold.subprocess.run") as mock_run:
+            write_project_scaffold(tmp_path / "my-agent", install_venv=True)
 
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0][0]
         assert call_args == ["uv", "sync"]
 
-    def test_init_uses_pip_when_uv_not_available(self, tmp_path, monkeypatch):
-        """When uv is not on PATH, init falls back to python -m venv + pip install."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "init", "my-agent"]), \
-             patch("shutil.which", return_value=None), \
-             patch("subprocess.run") as mock_run:
-            main()
+    def test_init_uses_pip_when_uv_not_available(self, tmp_path):
+        """When uv is not on PATH, write_project_scaffold falls back to python -m venv + pip install."""
+        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        with patch("vessal.ark.shell.cli.project_scaffold.shutil.which", return_value=None), \
+             patch("vessal.ark.shell.cli.project_scaffold.subprocess.run") as mock_run:
+            write_project_scaffold(tmp_path / "my-agent", install_venv=True)
 
         assert mock_run.call_count == 2
         all_args = [call[0][0] for call in mock_run.call_args_list]
-        assert any("venv" in a for a in all_args)
-        assert any("pip" in a for a in all_args)
+        assert any("venv" in str(a) for a in all_args)
+        assert any("pip" in str(a) for a in all_args)
 
 
 # ============================================================
@@ -336,71 +260,63 @@ class TestNoCommand:
 # ============================================================
 
 
-class TestSkillInit:
-    """vessal skill init command: Skill scaffold generation."""
+class TestSkillCreate:
+    """vessal skill create command: Skill scaffold generation."""
 
-    def test_skill_init_creates_scaffold(self, tmp_path, monkeypatch):
-        """vessal skill init <name> generates the correct scaffold files."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
-            main()
+    def _scaffold(self, tmp_path, skill_name="my_skill"):
+        from vessal.ark.shell.cli.scaffold import write_skill_scaffold
+        base = tmp_path / skill_name
+        base.mkdir()
+        write_skill_scaffold(base, skill_name)
+        return base
 
-        assert (tmp_path / "my_skill" / "__init__.py").exists()
-        assert (tmp_path / "my_skill" / "SKILL.md").exists()
-        assert (tmp_path / "my_skill" / "requirements.txt").exists()
-        assert (tmp_path / "my_skill" / "tests" / "__init__.py").exists()
-        assert (tmp_path / "my_skill" / "tests" / "test_my_skill.py").exists()
+    def test_skill_init_creates_scaffold(self, tmp_path):
+        """write_skill_scaffold generates the correct scaffold files."""
+        base = self._scaffold(tmp_path)
+        assert (base / "__init__.py").exists()
+        assert (base / "SKILL.md").exists()
+        assert (base / "requirements.txt").exists()
+        assert (base / "tests" / "__init__.py").exists()
+        assert (base / "tests" / "test_my_skill.py").exists()
 
-    def test_skill_init_creates_skill_py(self, tmp_path, monkeypatch):
+    def test_skill_init_creates_skill_py(self, tmp_path):
         """Generated scaffold contains skill.py."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
-            main()
+        base = self._scaffold(tmp_path)
+        assert (base / "skill.py").exists()
 
-        assert (tmp_path / "my_skill" / "skill.py").exists()
-
-    def test_skill_init_init_py_imports_skill_class(self, tmp_path, monkeypatch):
+    def test_skill_init_init_py_imports_skill_class(self, tmp_path):
         """Generated __init__.py imports Skill class from skill.py and exports __all__."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
-            main()
-
-        content = (tmp_path / "my_skill" / "__init__.py").read_text(encoding="utf-8")
+        base = self._scaffold(tmp_path)
+        content = (base / "__init__.py").read_text(encoding="utf-8")
         assert "from .skill import" in content
         assert "as Skill" in content
         assert '__all__ = ["Skill"]' in content
         assert "__guide__" not in content
         assert "from pathlib import Path" not in content
 
-    def test_skill_init_skill_py_has_skillbase(self, tmp_path, monkeypatch):
+    def test_skill_init_skill_py_has_skillbase(self, tmp_path):
         """Generated skill.py inherits SkillBase and defines name/description class attributes."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
-            main()
-
-        content = (tmp_path / "my_skill" / "skill.py").read_text(encoding="utf-8")
+        base = self._scaffold(tmp_path)
+        content = (base / "skill.py").read_text(encoding="utf-8")
         assert "SkillBase" in content
         assert 'name = "my_skill"' in content
         assert "description =" in content
 
-    def test_skill_init_camelcase_classname(self, tmp_path, monkeypatch):
+    def test_skill_init_camelcase_classname(self, tmp_path):
         """Generated class name is the CamelCase form of the skill_name."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_cool_skill"]):
-            main()
-
-        content = (tmp_path / "my_cool_skill" / "skill.py").read_text(encoding="utf-8")
+        from vessal.ark.shell.cli.scaffold import write_skill_scaffold
+        base = tmp_path / "my_cool_skill"
+        base.mkdir()
+        write_skill_scaffold(base, "my_cool_skill")
+        content = (base / "skill.py").read_text(encoding="utf-8")
         assert "class MyCoolSkill(SkillBase)" in content
-        init_content = (tmp_path / "my_cool_skill" / "__init__.py").read_text(encoding="utf-8")
+        init_content = (base / "__init__.py").read_text(encoding="utf-8")
         assert "from .skill import MyCoolSkill as Skill" in init_content
 
-    def test_skill_init_skill_md_has_frontmatter(self, tmp_path, monkeypatch):
+    def test_skill_init_skill_md_has_frontmatter(self, tmp_path):
         """Generated SKILL.md contains v1 YAML frontmatter with required fields."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
-            main()
-
-        content = (tmp_path / "my_skill" / "SKILL.md").read_text(encoding="utf-8")
+        base = self._scaffold(tmp_path)
+        content = (base / "SKILL.md").read_text(encoding="utf-8")
         assert "---" in content  # frontmatter delimiter
         assert "name: my_skill" in content
         assert "description:" in content
@@ -412,30 +328,21 @@ class TestSkillInit:
         assert "tags:" not in content
         assert "category:" not in content
 
-    def test_skill_init_skill_md_has_name(self, tmp_path, monkeypatch):
+    def test_skill_init_skill_md_has_name(self, tmp_path):
         """Generated SKILL.md contains the Skill name."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
-            main()
-
-        content = (tmp_path / "my_skill" / "SKILL.md").read_text(encoding="utf-8")
+        base = self._scaffold(tmp_path)
+        content = (base / "SKILL.md").read_text(encoding="utf-8")
         assert "my_skill" in content
 
-    def test_skill_init_no_readme(self, tmp_path, monkeypatch):
-        """vessal skill init does not generate README.md."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
-            main()
+    def test_skill_init_no_readme(self, tmp_path):
+        """write_skill_scaffold does not generate README.md."""
+        base = self._scaffold(tmp_path)
+        assert not (base / "README.md").exists()
 
-        assert not (tmp_path / "my_skill" / "README.md").exists()
-
-    def test_skill_init_skill_md_is_minimal(self, tmp_path, monkeypatch):
-        """Generated SKILL.md body is a short placeholder without a writing guide."""
-        monkeypatch.chdir(tmp_path)
-        with patch("sys.argv", ["vessal", "skill", "init", "my_skill"]):
-            main()
-
-        md = (tmp_path / "my_skill" / "SKILL.md").read_text(encoding="utf-8")
+    def test_skill_init_skill_md_is_minimal(self, tmp_path):
+        """Generated SKILL.md body does not contain a full writing guide."""
+        base = self._scaffold(tmp_path)
+        md = (base / "SKILL.md").read_text(encoding="utf-8")
         assert "---" in md
         assert "name: my_skill" in md
         assert "writing principles" not in md
@@ -714,7 +621,7 @@ class TestStartForegroundLock:
         """_start_foreground creates data/vessal.lock, not a PID file."""
         import argparse
         from unittest.mock import patch
-        from vessal.ark.shell.cli import _start_foreground
+        from vessal.ark.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj"
         project_dir.mkdir()
@@ -737,7 +644,7 @@ class TestStartForegroundLock:
                 lock_file_created["exists"] = True
             raise KeyboardInterrupt
 
-        with patch("vessal.ark.shell.cli.ShellServer") as MockShell:
+        with patch("vessal.ark.shell.server.ShellServer") as MockShell:
             mock_shell = MockShell.return_value
             mock_shell.start.return_value = None
             mock_shell.serve_forever.side_effect = capture_serve_forever
@@ -754,7 +661,7 @@ class TestStartForegroundLock:
         """_start_foreground creates data/vessal.lock and writes the port number."""
         import argparse
         from unittest.mock import patch
-        from vessal.ark.shell.cli import _start_foreground
+        from vessal.ark.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj2"
         project_dir.mkdir()
@@ -776,7 +683,7 @@ class TestStartForegroundLock:
                 lock_contents["data"] = lock_path.read_text()
             raise KeyboardInterrupt
 
-        with patch("vessal.ark.shell.cli.ShellServer") as MockShell:
+        with patch("vessal.ark.shell.server.ShellServer") as MockShell:
             mock_shell = MockShell.return_value
             mock_shell.start.return_value = None
             mock_shell.serve_forever.side_effect = capture_serve_forever
@@ -794,7 +701,7 @@ class TestStartForegroundLock:
         """When shell.start() raises RuntimeError, the lock file is released and exits with code 1."""
         import argparse
         import threading
-        from vessal.ark.shell.cli import _start_foreground
+        from vessal.ark.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj3"
         project_dir.mkdir()
@@ -823,7 +730,7 @@ class TestStartForegroundLock:
             def shutdown(self):
                 pass
 
-        monkeypatch.setattr("vessal.ark.shell.cli.ShellServer", FakeShellServer)
+        monkeypatch.setattr("vessal.ark.shell.server.ShellServer", FakeShellServer)
 
         args = argparse.Namespace(dir=str(project_dir), port=9001, daemon=False)
 
@@ -843,7 +750,7 @@ class TestStopCommand:
     def test_stop_reports_not_running_when_no_lock(self, tmp_path, capsys):
         """Reports Agent is not running when no lock file exists."""
         import argparse
-        from vessal.ark.shell.cli import _cmd_stop
+        from vessal.ark.shell.cli.process_cmds import _cmd_stop
 
         (tmp_path / "data").mkdir()
         args = argparse.Namespace(dir=str(tmp_path), port=8420)
@@ -854,7 +761,7 @@ class TestStopCommand:
     def test_stop_reports_not_running_when_no_data_dir(self, tmp_path, capsys):
         """Reports Agent is not running when data/ directory does not exist."""
         import argparse
-        from vessal.ark.shell.cli import _cmd_stop
+        from vessal.ark.shell.cli.process_cmds import _cmd_stop
 
         args = argparse.Namespace(dir=str(tmp_path), port=8420)
         _cmd_stop(args)

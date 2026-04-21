@@ -10,7 +10,8 @@ import time
 from pathlib import Path
 
 from vessal.ark.shell.events import EventBus
-from vessal.ark.shell.hot_reload import HotReloader
+from vessal.ark.shell.cli.hot_reload import HotReloader
+from vessal.ark.shell.http_server import SafeThreadingHTTPServer
 
 _logger = logging.getLogger(__name__)
 
@@ -207,7 +208,7 @@ class ShellServer:
         self._hull_alive = False
         self._stop_requested = False
         self._stop_event = threading.Event()
-        self._http_server: http.server.ThreadingHTTPServer | None = None
+        self._http_server: SafeThreadingHTTPServer | None = None
         self._monitor_thread: threading.Thread | None = None
         self._event_bus = EventBus()
         self._hot_reloader: HotReloader | None = None
@@ -237,7 +238,7 @@ class ShellServer:
         last_err: OSError | None = None
         for offset in range(20):
             try:
-                self._http_server = http.server.ThreadingHTTPServer(
+                self._http_server = SafeThreadingHTTPServer(
                     (self._host, requested + offset), _ProxyHandler
                 )
                 self._port = requested + offset
@@ -318,7 +319,7 @@ class ShellServer:
         cmd = [
             sys.executable,
             "-m",
-            "vessal.ark.shell.hull_runner",
+            "vessal.ark.shell.runtime.subprocess_mode",
             "--dir",
             self._project_dir,
             "--port",

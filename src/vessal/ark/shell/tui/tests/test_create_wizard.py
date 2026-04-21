@@ -1,15 +1,15 @@
 from vessal.ark.shell.tui.create_wizard import DEFAULT_ANSWERS, finalize_answers
 
 
-def test_defaults_include_all_six():
-    assert set(DEFAULT_ANSWERS.keys()) == {"name", "provider", "api_key", "template", "dockerize", "deploy"}
+def test_defaults_include_all_keys():
+    assert set(DEFAULT_ANSWERS.keys()) == {"name", "api_key", "base_url", "model", "dockerize"}
 
 
 def test_finalize_fills_missing_with_defaults():
     answers = finalize_answers({"name": "hello"})
     assert answers["name"] == "hello"
-    assert answers["provider"] == DEFAULT_ANSWERS["provider"]
-    assert answers["template"] == DEFAULT_ANSWERS["template"]
+    assert answers["dockerize"] == DEFAULT_ANSWERS["dockerize"]
+    assert answers["model"] == DEFAULT_ANSWERS["model"]
 
 
 def test_finalize_rejects_empty_name():

@@ -5,40 +5,39 @@ description: Create a new skill scaffold
 
 # skill_creator
 
-Generates a Skill directory scaffold under skill_paths. Creates 7 files including full protocol documentation and reference material that the AI can read to implement the Skill directly.
+Generates a Skill directory scaffold under `skill_paths[0]`. Delegates to the same generator used by
+the `vessal skill create` CLI, so the two surfaces always produce the same layout.
 
 ## Methods
 
-skill_creator.create(name, description) — Create a scaffold directory
+skill_creator.create(name) — Create a scaffold directory
 
 ## Generated Structure
 
 ```
 {name}/
-  __init__.py       Exports the Skill class
-  skill.py          Full protocol comments + skeleton code
-  SKILL.md          Guide template
-  CONTEXT.md        Formalin contract framework
-  REFERENCE.md      Reference docs (whitepaper excerpts + example source)
+  __init__.py
+  skill.py          SkillBase subclass with protocol-convention comments
+  SKILL.md          Frontmatter + guide template
+  requirements.txt  (empty)
   tests/
     __init__.py
-    test_{name}.py  Test skeleton
+    test_{name}.py  Placeholder test
 ```
 
 ## Usage
 
 ```python
-skill_creator.create("code_review", "Code review tool")
-# → Creates code_review/ directory under skill_paths[0] (7 files)
-# 1. Read REFERENCE.md to understand the Skill protocol
-# 2. Edit skill.py to fill in the implementation (remove comment blocks)
-# 3. Edit SKILL.md to write the guide
-# 4. Edit CONTEXT.md to write the contract
-# 5. Edit tests/test_code_review.py to add tests
-# 6. skills.load("code_review") to load
+skill_creator.create("code_review")
+# → Creates code_review/ under skill_paths[0]
+# 1. Edit skill.py to fill in `description` and implement the tool
+# 2. Edit SKILL.md to describe methods and replace the placeholder description
+# 3. Edit tests/test_code_review.py
+# 4. skills.load("code_review") to load
 ```
 
 ## Modifying an Existing Skill
 
-Any Skill (including built-ins) can be modified: edit the file, then call skills.unload(name) → skills.load(name).
-Modifications to built-in Skills will be overwritten when vessal is upgraded. For persistent changes, create a user Skill with the same name to override it.
+Any Skill (including built-ins) can be modified: edit the file, then `skills.unload(name)` →
+`skills.load(name)`. Modifications to built-in Skills will be overwritten when vessal is upgraded;
+for persistent changes, create a user Skill with the same name to override it.

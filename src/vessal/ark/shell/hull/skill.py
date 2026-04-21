@@ -15,6 +15,7 @@ class SkillBase(ABC):
         guide: str      — methodology text (SKILL.md body, set by loader)
         _signal()       — called each frame, returns (title, body) or None
         _prompt()       — called each frame, returns (condition, methodology) cognitive protocol or None
+        _bind_hull(hull)  — called once after the Skill lands in namespace, for Skills that need a Hull handle
 
     Creation rules:
         1. description ≤ 15 chars; describe function only, not method names.

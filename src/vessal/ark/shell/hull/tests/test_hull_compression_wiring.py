@@ -61,7 +61,7 @@ def test_compaction_worker_produces_record(monkeypatch, tmp_path):
         "notable": "",
     })
     fake_pong = Pong(think="", action=Action(operation=valid_json, expect=""))
-    monkeypatch.setattr(hull._compression_core, "run", lambda *a, **kw: (fake_pong, None, None))
+    monkeypatch.setattr(hull._compression_core, "step", lambda *a, **kw: (fake_pong, None, None))
 
     frame = {
         "schema_version": FRAME_SCHEMA_VERSION,
@@ -94,7 +94,7 @@ def test_compaction_worker_error_sentinel_on_bad_json(monkeypatch, tmp_path):
 
     hull = _make_hull(tmp_path)
     fake_pong = Pong(think="", action=Action(operation="not json at all", expect=""))
-    monkeypatch.setattr(hull._compression_core, "run", lambda *a, **kw: (fake_pong, None, None))
+    monkeypatch.setattr(hull._compression_core, "step", lambda *a, **kw: (fake_pong, None, None))
 
     frame = {
         "schema_version": FRAME_SCHEMA_VERSION,

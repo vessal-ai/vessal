@@ -1,8 +1,8 @@
 """protocol.py — Shell ↔ Hull protocol definitions. Shared by all Shell implementations.
 
-handle() is Hull's sole entry point. Shell adapters (standalone hull_runner.py,
-container entry.py, future embedded ipc_adapter) translate external requests into
-handle(method, path, body) calls and translate return values back to external protocols.
+handle() is Hull's sole entry point. Shell adapters (subprocess_mode, container_mode,
+future embedded ipc_adapter) translate external requests into handle(method, path, body)
+calls and translate return values back to external protocols.
 
 This module defines the return type of handle(), shared by all adapters.
 """

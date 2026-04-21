@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.4] - 2026-04-21
+
+### Console Redesign
+
+- Launcher is now a generic UI shell; the only hard-coded view is `frames`.
+- Every other UI (chat, skills management) is provided by a Skill and loaded as an iframe tab via `/skills/ui` discovery.
+- Data plane contract: every `GET /<domain>` accepts `?after=<cursor>`; frontend state is append-only.
+- Retired: `src/vessal/ark/util/logging/viewer.html`, `/logs`, `/logs/raw`.
+- Terminology: `● idle` → `● sleep` in the status indicator.
+- Fixes (as side effects of the migration): user chat messages no longer disappear on poll; Current Frame no longer blank after tab switch; Logs view no longer a placeholder.
+
+### Architecture — Shell / Hull / Cell layering
+
+- **Shell/Hull refactor** — Shell recast as Agent Carrier Layer (Entry / Runtime / Supervisor); Hull split via mixin composition (`HullInitMixin`, Skill loading); SkillHub moved out of Shell.
+- **Skills consolidation** — `SkillsManager` merged into `Skills`; `StaticRouter` extracted as a dedicated routing primitive; `audio`, `search`, `vision`, `ui` migrated to the unified interface.
+- **Cell leaf boundary restored** — Cell no longer imports `vessal.ark.util.logging`, no longer touches `Core._DEFAULT_API_PARAMS`, no longer reads `fs._hot`. Enforced by `tests/architecture/vessal/test_cell_dependency_tree.py`.
+
+### CLI — unified `create` wizards
+
+- **`vessal create`** and **`vessal skill create`** are now the only project/Skill scaffolding commands. `vessal init` and `vessal skill init` have been removed.
+- Both commands default to interactive wizards; positional arguments are no longer accepted — the design principle is "minimum CLI surface area; non-interactive needs are not the CLI's responsibility".
+- Skill scaffolds are now self-documenting: generated `SKILL.md` carries `## Methods`, `## Protocol conventions`, `## Common pitfalls` sections; optional TUTORIAL.md / `ui/index.html` / `server.py` emit based on wizard answers.
+
+### Documentation
+
+- **Whitepaper Ch. 08** — `references/whitepaper/08-console.md`, Console and the User-Facing Data Plane.
+- **README** — merged "60-Second First Agent" into Quick Start (single 4-line TL;DR at top); Skills chapter expanded to four layers (Methodology / Code / Perception / **UI**); removed standalone HTTP API section (endpoints are Shell implementation detail).
+
+### Governance
+
+- **Anti-Rot Governance** — CLAUDE.md R1–R5 (Single Source of Truth, Copy the Invariants, No Unowned Retirement Promises, Whitepaper as Source of Truth, Modification Declaration Protocol).
+- **R13 / R14** — Browser test required for user-facing surface; smoke test required for boot surface.
+- **Debug Protocol D1–D8** — `.claude/skills/debug-protocol/` auto-loads on bug/fix/debug triggers. PR template now includes Debug Protocol sections (D3/D4/D7/D8) for bug-fix PRs.
+
 ## [0.0.3] - 2026-04-18
 
 ### Added

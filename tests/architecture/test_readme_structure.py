@@ -7,8 +7,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_every_package_has_readme():
     """Every directory containing __init__.py has README.md (excluding tests/ directories).
 
-    Only Formalin components (directories with CONTEXT.md) require README.md.
-    Packages without CONTEXT.md are implementation details and do not participate in Formalin compilation.
+    Only boundary-layer components (directories with CONTEXT.md) require README.md.
+    Packages without CONTEXT.md are implementation details and do not need a README.
     """
     missing = []
     for init in (_REPO_ROOT / "src" / "vessal").rglob("__init__.py"):
@@ -18,8 +18,8 @@ def test_every_package_has_readme():
         # co-located test directories don't need README.md
         if "tests" in pkg_dir.parts:
             continue
-        # Only Formalin components (directories with CONTEXT.md) require README.md.
-        # Packages without CONTEXT.md are implementation details, not Formalin components.
+        # Only boundary-layer components (directories with CONTEXT.md) require README.md.
+        # Packages without CONTEXT.md are implementation details.
         if not (pkg_dir / "CONTEXT.md").exists():
             continue
         if not (pkg_dir / "README.md").exists():

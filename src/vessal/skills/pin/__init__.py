@@ -1,5 +1,4 @@
 """pin — variable pinned-observation Skill."""
-from .skill import Pin
-from .skill import Pin as Skill  # compatibility alias
+from .skill import Pin as Skill
 
-__all__ = ["Pin"]
+__all__ = ["Skill"]

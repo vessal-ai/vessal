@@ -63,9 +63,9 @@ flowchart TD
     Backoff --> Call
 ```
 
-Invariants: run(ping) either returns a valid Pong (with non-empty action.operation) or raises an exception; there is no scenario where a "successful call but unparseable response" returns a default value — ParseError propagates upward, handled by Cell. After retries are exhausted, the last exception is raised; callers can distinguish timeout from authentication failure.
+Invariants: step(ping) either returns a valid Pong (with non-empty action.operation) or raises an exception; there is no scenario where a "successful call but unparseable response" returns a default value — ParseError propagates upward, handled by Cell. After retries are exhausted, the last exception is raised; callers can distinguish timeout from authentication failure.
 
-Core and Cell relationship: Cell calls core.run(ping), passes the returned Pong to Kernel. Core is unaware of Cell's existence or Kernel's existence. Core and parser relationship: core.run() calls parse_response() after successfully receiving an API response; ParseError propagates upward. Core and retry relationship: on each API call exception, classifies via is_retryable_error(), calculates wait time via calculate_backoff_seconds().
+Core and Cell relationship: Cell calls core.step(ping), passes the returned Pong to Kernel. Core is unaware of Cell's existence or Kernel's existence. Core and parser relationship: core.step() calls parse_response() after successfully receiving an API response; ParseError propagates upward. Core and retry relationship: on each API call exception, classifies via is_retryable_error(), calculates wait time via calculate_backoff_seconds().
 
 ## Status
 

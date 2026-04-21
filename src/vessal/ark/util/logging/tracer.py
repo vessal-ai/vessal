@@ -99,8 +99,8 @@ class Tracer:
 
         Usage::
 
-            with tracer.span(frame, "core.run"):
-                result = core.run(state)
+            with tracer.span(frame, "core.step"):
+                result = core.step(state)
 
         Args:
             frame: Current frame number.

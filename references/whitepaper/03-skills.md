@@ -97,13 +97,13 @@ The meta-skill is injected directly into the namespace by Vessal's initializatio
 
 `query_guide(name)` — reads the guide text for the specified Skill. Returns markdown content.
 
-The meta-skill's existence is not in tension with the principle that "the Cell doesn't know about Skills." The meta-skill's tool functions internally call Hull's SkillManager through an injected callback in the namespace; the Cell and Kernel themselves are unaware of what happens. This is entirely consistent with the existing `load`, `unload`, and `list_skills` functions in `hull/builtins.py` — the meta-skill is simply an upgrade from loose functions to a proper Skill with SOP.
+The meta-skill's existence is not in tension with the principle that "the Cell doesn't know about Skills." The meta-skill's tool functions internally call Hull's SkillLoader through an injected callback in the namespace; the Cell and Kernel themselves are unaware of what happens. This is entirely consistent with the existing `load`, `unload`, and `list_skills` functions in `hull/builtins.py` — the meta-skill is simply an upgrade from loose functions to a proper Skill with SOP.
 
 ```mermaid
 sequenceDiagram
     participant A as Agent
     participant M as Meta-Skill
-    participant SM as SkillManager
+    participant SM as SkillLoader
     participant C as Cell
     participant SV as Server
 

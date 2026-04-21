@@ -16,20 +16,15 @@
 #
 # Public interface:
 #   Core(timeout, max_retries, api_params)    constructor
-#   run(ping, tracer, frame) -> Pong          call LLM, return parsed Pong
+#   step(ping, tracer, frame) -> Pong         call LLM, return parsed Pong
 
 import logging
 import os
 import time
 
 import openai
-from openai import (
-    AuthenticationError,
-    PermissionDeniedError,
-    BadRequestError,
-)
 
-from vessal.ark.util.logging import Tracer
+from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
 from vessal.ark.shell.hull.cell.protocol import Ping, Pong
 from vessal.ark.shell.hull.cell.core.retry import is_retryable_error, calculate_backoff_seconds
 from vessal.ark.shell.hull.cell.core.parser import ParseError, parse_response
@@ -49,7 +44,7 @@ class Core:
     or providers, only api_params and environment variables need to be updated;
     Core code itself requires no modification.
 
-    Stateless: each run() is an independent API call; no conversation history
+    Stateless: each step() is an independent API call; no conversation history
     is maintained and no responses are cached.
     """
 
@@ -86,10 +81,16 @@ class Core:
         self._max_retries = max_retries
         self._api_params = dict(api_params) if api_params else dict(self._DEFAULT_API_PARAMS)
 
-    def run(
+    @property
+    def max_tokens(self) -> int:
+        """Token budget derived from api_params. OpenAI parameter naming stays local to Core."""
+        return self._api_params.get("max_tokens",
+                self._api_params.get("max_completion_tokens", 4096))
+
+    def step(
         self,
         ping: Ping,
-        tracer: Tracer | None = None,
+        tracer: TracerLike | None = None,
         frame: int = 0,
     ) -> tuple[Pong, int | None, int | None]:
         """Call the LLM, parse the response, and return a Pong.
@@ -99,7 +100,7 @@ class Core:
 
         Args:
             ping:   Perceptual input rendered by Kernel (contains system_prompt/state).
-            tracer: Optional Tracer.
+            tracer: Optional TracerLike.
             frame:  Frame number, used for trace recording.
 
         Returns:

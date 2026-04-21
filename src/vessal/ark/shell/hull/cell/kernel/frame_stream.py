@@ -61,6 +61,30 @@ class FrameStream:
     def cold_record_count(self) -> int:
         return sum(len(layer) for layer in self._cold)
 
+    def latest_hot_frame(self) -> dict | None:
+        """Most recently committed hot-zone frame, or None if the stream is empty."""
+        return self._hot[0][-1] if self._hot[0] else None
+
+    def hot_head_len(self) -> int:
+        """Current length of the B_0 bucket (newest hot bucket)."""
+        return len(self._hot[0])
+
+    def find_creation(self, key: str) -> str | None:
+        """Search hot buckets newest-first for the operation that first introduced `key`.
+
+        Args:
+            key: Variable name to search for in frame observation diffs.
+
+        Returns:
+            The operation string from the matching frame, or None if not found.
+        """
+        for bucket in self._hot:
+            for frame in reversed(bucket):
+                diff = frame.get("observation", {}).get("diff", "")
+                if f"+ {key}" in diff:
+                    return frame.get("pong", {}).get("action", {}).get("operation", "")
+        return None
+
     def commit_frame(self, frame: dict) -> None:
         """Append a raw frame dict to B_0. Called by Kernel._commit_frame."""
         if frame.get("schema_version") != FRAME_SCHEMA_VERSION:
@@ -205,7 +229,7 @@ class FrameStream:
         return {"cold": cold_view, "hot": hot_view}
 
     def project_compactions(self) -> dict:
-        """View for viewer.html /state/compactions endpoint."""
+        """View for the /state/compactions endpoint."""
         return {
             "schema_version": FRAME_SCHEMA_VERSION,
             "k": self._k,

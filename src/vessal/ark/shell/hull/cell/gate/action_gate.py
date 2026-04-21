@@ -16,6 +16,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
+from vessal.ark.shell.hull.cell.gate.gate_base import _GateBase
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +38,7 @@ class ActionGateResult:
         self.reason = reason
 
 
-class ActionGate:
+class ActionGate(_GateBase):
     """Safety gate for action code before execution.
 
     Three modes:
@@ -91,26 +93,6 @@ class ActionGate:
                 logger.warning("gate rule %r raised exception: %s", rule_name, e)
 
         return ActionGateResult(allowed=True, action=action)
-
-    def add_rule(self, name: str, check_fn: Callable[[str], str | None]) -> None:
-        """Register a custom rule.
-
-        check_fn(action: str) -> str | None
-        Return None to pass through; return a string to indicate the block reason.
-
-        Args:
-            name:     Rule name, used in logs and remove_rule.
-            check_fn: Rule function.
-        """
-        self._rules.append((name, check_fn))
-
-    def remove_rule(self, name: str) -> None:
-        """Remove a rule by name.
-
-        Args:
-            name: Name of the rule to remove. Silently does nothing if not found.
-        """
-        self._rules = [(n, fn) for n, fn in self._rules if n != name]
 
     def _load_builtin_rules(self) -> None:
         """Load the built-in safety rules."""

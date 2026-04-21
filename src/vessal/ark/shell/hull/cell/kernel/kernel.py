@@ -39,7 +39,7 @@ from vessal.ark.shell.hull.cell.protocol import (
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
-from vessal.ark.util.logging import Tracer
+from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class Kernel:
         ns["_compaction_n"] = 8                   # max cold-zone layers
 
         # Execution state
-        ns["_frame"] = 0                          # current frame number; set by executor before execution
+        ns["_frame"] = 0                          # last committed frame number; written by _commit_frame
         ns["_ns_meta"] = {}                       # variable usage tracking; rewritten by executor each frame
         ns["_frame_stream"] = FrameStream(
             k=ns["_compaction_k"],
@@ -120,14 +120,14 @@ class Kernel:
 
         # Context budget (used by renderer to calculate utilization)
         ns["_context_budget"] = 128000            # total context window (estimated tokens); Hull can override
-        ns["_max_tokens"] = 4096                  # reserved for LLM reply; Cell will override with actual value
+        ns["_token_budget"] = 4096                # reserved for LLM reply; Hull writes via cell.set("_token_budget", cell.max_tokens)
 
         # Initial values of side-effect variables written by executor
         # (ensures fields exist when rendering the first frame)
         ns["_operation"] = ""                     # operation code executed in the previous frame
         ns["_stdout"] = ""                        # stdout from this frame
         ns["_error"] = None                       # exception from this frame
-        ns["_errors"] = []                        # error history, list[ErrorRecord], capped at 50
+        ns["_errors"] = []                        # error history, list[ErrorRecord]; cap enforced by append_error() via _error_buffer_cap
         ns["_actual_tokens_in"] = None            # actual input token count returned by API (None if unavailable)
         ns["_actual_tokens_out"] = None           # actual output token count returned by API (None if unavailable)
         ns["_diff"] = ""                          # change summary for this frame (git-style +/- format)
@@ -140,11 +140,7 @@ class Kernel:
 
         # Lifecycle variables
         ns["_sleeping"] = False                   # set to True when Agent sleeps → frame loop pauses
-
-        def _sleep_fn():
-            ns["_sleeping"] = True
-
-        ns["sleep"] = _sleep_fn
+        ns["sleep"] = self.sleep
         ns["_next_wake"] = None                  # next wake time set by Agent (absolute timestamp)
 
         # Protected keys: all keys present at namespace init time.
@@ -155,7 +151,7 @@ class Kernel:
         self,
         operation: str,
         frame_number: int,
-        tracer: Tracer | None = None,
+        tracer: TracerLike | None = None,
     ) -> ExecResult:
         """Execute operation code. Does not increment _frame or append _frame_log.
 
@@ -164,8 +160,9 @@ class Kernel:
 
         Args:
             operation: Python code string to execute.
-            frame_number: Current frame number; written to ns["_frame"] and passed to _ns_meta.
-            tracer: Optional Tracer for recording execution time.
+            frame_number: Current frame number; passed to executor for ErrorRecord/_ns_meta tracking.
+                          Not written to ns["_frame"] — that is _commit_frame's responsibility.
+            tracer: Optional TracerLike for recording execution time.
 
         Returns:
             ExecResult containing stdout, diff, and error fields.
@@ -180,7 +177,7 @@ class Kernel:
     def eval_expect(
         self,
         expect: str,
-        tracer: Tracer | None = None,
+        tracer: TracerLike | None = None,
     ) -> Verdict:
         """Evaluate prediction assertions on a shallow copy of the namespace. Does not modify the real namespace.
 
@@ -188,7 +185,7 @@ class Kernel:
 
         Args:
             expect: Expect code string (containing assert statements).
-            tracer: Optional Tracer for recording evaluation time.
+            tracer: Optional TracerLike for recording evaluation time.
 
         Returns:
             Verdict containing total/passed/failures fields.
@@ -229,6 +226,10 @@ class Kernel:
                 fn_name = getattr(fn, "__name__", repr(fn))
                 logger.warning("Base signal '%s' failed: %s", fn_name, e)
 
+        # TODO: future optimization — switch to explicit registry via
+        # ns["_signal_sources"] when O(|ns|) full scan becomes measurable.
+        # Current duck-typing scan is intentional design — see console/1-active/
+        # 20260421-cell-architecture-review.md C16.
         # Duck-typing signal scan: any object in namespace with a _signal method
         for obj in list(self.ns.values()):
             if hasattr(obj, "_signal") and callable(getattr(obj, "_signal")):
@@ -253,14 +254,8 @@ class Kernel:
         return _render(self.ns, self.ns.get("_render_config"))
 
     def snapshot(self, path: str) -> None:
-        """Serialize the namespace to a file.
+        """Serialize namespace to file. Pure bytes — no Skill awareness.
 
-        Uses cloudpickle, supporting functions, classes, lambdas, closures, and
-        all other callables. The file is written in two parts: first _loaded_skills
-        metadata (header), then the full ns (body). The header is used at restore
-        time to repair sys.path before deserialization, ensuring __import__ succeeds.
-        Module objects are recorded by cloudpickle under their names and re-imported
-        from disk at restore time.
         Atomic write: first writes to a temp file; replaces the target only on full
         success; the original file is unaffected on failure.
 
@@ -278,7 +273,6 @@ class Kernel:
         import tempfile
         path = str(path)
 
-        header_bytes = cloudpickle.dumps(self.ns.get("_loaded_skills", {}))
         try:
             body_bytes = cloudpickle.dumps(self.ns)
         except Exception as e:
@@ -302,7 +296,6 @@ class Kernel:
         fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as f:
-                f.write(header_bytes)
                 f.write(body_bytes)
             os.replace(tmp_path, path)
         except Exception:
@@ -313,31 +306,29 @@ class Kernel:
             raise
 
     def restore(self, path: str) -> None:
-        """Restore namespace from a file, completely replacing the current state.
-
-        Reads the header (Skill metadata) first, repairs sys.path and clears
-        sys.modules cache, then reads the body (full ns). cloudpickle deserializes
-        the body with __import__ for modules, by which point sys.path is ready.
+        """Restore ns from file. Caller MUST have prepared sys.path / sys.modules.
 
         Args:
             path: File path written by snapshot().
 
         Side effects:
-            Completely replaces self.ns. Modifies sys.path and sys.modules.
+            Completely replaces self.ns.
         """
-        import sys as _sys
+        import io as _io
         with open(path, "rb") as f:
-            loaded_skills = cloudpickle.load(f)
-            for name, info in loaded_skills.items():
-                parent_path = info.get("parent_path", "")
-                if parent_path and parent_path not in _sys.path:
-                    _sys.path.insert(0, parent_path)
-                # Clear sys.modules cache to ensure latest code is loaded from disk
-                stale = [k for k in _sys.modules
-                         if k == name or k.startswith(name + ".")]
-                for k in stale:
-                    del _sys.modules[k]
-            self.ns = cloudpickle.load(f)
+            raw = f.read()
+        buf = _io.BytesIO(raw)
+        first = cloudpickle.load(buf)
+        remaining = len(raw) - buf.tell()
+        if remaining > 0:
+            # Legacy layout: [cloudpickle(header_dict)][cloudpickle(ns)]
+            # Discard header; load the actual namespace from remaining bytes.
+            self.ns = cloudpickle.load(buf)
+            # Write back in new format so subsequent restores use fast path.
+            with open(path, "wb") as f:
+                f.write(cloudpickle.dumps(self.ns))
+        else:
+            self.ns = first
         self._migrate_snapshot()
 
     def _find_creation_operation(self, key: str) -> str:
@@ -352,13 +343,7 @@ class Kernel:
         fs = self.ns.get("_frame_stream")
         if fs is None:
             return ""
-        # Search all hot buckets newest-first: B_0 (newest) through B_4
-        for bucket in fs._hot:
-            for frame in reversed(bucket):
-                diff = frame.get("observation", {}).get("diff", "")
-                if f"+ {key}" in diff:
-                    return frame.get("pong", {}).get("action", {}).get("operation", "")
-        return ""
+        return fs.find_creation(key) or ""
 
     def _migrate_snapshot(self) -> None:
         """Clear per-run state whose schema version doesn't match.
@@ -375,17 +360,22 @@ class Kernel:
                 k=self.ns.get("_compaction_k", 16),
                 n=self.ns.get("_compaction_n", 8),
             )
-            return
-        try:
-            d = fs.to_dict()
-            if d.get("schema_version") != FRAME_SCHEMA_VERSION:
-                raise ValueError("schema mismatch")
-        except Exception:
-            self.ns["_frame_stream"] = FrameStream(
-                k=self.ns.get("_compaction_k", 16),
-                n=self.ns.get("_compaction_n", 8),
-            )
-            logger.info("Cleared incompatible frame_stream (schema mismatch)")
+        else:
+            try:
+                d = fs.to_dict()
+                if d.get("schema_version") != FRAME_SCHEMA_VERSION:
+                    raise ValueError("schema mismatch")
+            except Exception:
+                self.ns["_frame_stream"] = FrameStream(
+                    k=self.ns.get("_compaction_k", 16),
+                    n=self.ns.get("_compaction_n", 8),
+                )
+                logger.info("Cleared incompatible frame_stream (schema mismatch)")
+        self.ns["sleep"] = self.sleep
+
+    def sleep(self) -> None:
+        """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
+        self.ns["_sleeping"] = True
 
     # ------------------------------------------------------------------ High-level interface
 
@@ -401,11 +391,12 @@ class Kernel:
         self.update_signals()
         return self.render()
 
-    def run(
+    def step(
         self,
         pong: Pong,
-        tracer: Tracer | None = None,
+        tracer: TracerLike | None = None,
         ping: "Ping | None" = None,
+        frame_number: int | None = None,
     ) -> None:
         """Single-frame execution: exec → expect → observation → frame → commit.
 
@@ -416,12 +407,15 @@ class Kernel:
         done by Cell at the start of the next frame via prepare().
 
         Args:
-            pong:   Control signal from the reasoner, containing action.operation / action.expect.
-            tracer: Optional Tracer, forwarded to exec_operation and eval_expect.
-            ping:   Perceptual input seen by the model for this frame (optional;
-                    used to write into FrameRecord v6).
+            pong:         Control signal from the reasoner, containing action.operation / action.expect.
+            tracer:       Optional TracerLike, forwarded to exec_operation and eval_expect.
+            ping:         Perceptual input seen by the model for this frame (optional;
+                          used to write into FrameRecord v6).
+            frame_number: Frame sequence number. When None, computed from ns["_frame"] + 1
+                          (backward-compatibility guard for callers that do not pass it).
         """
-        frame_number = self.ns["_frame"] + 1
+        if frame_number is None:
+            frame_number = self.ns["_frame"] + 1
 
         exec_result = self.exec_operation(pong.action.operation, frame_number, tracer)
 
@@ -470,4 +464,5 @@ class Kernel:
             fs = FrameStream(k=ns.get("_compaction_k", 16), n=ns.get("_compaction_n", 8))
             ns["_frame_stream"] = fs
         fs.commit_frame(record.to_dict())
+        ns["_frame"] = frame_number
         ns["_verdict"] = observation.verdict

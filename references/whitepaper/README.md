@@ -21,6 +21,8 @@ V5 begins with the action space problem: where other Agent frameworks hand the L
 
 `07-training.md` — Training and Scaling. The SORA loop as a Markov Decision Process. Structured trajectories as self-annotating training data. Three scaling axes (parameters, trajectories, environment complexity). RL from environment feedback. The virtuous cycle from deployment through training to redeployment.
 
+`08-console.md` — Console and the User-Facing Data Plane. Console as a generic UI layer above Shell. Launcher + Skill-provided UI (symmetric to Shell + Skill-server). Built-in `frames` view as the universal SORA substrate. The data plane contract (hydrate-then-subscribe, `?after=<cursor>`, append-only local state, SSE multiplexed at Shell). Layer responsibility table. Anti-rot discipline applied to the Console surface.
+
 `QA.md` — Design Discussion Summary. Specific Q&A covering details not addressed in the main text.
 
 

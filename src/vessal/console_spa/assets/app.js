@@ -1,33 +1,27 @@
-// app.js — Alpine component + SSE subscription + chat POST
-import { renderFrame } from "./frame-renderer.js";
+// app.js — Alpine component + SSE subscription
 
 const VIEWS = [
-  { id: "chat",   icon: "💬", label: "Chat" },
   { id: "frames", icon: "🎞️", label: "Frames" },
-  { id: "state",  icon: "🔧", label: "State" },
-  { id: "logs",   icon: "📜", label: "Logs" },
-  { id: "market", icon: "🛒", label: "Skill Market" },
 ];
 
-window.consoleApp = function consoleApp() {
+function consoleApp() {
   return {
     views: VIEWS,
-    current: "chat",
+    current: "frames",
     project: "",
     state: { sleeping: true, frame: 0 },
     banner: null,
-    pinnedFrame: null,
-    rightCollapsed: localStorage.getItem("right-collapsed") === "1",
-    messages: [],
-    input: "",
     frames: [],
     selectedFrame: null,
+    get currentFrame() {
+      if (this.selectedFrame == null) return null;
+      return this.frames.find(f => f.number === this.selectedFrame) || null;
+    },
 
     async init() {
       this.pollStatus();
       setInterval(() => this.pollStatus(), 2000);
       this.openSse();
-      await this.loadMessages();
       await this.loadSkillUis();
     },
 
@@ -51,10 +45,11 @@ window.consoleApp = function consoleApp() {
 
     handleEvent(ev) {
       if (ev.type === "frame") {
-        this.pinnedFrame = ev.payload;
-        this.frames.push(ev.payload);
-        const pane = document.getElementById("frame-pinned");
-        if (pane) renderFrame(pane, ev.payload);
+        const f = ev.payload;
+        const idx = this.frames.findIndex(x => x.number === f.number);
+        if (idx >= 0) this.frames.splice(idx, 1, f);
+        else this.frames.push(f);
+        if (this.selectedFrame == null) this.selectedFrame = f.number;
       } else if (ev.type === "agent_crash") {
         this.banner = {
           level: "red",
@@ -69,31 +64,34 @@ window.consoleApp = function consoleApp() {
       }
     },
 
-    async loadMessages() {
+    async loadFrames() {
+      const last = this.frames.length ? this.frames[this.frames.length - 1].number : 0;
       try {
-        const r = await fetch("/skills/chat/outbox");
+        const r = await fetch(`/frames?after=${last}`);
         if (r.ok) {
           const body = await r.json();
-          this.messages = body.messages || [];
+          const incoming = body.frames || [];
+          for (const f of incoming) {
+            const idx = this.frames.findIndex(x => x.number === f.number);
+            if (idx >= 0) this.frames.splice(idx, 1, f);
+            else this.frames.push(f);
+          }
+          if (this.frames.length > 0 && this.selectedFrame == null) {
+            this.selectedFrame = this.frames[this.frames.length - 1].number;
+          }
         }
       } catch {}
     },
 
-    async send() {
-      const text = this.input.trim();
-      if (!text) return;
-      this.messages.push({ role: "user", content: text });
-      this.input = "";
-      try {
-        await fetch("/skills/chat/inbox", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: text }),
-        });
-      } catch (e) {
-        this.banner = { level: "red", text: `Send failed: ${e}` };
-      }
-      setTimeout(() => this.loadMessages(), 500);
+    selectFrame(f) { this.selectedFrame = f.number; },
+
+    frameExcerpt(f) {
+      return (f.pong?.think || f.pong?.action?.operation || '').toString().slice(0, 80);
+    },
+
+    actionText(action) {
+      if (typeof action === 'string') return action;
+      return action.operation || JSON.stringify(action, null, 2);
     },
 
     async loadSkillUis() {
@@ -106,29 +104,9 @@ window.consoleApp = function consoleApp() {
         }
       } catch {}
     },
-
-    async loadFrames() {
-      try {
-        const r = await fetch("/frames");
-        if (r.ok) {
-          const body = await r.json();
-          this.frames = body.frames || [];
-          if (this.frames.length > 0) this.selectFrame(this.frames[this.frames.length - 1]);
-        }
-      } catch {}
-    },
-
-    selectFrame(f) {
-      this.selectedFrame = f.number;
-      const pane = document.getElementById("frame-detail-pane");
-      if (pane) {
-        import("./frame-renderer.js").then(m => m.renderFrame(pane, f));
-      }
-    },
-
-    toggleRight() {
-      this.rightCollapsed = !this.rightCollapsed;
-      localStorage.setItem("right-collapsed", this.rightCollapsed ? "1" : "0");
-    },
   };
-};
+}
+
+document.addEventListener("alpine:init", () => {
+  window.Alpine.data("consoleApp", consoleApp);
+});

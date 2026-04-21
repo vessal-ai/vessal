@@ -98,7 +98,7 @@ class EventLoop:
             self.inject_wake(event)
             await asyncio.to_thread(self._run_wake_cycle)
 
-    async def run_once(self) -> None:
+    async def step(self) -> None:
         """Execute one wake cycle and return.
 
         Waits for one event, runs the frame loop until idle, saves a snapshot, then returns.
@@ -157,7 +157,7 @@ class EventLoop:
 
             if result.protocol_error is None:
                 fs = self._cell.get("_frame_stream")
-                last_frame = fs._hot[0][-1] if (fs is not None and fs._hot[0]) else None
+                last_frame = fs.latest_hot_frame() if fs is not None else None
                 if last_frame is not None:
                     if frame_logger is not None:
                         frame_logger.write_frame(last_frame)

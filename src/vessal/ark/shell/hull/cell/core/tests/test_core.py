@@ -158,7 +158,7 @@ class TestCore:
 
     @patch.dict(os.environ, {"OPENAI_MODEL": "test-model"})
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
-    def test_run_calls_api_correctly(self, mock_openai_cls):
+    def test_step_calls_api_correctly(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = _make_mock_response(
@@ -167,7 +167,7 @@ class TestCore:
 
         core = Core(api_params={"temperature": 0.5, "max_tokens": 2048})
         ping = _make_ping(system_prompt="sys", frame_stream="frames", signals="")
-        pong, _, _ = core.run(ping)
+        pong, _, _ = core.step(ping)
 
         call_args = mock_client.chat.completions.create.call_args
         assert call_args.kwargs["model"] == "test-model"
@@ -176,8 +176,8 @@ class TestCore:
         assert isinstance(pong, Pong)
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
-    def test_run_returns_pong(self, mock_openai_cls):
-        """Core.run() returns a Pong."""
+    def test_step_returns_pong(self, mock_openai_cls):
+        """Core.step() returns a Pong."""
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = _make_mock_response(
@@ -185,13 +185,13 @@ class TestCore:
         )
 
         core = Core()
-        pong, _, _ = core.run(_make_ping())
+        pong, _, _ = core.step(_make_ping())
         assert isinstance(pong, Pong)
         assert pong.action.operation == "y = 2 + 3"
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
-    def test_run_empty_response(self, mock_openai_cls):
-        """Core.run() raises ValueError when response content is None (no action tag)."""
+    def test_step_empty_response(self, mock_openai_cls):
+        """Core.step() raises ValueError when response content is None (no action tag)."""
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
 
@@ -207,7 +207,7 @@ class TestCore:
 
         core = Core()
         with pytest.raises(ValueError):
-            core.run(_make_ping())
+            core.step(_make_ping())
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_client_created_with_timeout(self, mock_openai_cls):
@@ -238,7 +238,7 @@ class TestCore:
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_system_and_user_messages_sent(self, mock_openai_cls):
-        """run(ping) sends system + user messages."""
+        """step(ping) sends system + user messages."""
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = _make_mock_response(
@@ -251,7 +251,7 @@ class TestCore:
             frame_stream="══════ frame stream ══════",
             signals="goal: test",
         )
-        core.run(ping)
+        core.step(ping)
 
         call_args = mock_client.chat.completions.create.call_args
         messages = call_args.kwargs["messages"]
@@ -264,7 +264,7 @@ class TestCore:
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_messages_sent_every_call(self, mock_openai_cls):
-        """Multiple consecutive run() calls each carry system + user messages."""
+        """Multiple consecutive step() calls each carry system + user messages."""
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = _make_mock_response(
@@ -272,8 +272,8 @@ class TestCore:
         )
 
         core = Core()
-        core.run(_make_ping(frame_stream="state 1"))
-        core.run(_make_ping(frame_stream="state 2"))
+        core.step(_make_ping(frame_stream="state 1"))
+        core.step(_make_ping(frame_stream="state 2"))
 
         for call in mock_client.chat.completions.create.call_args_list:
             messages = call.kwargs["messages"]
@@ -327,7 +327,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=2)
-        pong, _, _ = core.run(_make_ping())
+        pong, _, _ = core.step(_make_ping())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "x = 1"
@@ -342,7 +342,7 @@ class TestCoreResilience:
 
         core = Core(max_retries=2)
         with pytest.raises(APITimeoutError):
-            core.run(_make_ping())
+            core.step(_make_ping())
 
         # Initial attempt + 2 retries = 3 total calls
         assert mock_client.chat.completions.create.call_count == 3
@@ -364,7 +364,7 @@ class TestCoreResilience:
 
         core = Core(max_retries=3)
         with pytest.raises(AuthenticationError):
-            core.run(_make_ping())
+            core.step(_make_ping())
 
         # Called only once, no retries
         assert mock_client.chat.completions.create.call_count == 1
@@ -380,7 +380,7 @@ class TestCoreResilience:
 
         core = Core(max_retries=3)
         with pytest.raises(PermissionDeniedError):
-            core.run(_make_ping())
+            core.step(_make_ping())
 
         assert mock_client.chat.completions.create.call_count == 1
 
@@ -395,7 +395,7 @@ class TestCoreResilience:
 
         core = Core(max_retries=3)
         with pytest.raises(BadRequestError):
-            core.run(_make_ping())
+            core.step(_make_ping())
 
         assert mock_client.chat.completions.create.call_count == 1
 
@@ -415,7 +415,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=1)
-        pong, _, _ = core.run(_make_ping())
+        pong, _, _ = core.step(_make_ping())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "pass"
@@ -432,7 +432,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=1)
-        pong, _, _ = core.run(_make_ping())
+        pong, _, _ = core.step(_make_ping())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "pass"
@@ -445,8 +445,8 @@ class TestCoreResilience:
 
 
 @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
-def test_core_run_accepts_ping(mock_openai_cls):
-    """Core.run() accepts a Ping and returns a Pong."""
+def test_core_step_accepts_ping(mock_openai_cls):
+    """Core.step() accepts a Ping and returns a Pong."""
     mock_client = MagicMock()
     mock_openai_cls.return_value = mock_client
     mock_client.chat.completions.create.return_value = _make_mock_response(
@@ -458,14 +458,14 @@ def test_core_run_accepts_ping(mock_openai_cls):
         system_prompt="You are an agent.",
         state=State(frame_stream="══════ frame stream ══════", signals="goal: test"),
     )
-    pong, _, _ = core.run(ping)
+    pong, _, _ = core.step(ping)
     assert isinstance(pong, Pong)
     assert isinstance(pong.action, Action)
 
 
 @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
-def test_core_run_ping_builds_system_and_user_messages(mock_openai_cls):
-    """run(ping) sends system + user messages whose content comes from ping fields."""
+def test_core_step_ping_builds_system_and_user_messages(mock_openai_cls):
+    """step(ping) sends system + user messages whose content comes from ping fields."""
     mock_client = MagicMock()
     mock_openai_cls.return_value = mock_client
     mock_client.chat.completions.create.return_value = _make_mock_response(
@@ -477,7 +477,7 @@ def test_core_run_ping_builds_system_and_user_messages(mock_openai_cls):
         system_prompt="You are an agent.",
         state=State(frame_stream="══════ frame stream ══════", signals="goal: test"),
     )
-    core.run(ping)
+    core.step(ping)
 
     call_args = mock_client.chat.completions.create.call_args
     messages = call_args.kwargs["messages"]
@@ -490,8 +490,8 @@ def test_core_run_ping_builds_system_and_user_messages(mock_openai_cls):
 
 
 @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
-def test_core_pong_parsed_correctly(mock_openai_cls):
-    """core.run() returns a Pong with the correct action.operation field."""
+def test_core_step_pong_parsed_correctly(mock_openai_cls):
+    """core.step() returns a Pong with the correct action.operation field."""
     mock_client = MagicMock()
     mock_openai_cls.return_value = mock_client
     mock_client.chat.completions.create.return_value = _make_mock_response(
@@ -500,18 +500,18 @@ def test_core_pong_parsed_correctly(mock_openai_cls):
 
     core = Core()
     ping = Ping(system_prompt="sys", state=State(frame_stream="frames", signals=""))
-    pong, _, _ = core.run(ping)
+    pong, _, _ = core.step(ping)
     assert pong.action.operation == "x = 42"
     assert pong.think == "analysis"
 
 
 # ============================================================
-# Core.run() usage tuple return tests
+# Core.step() usage tuple return tests
 # ============================================================
 
 
 class TestCoreUsageReturn:
-    """Core.run() returns (Pong, prompt_tokens, completion_tokens)."""
+    """Core.step() returns (Pong, prompt_tokens, completion_tokens)."""
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_returns_usage_tuple(self, mock_openai_cls):
@@ -523,7 +523,7 @@ class TestCoreUsageReturn:
         mock_client.chat.completions.create.return_value = resp
 
         core = Core()
-        pong, pt, ct = core.run(_make_ping())
+        pong, pt, ct = core.step(_make_ping())
         assert isinstance(pong, Pong)
         assert pt == 5000
         assert ct == 200
@@ -537,7 +537,7 @@ class TestCoreUsageReturn:
         mock_client.chat.completions.create.return_value = resp
 
         core = Core()
-        pong, pt, ct = core.run(_make_ping())
+        pong, pt, ct = core.step(_make_ping())
         assert isinstance(pong, Pong)
         assert pt is None
         assert ct is None

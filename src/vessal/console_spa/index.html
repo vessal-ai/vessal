@@ -5,16 +5,16 @@
   <title>Vessal Console</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="assets/style.css" />
-  <script defer src="assets/alpine.min.js"></script>
   <script type="module" src="assets/app.js"></script>
+  <script defer src="assets/alpine.min.js"></script>
 </head>
 <body>
-  <div id="app" x-data="consoleApp()" x-init="init()">
+  <div id="app" x-data="consoleApp" x-init="init()">
     <header class="top-nav">
       <span class="brand">Vessal</span>
       <span class="project" x-text="project"></span>
       <span class="state" :class="state.sleeping ? 'idle' : 'active'"
-            x-text="state.sleeping ? '● idle' : '● active'"></span>
+            x-text="state.sleeping ? '● sleep' : '● active'"></span>
     </header>
 
     <template x-if="banner">
@@ -33,56 +33,47 @@
       </nav>
 
       <main class="main">
-        <template x-if="current === 'chat'">
-          <section class="chat-layout" :class="{collapsed: rightCollapsed}">
-            <div class="chat-main">
-              <div class="chat-log">
-                <template x-for="m in messages" :key="m.ts || Math.random()">
-                  <div class="msg" :class="m.role">
-                    <strong x-text="m.role + ':'"></strong>
-                    <span x-text="m.content"></span>
-                  </div>
-                </template>
-              </div>
-              <form class="chat-input" @submit.prevent="send()">
-                <input type="text" x-model="input" placeholder="Type a message..."
-                       aria-label="Message input" autofocus />
-                <button type="submit">Send</button>
-              </form>
-            </div>
-            <aside class="chat-side" x-show="!rightCollapsed">
-              <header>
-                <span>🎞️ Current Frame</span>
-                <button class="collapse-btn" @click="toggleRight()" title="Collapse">⊟</button>
-              </header>
-              <div id="frame-pinned" class="frame-container"></div>
-            </aside>
-            <button class="expand-btn" x-show="rightCollapsed" @click="toggleRight()"
-                    title="Expand pinned frame">⊡</button>
-          </section>
-        </template>
         <template x-if="current === 'frames'">
           <section class="frames-layout" x-init="loadFrames()">
             <ol class="frame-list">
               <template x-for="f in frames" :key="f.number">
-                <li :class="{active: selectedFrame === f.number}"
-                    @click="selectFrame(f)">
+                <li :class="{active: selectedFrame === f.number}" @click="selectFrame(f)">
                   <span class="n" x-text="'#' + f.number"></span>
-                  <span class="excerpt" x-text="(f.pong?.think || f.pong?.action?.operation || '').toString().slice(0, 80)"></span>
+                  <span class="excerpt" x-text="frameExcerpt(f)"></span>
                 </li>
               </template>
             </ol>
-            <div class="frame-detail" id="frame-detail-pane"></div>
+            <aside class="frame-detail">
+              <template x-if="currentFrame">
+                <div>
+                  <h3 x-text="'Frame #' + currentFrame.number + (currentFrame.wake ? '  ·  ' + currentFrame.wake : '')"></h3>
+                  <template x-if="currentFrame.pong?.think">
+                    <div class="frame-section"><div class="frame-label">think</div>
+                      <pre class="think" x-text="currentFrame.pong.think"></pre></div>
+                  </template>
+                  <template x-if="currentFrame.pong?.action">
+                    <div class="frame-section"><div class="frame-label">action</div>
+                      <pre class="action" x-text="actionText(currentFrame.pong.action)"></pre></div>
+                  </template>
+                  <template x-if="currentFrame.pong?.action?.expect">
+                    <div class="frame-section"><div class="frame-label">expect</div>
+                      <pre class="expect" x-text="currentFrame.pong.action.expect"></pre></div>
+                  </template>
+                  <template x-if="currentFrame.observation?.stdout">
+                    <div class="frame-section"><div class="frame-label">stdout</div>
+                      <pre class="observation" x-text="currentFrame.observation.stdout"></pre></div>
+                  </template>
+                  <template x-if="currentFrame.observation?.error">
+                    <div class="frame-section"><div class="frame-label">error</div>
+                      <pre class="error" x-text="currentFrame.observation.error"></pre></div>
+                  </template>
+                </div>
+              </template>
+              <template x-if="!currentFrame">
+                <p class="placeholder">(no current frame)</p>
+              </template>
+            </aside>
           </section>
-        </template>
-        <template x-if="current === 'state'">
-          <section id="state-view"><p class="placeholder">State — coming soon</p></section>
-        </template>
-        <template x-if="current === 'logs'">
-          <section id="logs-view"><p class="placeholder">Logs — coming soon</p></section>
-        </template>
-        <template x-if="current === 'market'">
-          <section id="market-view"><p class="placeholder">Skill Market — coming soon</p></section>
         </template>
         <template x-for="v in views.filter(x => x.id.startsWith('skill:'))" :key="v.id">
           <section x-show="current === v.id" class="skill-iframe-wrap">

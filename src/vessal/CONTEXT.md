@@ -80,7 +80,7 @@ flowchart TB
     subgraph SubProcess["Subprocess — agent/.venv/bin/python"]
         Hull["Hull Orchestrator"]
         EL["EventLoop\nevent loop"]
-        SM["SkillManager\ndiscovery + loading"]
+        SM["SkillLoader\ndiscovery + loading"]
         Cell["Cell\nsingle-frame execution"]
         Kernel["Kernel\nnamespace + exec()"]
         Gate["Gate\nstate/action validation"]
@@ -206,7 +206,7 @@ stateDiagram-v2
 ## Status
 
 ### TODO
-- [ ] 2026-04-09: Add complete Formalin annotation spec to `__init__.py` and `cli.py`
+None.
 
 ### Known Issues
 None.

@@ -19,7 +19,7 @@ from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, attach_source, execute, _compress_traceback, _maybe_capture_last_expr
 from vessal.ark.shell.hull.cell.kernel.render import render
-from vessal.ark.shell.hull.skill_manager import SkillManager
+from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
 # ─────────────────────────────────────────────
@@ -40,7 +40,7 @@ def bare_ns() -> dict:
         "_error": None,
         "_diff": "",
         "_context_budget": 128000,
-        "_max_tokens": 4096,
+        "_token_budget": 4096,
         "_system_prompt": "",
         "_pins": set(),
         "_log_path": "",
@@ -394,11 +394,12 @@ class TestExecute:
         assert ns["_error"] is None
         assert ns["foo"] == 42
 
-    def test_frame_set_before_execution(self):
-        """ns['_frame'] is set to frame_number before execution; operation code can read it."""
+    def test_frame_not_written_by_execute(self):
+        """execute() does not write ns['_frame']; that is _commit_frame's responsibility."""
         ns = bare_ns()
-        execute("seen_frame = _frame", ns, frame_number=5)
-        assert ns["seen_frame"] == 5
+        initial = ns.get("_frame", 0)
+        execute("x = 1", ns, frame_number=5)
+        assert ns.get("_frame", 0) == initial
 
 
 # ─────────────────────────────────────────────
@@ -631,11 +632,12 @@ class TestKernel:
         assert isinstance(ping, Ping)
         assert ping.system_prompt == "You are an agent."
 
-    def test_exec_operation_sets_frame(self):
-        """exec_operation sets _frame to the passed frame_number."""
+    def test_exec_operation_does_not_set_frame(self):
+        """exec_operation does not write ns['_frame']; that is _commit_frame's responsibility."""
         k = Kernel()
+        initial = k.ns["_frame"]
         k.exec_operation("pass", frame_number=5)
-        assert k.ns["_frame"] == 5
+        assert k.ns["_frame"] == initial
 
     def test_exec_operation_does_not_append_frame_stream(self):
         """exec_operation does not commit to _frame_stream (Cell's responsibility, Phase 3)."""
@@ -710,7 +712,7 @@ class TestKernel:
             os.unlink(snap_path)
 
     def test_snapshot_restore_no_skills(self, tmp_path):
-        """snapshot/restore works normally without Skills; header is an empty dict."""
+        """snapshot/restore works normally without Skills present in the namespace."""
         k = Kernel()
         k.exec_operation("x = 42", frame_number=1)
         snap = str(tmp_path / "test.pkl")
@@ -731,17 +733,20 @@ class TestKernel:
         k2.restore(snap)
         assert isinstance(k2.ns["_builtin_names"], list)
 
-    def test_snapshot_header_is_plain_dict(self, tmp_path):
-        """The snapshot file header is a plain string dict, readable without sys.path repair."""
+    def test_snapshot_is_single_blob_of_ns_dict(self, tmp_path):
+        """The snapshot file is a single cloudpickle blob containing the ns dict."""
         import cloudpickle as _cp
+        import io
         k = _kw()
         snap = str(tmp_path / "test.pkl")
         k.snapshot(snap)
 
-        with open(snap, "rb") as f:
-            header = _cp.load(f)
-
-        assert isinstance(header, dict)
+        raw = Path(snap).read_bytes()
+        buf = io.BytesIO(raw)
+        ns = _cp.load(buf)
+        # Exactly one blob: reading it consumes all bytes
+        assert buf.tell() == len(raw)
+        assert isinstance(ns, dict)
 
     def test_snapshot_restore_with_skill(self, tmp_path):
         """After loading a Skill and doing snapshot/restore, the Skill class object is correctly restored."""
@@ -749,7 +754,7 @@ class TestKernel:
         skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
-            sm = SkillManager(skill_paths=[skills_root])
+            sm = SkillLoader(skill_paths=[skills_root])
             k.ns["_builtin_names"] = []
 
             skill_cls = sm.load("tasks")
@@ -771,7 +776,7 @@ class TestKernel:
         skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
-            sm = SkillManager(skill_paths=[skills_root])
+            sm = SkillLoader(skill_paths=[skills_root])
             k.ns["_builtin_names"] = []
 
             TasksCls = sm.load("tasks")
@@ -827,7 +832,7 @@ class TestKernel:
         skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
-            sm = SkillManager(skill_paths=[skills_root])
+            sm = SkillLoader(skill_paths=[skills_root])
             k.ns["_builtin_names"] = []
 
             TasksCls = sm.load("tasks")
@@ -901,7 +906,10 @@ class TestKernel:
         assert k.ns["x"] == 1
 
     def test_run_returns_none_and_commits_frame(self):
-        """run(Pong) returns None; _frame_stream gets one frame committed; _frame increments by 1."""
+        """run(Pong) returns None; _frame_stream gets one frame committed; _frame increments by 1.
+
+        ns["_frame"] is written by _commit_frame (not by exec_operation).
+        """
         from vessal.ark.shell.hull.cell.protocol import Action, Pong
         from vessal.ark.shell.hull.cell.kernel.executor import ExecResult
 
@@ -914,11 +922,11 @@ class TestKernel:
         mock_result = ExecResult(stdout="", diff="+x = 1", error=None)
 
         def _fake_exec(operation, frame_number, tracer=None):
-            k.ns["_frame"] = frame_number  # replicate the side effect of execute()
+            # exec_operation no longer writes ns["_frame"]; _commit_frame does
             return mock_result
 
         with patch.object(k, "exec_operation", side_effect=_fake_exec) as mock_exec:
-            result = k.run(pong)
+            result = k.step(pong)
 
         assert result is None
         assert k.ns["_frame"] == frame_before + 1
@@ -1028,21 +1036,21 @@ class TestExprCapture:
 
 
 # ─────────────────────────────────────────────
-# kernel.run() return value
+# kernel.step() return value
 # ─────────────────────────────────────────────
 
-class TestRunReturnsNone:
-    """kernel.run() no longer returns a Ping — it returns None."""
+class TestStepReturnsNone:
+    """kernel.step() no longer returns a Ping — it returns None."""
 
-    def test_run_returns_none(self):
-        """run() returns None after eliminating pre-render."""
+    def test_step_returns_none(self):
+        """step() returns None after eliminating pre-render."""
         from vessal.ark.shell.hull.cell.kernel import Kernel
         from vessal.ark.shell.hull.cell.protocol import Action, Pong
 
         k = Kernel()
         k.ns["_system_prompt"] = "test"
         pong = Pong(think="t", action=Action(operation="x = 1", expect=""))
-        result = k.run(pong)
+        result = k.step(pong)
         assert result is None, f"Expected None, got {type(result)}"
 
 
@@ -1096,6 +1104,35 @@ def test_restore_keeps_current_schema_frame_stream(tmp_path):
     assert isinstance(k.ns["_frame_stream"], FrameStream)
     assert k.ns["_frame_stream"].hot_frame_count() == 1
     assert k.ns["_frame_stream"]._hot[0][0]["schema_version"] == FRAME_SCHEMA_VERSION
+
+
+def test_restore_migrates_legacy_two_blob_format(tmp_path):
+    """Legacy snapshot format: [skills_header_blob][ns_blob] is migrated to single-blob on restore.
+
+    The legacy format wrote a header dict (first blob) followed by the real namespace dict
+    (second blob). restore() detects remaining bytes after reading the first blob, discards
+    the header, loads the namespace from the second blob, and rewrites the file in the
+    current single-blob format so subsequent restores use the fast path.
+    """
+    import cloudpickle
+
+    header_bytes = cloudpickle.dumps({"chat": {"parent_path": "/skills"}})
+    ns_bytes = cloudpickle.dumps({"x": 99, "_sleeping": False})
+    legacy_path = tmp_path / "legacy.pkl"
+    legacy_path.write_bytes(header_bytes + ns_bytes)
+
+    k = Kernel()
+    k.restore(str(legacy_path))
+
+    assert k.ns["x"] == 99
+
+    # File must be rewritten in new single-blob format (fast path on subsequent restore)
+    raw = legacy_path.read_bytes()
+    import io
+    buf = io.BytesIO(raw)
+    restored_ns = cloudpickle.load(buf)
+    assert buf.tell() == len(raw), "expected exactly one blob in migrated file"
+    assert restored_ns["x"] == 99
 
 
 def test_snapshot_tracks_dropped_keys(tmp_path):

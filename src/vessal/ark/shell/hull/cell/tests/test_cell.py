@@ -1,8 +1,8 @@
 # test_cell.py — Cell module tests (v4 Protocol)
 #
-# Strategy: mock cell._core.run (avoid real API calls); Kernel uses a real instance.
+# Strategy: mock cell._core.step (avoid real API calls); Kernel uses a real instance.
 # Cell.step() returns StepResult(protocol_error=str|None).
-# _core.run accepts a Ping (system perception) and returns Pong(think=str, action=Action(...)).
+# _core.step accepts a Ping (system perception) and returns Pong(think=str, action=Action(...)).
 # _frame_stream stores frame dicts in hot zone (not FrameRecord instances).
 
 from pathlib import Path
@@ -34,7 +34,7 @@ def _make_pong(raw_text: str) -> Pong:
 
 
 def _set_responses(cell: Cell, raw_texts: list) -> None:
-    """Configure _core.run to return (Pong, None, None) or raise exceptions in sequence.
+    """Configure _core.step to return (Pong, None, None) or raise exceptions in sequence.
 
     If a list element is an Exception instance, it is raised directly.
     If it is a str, parsing is attempted: success returns (Pong, None, None), failure raises ParseError.
@@ -45,7 +45,7 @@ def _set_responses(cell: Cell, raw_texts: list) -> None:
         if isinstance(item, Exception):
             return item  # Exception: will be raised by side_effect
         try:
-            return (_make_pong(item), None, None)  # tuple: Core.run() return format
+            return (_make_pong(item), None, None)  # tuple: Core.step() return format
         except _ParseError as e:
             return e  # ParseError: will be raised by side_effect
 
@@ -57,7 +57,7 @@ def _set_responses(cell: Cell, raw_texts: list) -> None:
             raise val
         return val  # returns (Pong, None, None) tuple
 
-    cell._core.run = MagicMock(side_effect=_side_effect)
+    cell._core.step = MagicMock(side_effect=_side_effect)
 
 
 def _action(code: str) -> str:
@@ -147,11 +147,11 @@ class TestStepBasic:
         assert cell.ns["_frame_stream"].hot_frame_count() == 1
 
     def test_step_calls_core(self):
-        """step() calls Core.run()."""
+        """step() calls Core.step()."""
         cell = _make_cell()
         _set_responses(cell, [_action("x = 1")])
         cell.step()
-        assert cell._core.run.called
+        assert cell._core.step.called
 
     def test_step_executes_action(self):
         """step() executes the code returned by Core — new variable appears in namespace."""
@@ -635,18 +635,18 @@ class TestRealTokenPassthrough:
     def test_actual_tokens_written_to_ns(self):
         cell = _make_cell()
         pong = _make_pong(_action("x = 1"))
-        cell._core.run = MagicMock(return_value=(pong, 5000, 200))
+        cell._core.step = MagicMock(return_value=(pong, 5000, 200))
         cell.step()
         assert cell.ns["_actual_tokens_in"] == 5000
         assert cell.ns["_actual_tokens_out"] == 200
 
     def test_context_pct_overwritten_by_real_data(self):
         cell = _make_cell()
-        # Set context_budget and max_tokens so renderer computes budget_total = 100000
+        # Set context_budget and token_budget so renderer computes budget_total = 100000
         cell.ns["_context_budget"] = 104096
-        cell.ns["_max_tokens"] = 4096
+        cell.ns["_token_budget"] = 4096
         pong = _make_pong(_action("x = 1"))
-        cell._core.run = MagicMock(return_value=(pong, 50000, 200))
+        cell._core.step = MagicMock(return_value=(pong, 50000, 200))
         cell.step()
         # renderer sets budget_total = 104096 - 4096 = 100000
         # our token write logic: round(50000 / 100000 * 100) = 50
@@ -658,7 +658,7 @@ class TestRealTokenPassthrough:
         cell = _make_cell()
         cell.ns["_budget_total"] = 100000
         pong = _make_pong(_action("x = 1"))
-        cell._core.run = MagicMock(return_value=(pong, None, None))
+        cell._core.step = MagicMock(return_value=(pong, None, None))
         cell.step()
         assert cell.ns["_actual_tokens_in"] is None
 
@@ -675,7 +675,7 @@ class TestErrorRecord:
         from vessal.ark.shell.hull.cell.protocol import ErrorRecord
         cell = _make_cell()
         cell.ns["_errors"] = []
-        cell._core.run = MagicMock(side_effect=Exception("BadRequest"))
+        cell._core.step = MagicMock(side_effect=Exception("BadRequest"))
         cell.step()
         errors = cell.ns["_errors"]
         assert len(errors) == 1
@@ -683,14 +683,15 @@ class TestErrorRecord:
         assert errors[0].type == "protocol"
         assert "BadRequest" in errors[0].message
 
-    def test_errors_capped_at_50(self):
+    def test_errors_capped_at_configured_size(self):
         from vessal.ark.shell.hull.cell.protocol import ErrorRecord
         cell = _make_cell()
+        cell.ns["_error_buffer_cap"] = 50
         cell.ns["_errors"] = [
             ErrorRecord("runtime", f"err{i}", i, 0.0)
             for i in range(50)
         ]
-        cell._core.run = MagicMock(side_effect=Exception("overflow"))
+        cell._core.step = MagicMock(side_effect=Exception("overflow"))
         cell.step()
         assert len(cell.ns["_errors"]) == 50
         assert cell.ns["_errors"][-1].type == "protocol"

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vessal Agent</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Left panel: Chat -->
+<div class="chat-panel">
+  <div class="chat-header">
+    <span>Chat</span>
+    <span class="status"><span class="status-dot" id="statusDot"></span> <span id="statusText">--</span></span>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input-area">
+    <input type="text" id="chatInput" placeholder="Send a message..." />
+    <button id="sendBtn">Send</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

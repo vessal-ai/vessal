@@ -1,6 +1,6 @@
 """compression_parser.py — Parse LLM compression output into CompactionRecord.
 
-Called by the Hull compression worker after compression_core.run().
+Called by the Hull compression worker after compression_core.step().
 """
 from __future__ import annotations
 

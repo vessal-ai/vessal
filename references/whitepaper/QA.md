@@ -28,7 +28,7 @@ Yes. exec'd code can spin up a persistent service with `threading.Thread(...).st
 
 ### Q: Why the Ping-Pong naming?
 
-**Ping** = the system's outgoing state projection (system_prompt + state). **Pong** = the LLM's response (think + action). Follows ICMP convention. The whitepaper uses the intended naming throughout. Implementation alignment is a code-level TODO, not a design question.
+**Ping** = the system's outgoing state projection (system_prompt + state). **Pong** = the LLM's response (think + action). Follows ICMP convention.
 
 ### Q: Does Cell need `run_until_idle()`?
 
@@ -76,7 +76,7 @@ Cell is frame-driven (execute → sleep → execute); a server runs continuously
 
 ### Q: What are the two parts of a Skill?
 
-**Skill class** (Cell side): SOP metadata (name + summary + guide path) + Tool (declared methods) + Signal (_signal).
+**Skill class** (Cell side): metadata (name + description + guide) + Tool (declared methods) + Signal (_signal).
 
 **Server** (Hull side): standalone code in any language; Hull manages start/stop.
 
@@ -90,7 +90,7 @@ Three paths: (1) shared mutable data structures (passed to both sides at constru
 
 ### Q: What is the word limit for a guide?
 
-~500 words. 300–800 is normal. The guide is not injected into the system prompt — the Agent queries it on demand via the meta-skill's `query_guide(name)`.
+~500 words. 300–800 is normal. The guide is not injected into the system prompt — the Agent reads it on demand via attribute access (`print(skill.guide)`).
 
 ### Q: Can the system prompt be modified?
 
@@ -124,7 +124,7 @@ No. Only the guide is a framework standard. Other documentation is defined by th
 
 ### Q: How are Skill files organized?
 
-Multiple files: `skill.py` + `server.py` + `sop.md` + `__init__.py`. Distribution packaging = directory compression.
+A Skill directory contains `__init__.py` (re-exports the Skill class), `skill.py` (the SkillBase subclass), `SKILL.md` (guide for the LLM), `requirements.txt` (Skill-local deps), and `tests/`. `server.py` is added only when the Skill needs a long-running server. Distribution packaging = directory compression.
 
 ### Q: Any changes to compressed frames in V5?
 
