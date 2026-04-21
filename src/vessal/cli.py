@@ -14,7 +14,7 @@ Container commands (require Docker):
 
 Development tools (do not require ARK runtime):
   vessal init      Create project scaffold
-  vessal skill     Skill management (init, check)
+  vessal skill     Skill management (create, check)
 """
 from __future__ import annotations
 
@@ -97,8 +97,7 @@ def main() -> None:
     # vessal skill
     skill_parser = subparsers.add_parser("skill", help="Skill management")
     skill_sub = skill_parser.add_subparsers(dest="skill_command")
-    skill_init_parser = skill_sub.add_parser("init", help="Create Skill scaffold")
-    skill_init_parser.add_argument("name", type=str, help="Skill name")
+    skill_sub.add_parser("create", help="Create Skill scaffold (wizard)")
     skill_check_parser = skill_sub.add_parser("check", help="Check Skill compliance")
     skill_check_parser.add_argument("path", type=str, help="Path to Skill directory")
     skill_check_parser.add_argument("--test", action="store_true", help="Run tests")
@@ -158,8 +157,8 @@ def main() -> None:
             from vessal.ark.shell.tui.create_wizard import run as wizard_run
             sys.exit(wizard_run(Path.cwd()))
         elif args.command == "skill":
-            if args.skill_command == "init":
-                _cmd_skill_init(args)
+            if args.skill_command == "create":
+                _cmd_skill_create(args)
             elif args.skill_command == "check":
                 _cmd_skill_check(args)
             elif args.skill_command == "install":
@@ -267,9 +266,9 @@ def _cmd_init(args: argparse.Namespace) -> None:
     shell_init(args)
 
 
-def _cmd_skill_init(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_init as shell_skill_init
-    shell_skill_init(args)
+def _cmd_skill_create(args: argparse.Namespace) -> None:
+    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_create as shell_skill_create
+    shell_skill_create(args)
 
 
 def _cmd_skill_check(args: argparse.Namespace) -> None:

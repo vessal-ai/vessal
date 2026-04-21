@@ -49,8 +49,8 @@ def test_skill_list_help() -> None:
     assert r.returncode == 0, r.stderr
 
 
-def test_skill_init_help() -> None:
-    r = _run("skill", "init", "--help")
+def test_skill_create_help() -> None:
+    r = _run("skill", "create", "--help")
     assert r.returncode == 0, r.stderr
 
 

@@ -8,19 +8,23 @@ from pathlib import Path
 from vessal.ark.shell.cli.scaffold import write_skill_scaffold
 
 
-def _cmd_skill_init(args: argparse.Namespace) -> None:
-    """Create a Skill scaffold directory.
+def _cmd_skill_create(args: argparse.Namespace) -> None:
+    """Run the skill-create wizard and scaffold the chosen Skill."""
+    from vessal.ark.shell.tui.skill_create_wizard import run_skill_create_wizard
 
-    Args:
-        args: argparse result; args.name is the Skill name.
-    Side effects:
-        Creates <name>/ scaffold directory in the current directory.
-    """
-    name = args.name
-    base = Path(name)
-    skill_name = base.name  # leaf directory name, used as Python identifier and Skill name
-    write_skill_scaffold(base, skill_name)
-    print(f"Skill '{skill_name}' scaffold created at ./{name}/")
+    choices = run_skill_create_wizard()
+    base = Path(choices.name)
+    if base.exists():
+        print(f"Error: directory {base} already exists.", file=sys.stderr)
+        sys.exit(1)
+    write_skill_scaffold(
+        base,
+        choices.name,
+        with_tutorial=choices.with_tutorial,
+        with_ui=choices.with_ui,
+        with_server=choices.with_server,
+    )
+    print(f"Skill '{choices.name}' scaffold created at ./{choices.name}/")
 
 
 def _cmd_skill_check(args: argparse.Namespace) -> None:
