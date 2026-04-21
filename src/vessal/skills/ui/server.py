@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from vessal.ark.shell.hull.hull_api import StaticResponse
 from vessal.ark.shell.hull.skill_static import StaticRouter
 
 
@@ -27,8 +28,6 @@ def start(hull_api, skill=None) -> None:
 
     _hull_api = hull_api
     _skill = skill
-
-    from vessal.ark.shell.hull.hull_api import StaticResponse
 
     static_dir = Path(__file__).parent / "static"
     index_path = static_dir / "index.html"
