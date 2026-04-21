@@ -206,6 +206,17 @@ class Cell:
             return StepResult(protocol_error="Action gate blocked")
 
         self._kernel.run(self._pong, tracer, ping=self._ping, frame_number=frame_number)
+
+        fs = self._kernel.ns.get("_frame_stream")
+        latest = fs.latest_hot_frame() if fs is not None else None
+        if latest is not None:
+            ping_dict = latest.get("ping")
+            if ping_dict is not None:
+                self._ping = Ping.from_dict(ping_dict)
+            pong_dict = latest.get("pong")
+            if pong_dict is not None:
+                self._pong = Pong.from_dict(pong_dict)
+
         return StepResult()
 
     def set_gate(self, gate_type: str, fn: Any) -> None:
