@@ -32,7 +32,7 @@ graph LR
     Parse --> Pong
 ```
 
-Core's shape is "stateless pipeline" rather than "conversation manager". Each run() is an independent API call; it does not maintain multi-turn conversation history or cache responses — history is rendered by Kernel as frame_stream injected into Ping.state; Core only sees the current frame's perception. This design rejected the alternative of "Core maintaining messages history" because state management already lives in Kernel.ns; dual maintenance would cause state fragmentation.
+Core's shape is "stateless pipeline" rather than "conversation manager". Each step() is an independent API call; it does not maintain multi-turn conversation history or cache responses — history is rendered by Kernel as frame_stream injected into Ping.state; Core only sees the current frame's perception. This design rejected the alternative of "Core maintaining messages history" because state management already lives in Kernel.ns; dual maintenance would cause state fragmentation.
 
 Two key internal decisions. First, model compatibility is achieved via api_params: Core only fixes model (from the OPENAI_MODEL environment variable) and messages; all other parameters are injected by the caller into create() via an api_params dict, so differences between Providers or models (max_tokens vs max_completion_tokens, extra_body, etc.) are entirely resolved by external configuration. Second, retry.py and parser.py are pure-function modules, independent from the Core class — is_retryable_error and calculate_backoff_seconds have no side effects; parse_response has no network dependencies; all can be tested independently.
 
@@ -56,9 +56,9 @@ flowchart TD
     Backoff --> Call
 ```
 
-Invariants: run(ping) either returns a valid Pong (with non-empty action.operation) or raises an exception; there is no scenario where a "successful call but unparseable response" returns a default value — ParseError propagates upward, handled by Cell. After retries are exhausted, the last exception is raised; callers can distinguish timeout from authentication failure.
+Invariants: step(ping) either returns a valid Pong (with non-empty action.operation) or raises an exception; there is no scenario where a "successful call but unparseable response" returns a default value — ParseError propagates upward, handled by Cell. After retries are exhausted, the last exception is raised; callers can distinguish timeout from authentication failure.
 
-Core and Cell relationship: Cell calls core.run(ping), passes the returned Pong to Kernel. Core is unaware of Cell's existence or Kernel's existence. Core and parser relationship: core.run() calls parse_response() after successfully receiving an API response; ParseError propagates upward. Core and retry relationship: on each API call exception, classifies via is_retryable_error(), calculates wait time via calculate_backoff_seconds().
+Core and Cell relationship: Cell calls core.step(ping), passes the returned Pong to Kernel. Core is unaware of Cell's existence or Kernel's existence. Core and parser relationship: core.step() calls parse_response() after successfully receiving an API response; ParseError propagates upward. Core and retry relationship: on each API call exception, classifies via is_retryable_error(), calculates wait time via calculate_backoff_seconds().
 
 ## Public Interface
 

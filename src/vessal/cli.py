@@ -229,7 +229,7 @@ def _cmd_once(args: argparse.Namespace) -> None:
     hull.wake("user_message")
 
     try:
-        asyncio.run(hull.run_once())
+        asyncio.run(hull.step())
     except KeyboardInterrupt:
         print("\nInterrupted.")
 

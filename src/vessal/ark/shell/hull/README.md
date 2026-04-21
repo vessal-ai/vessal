@@ -78,6 +78,8 @@ graph LR
 
 Invariants: Each `wake()` call ultimately produces a complete frame cycle — inject_wake, frame loop until `_sleeping` is set, snapshot save. EventLoop guarantees this process is not interrupted (unless max_frames_per_wake is exceeded). Hull.handle() returns 404 for all unknown routes without throwing exceptions, ensuring the Shell layer always receives a valid response.
 
+**Snapshot management.** Hull owns `<snap>.skills.json`. Written atomically alongside `cell.snapshot()` to record active Skill paths and names; read before `cell.restore()` to prime `sys.path`/`sys.modules` before cloudpickle resolves Skill classes. Cell is unaware of this file — Cell serializes namespace bytes only. This is the only place `sys.path`/`sys.modules` are mutated for Skill restoration.
+
 Hull and Cell relationship: Hull creates Cell and operates through public interfaces (`cell.step()`, `cell.get()`, `cell.set()`, `cell.ns`, etc.). Hull does not import Kernel or Core — these are internal to Cell. Hull and EventLoop relationship: Hull creates EventLoop and injects callbacks via FrameHooks (before_frame, snapshot, run_compression); EventLoop does not know Hull exists.
 
 ### Three-Layer Information Distribution for Skills

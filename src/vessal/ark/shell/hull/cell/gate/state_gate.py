@@ -1,6 +1,6 @@
 """state_gate.py — Gate for state before it is sent to the LLM.
 
-StateGate checks the state string before it is sent to Core.run().
+StateGate checks the state string before it is sent to Core.step().
 Goal: intercept abnormally large context to protect API budget.
 
 Design principles:
@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+
+from vessal.ark.shell.hull.cell.gate.gate_base import _GateBase
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ class StateGateResult:
         self.reason = reason
 
 
-class StateGate:
+class StateGate(_GateBase):
     """Safety gate for the state string before it is sent to the LLM.
 
     Three modes:
@@ -88,22 +90,3 @@ class StateGate:
 
         return StateGateResult(allowed=True, state=state)
 
-    def add_rule(self, name: str, check_fn: Callable[[str], str | None]) -> None:
-        """Register a custom rule.
-
-        check_fn(state: str) -> str | None
-        Return None to pass through; return a string to indicate the block reason.
-
-        Args:
-            name:     Rule name, used in logs and remove_rule.
-            check_fn: Rule function.
-        """
-        self._rules.append((name, check_fn))
-
-    def remove_rule(self, name: str) -> None:
-        """Remove a rule by name.
-
-        Args:
-            name: Name of the rule to remove. Silently does nothing if not found.
-        """
-        self._rules = [(n, fn) for n, fn in self._rules if n != name]

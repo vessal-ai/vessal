@@ -3,7 +3,7 @@
 Single-frame SORA execution engine. Encapsulates Kernel (execution) and Core (inference), driving one Ping → Core → Pong → Kernel → FrameRecord cycle via step().
 
 Responsible for:
-- Single-frame execution orchestration (step()): prepare, state_gate, core.run, action_gate, kernel.run
+- Single-frame execution orchestration (step()): prepare, state_gate, core.step, action_gate, kernel.step
 - Lifecycle and mode switching for ActionGate and StateGate
 - Read/write proxy for namespace (get / set / keys / ns pass-through to Kernel)
 - Snapshot serialization and restore (pass-through to Kernel)
@@ -44,23 +44,23 @@ sequenceDiagram
         Cell-->>Hull: protocol_error
     end
 
-    Cell->>Core: core.run(ping) → (Pong, prompt_tokens, completion_tokens)
+    Cell->>Core: core.step(ping) → (Pong, prompt_tokens, completion_tokens)
     Cell->>ActionGate: check(pong.action.operation)
     alt action intercepted
         ActionGate-->>Cell: rejected
         Cell-->>Hull: protocol_error
     end
 
-    Cell->>Kernel: kernel.run(pong)
+    Cell->>Kernel: kernel.step(pong)
     Note over Kernel: exec code, commit frame (no pre-render)
     Cell-->>Hull: FrameRecord committed to _frame_log
 ```
 
-Two key internal decisions. First, step() unconditionally calls kernel.prepare() each frame to generate a fresh Ping, ensuring signals (unread messages, timestamps, etc.) are always up to date. kernel.run() is only responsible for exec + commit, no longer pre-rendering the next frame's Ping. Second, Gates are exposed to the outside via string properties (cell.action_gate = "safe"), so Hull does not need to know the concrete types of ActionGate/StateGate, reducing inter-layer coupling.
+Two key internal decisions. First, step() unconditionally calls kernel.prepare() each frame to generate a fresh Ping, ensuring signals (unread messages, timestamps, etc.) are always up to date. kernel.step() is only responsible for exec + commit, no longer pre-rendering the next frame's Ping. Second, Gates are exposed to the outside via string properties (cell.action_gate = "safe"), so Hull does not need to know the concrete types of ActionGate/StateGate, reducing inter-layer coupling.
 
 Invariants: each successful step() call (protocol_error is None) produces exactly one FrameRecord committed by Kernel (schema version defined by `FRAME_SCHEMA_VERSION` in `protocol.py`); _ping is the output of the current frame's prepare(), its semantics expire at frame end (regenerated next frame); _pong always points to the previous frame's LLM output; _actual_tokens_in/_actual_tokens_out are overwritten with real values when the API returns usage, otherwise remain None; on protocol exceptions _errors appends ErrorRecord("protocol", ...).
 
-Cell and Hull relationship: Hull creates Cell, operates it via public interfaces step(), get(), set(), ns, snapshot(), restore(), and does not access Cell internals. Cell and Kernel relationship: Cell calls kernel.prepare() and kernel.run(), reads kernel.ns, but does not directly operate on Kernel's internal Executor or Renderer. Cell and Core relationship: Cell calls core.run(ping), passes the resulting Pong directly to Kernel; Core is stateless.
+Cell and Hull relationship: Hull creates Cell, operates it via public interfaces step(), get(), set(), ns, snapshot(), restore(), and does not access Cell internals. Cell and Kernel relationship: Cell calls kernel.prepare() and kernel.step(), reads kernel.ns, but does not directly operate on Kernel's internal Executor or Renderer. Cell and Core relationship: Cell calls core.step(ping), passes the resulting Pong directly to Kernel; Core is stateless.
 
 ## Public Interface
 
@@ -68,10 +68,31 @@ Cell and Hull relationship: Hull creates Cell, operates it via public interfaces
 
 Stateful single-frame execution engine. Step-based, does not auto-loop.
 
+Constructor: `Cell(api_params=None, timeout=60.0, core_max_retries=3, action_gate="auto", state_gate="auto")`
+
+Key properties and methods:
+
+| Member | Description |
+|--------|-------------|
+| `step(tracer=None) → StepResult` | Run one frame (Ping → LLM → Pong → exec → commit) |
+| `snapshot(path)` / `restore(path)` | Persist / reload namespace bytes via cloudpickle |
+| `ping` / `pong` | Read-only projections of the latest committed FrameRecord |
+| `max_tokens` | Read-only int; proxies to Core |
+| `get(key)` / `set(key, value)` / `keys()` | Controlled namespace access (use these; do not bypass via `cell.ns[]` from Hull) |
+| `ns` | Raw namespace dict; available for Hull's pre-frame writes via `cell.set()` |
+| `action_gate` / `state_gate` | String mode property — "auto" \| "safe" \| "human" |
+| `set_gate(gate_type, fn)` | Supply a custom gate rule function |
+
 ### class StepResult
 
 Return value of Cell.step().
 
+
+## Boundary Rules
+
+See `CONTEXT.md`. Enforcement: `tests/architecture/vessal/test_cell_dependency_tree.py`.
+
+Snapshot note: `cell.snapshot(path)` / `cell.restore(path)` handle namespace bytes only. Before calling `snapshot`, Hull writes `<snap>.skills.json`; before calling `restore`, Hull reads it to prime `sys.path`/`sys.modules`. Cell does not know about this file.
 
 ## Tests
 

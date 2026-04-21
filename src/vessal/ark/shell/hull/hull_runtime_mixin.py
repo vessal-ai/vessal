@@ -122,13 +122,13 @@ class HullRuntimeMixin:
         """
         await self._event_loop.run_forever()
 
-    async def run_once(self) -> None:
+    async def step(self) -> None:
         """Execute a single wake cycle and return.
 
         Waits for one event, runs the frame loop until idle, then returns.
         Used for `vessal run --goal "..."` single-run mode.
         """
-        await self._event_loop.run_once()
+        await self._event_loop.step()
 
     def stop(self) -> None:
         """Request stop."""

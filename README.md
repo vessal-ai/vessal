@@ -23,7 +23,7 @@ Every major agent framework gives the LLM a menu of functions and lets it pick. 
 ## ⚡ 60-Second First Agent
 
 ```bash
-pip install vessal
+uv tool install vessal         # or: pipx install vessal
 vessal create                  # interactive wizard — Enter to accept defaults
 cd my-agent && vessal start
 # Console opens at http://127.0.0.1:8420/console/

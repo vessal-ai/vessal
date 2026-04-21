@@ -2,7 +2,7 @@
 
 Provides two independent gates:
 - ActionGate: checks action code before it is sent to Kernel.exec_operation()
-- StateGate: checks the state string before it is sent to Core.run()
+- StateGate: checks the state string before it is sent to Core.step()
 
 Both gates support three modes:
 - "auto":  pass through directly (default for development/debugging)

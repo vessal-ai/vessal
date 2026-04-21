@@ -28,7 +28,7 @@ def render(ns: dict[str, Any]) -> str:
 
     context_pct = ns.get("_context_pct", 0)
     budget_total = ns.get("_budget_total", 0) or (
-        ns.get("_context_budget", 128000) - ns.get("_max_tokens", 4096)
+        ns.get("_context_budget", 128000) - ns.get("_token_budget", 4096)
     )
     used_tokens = round(budget_total * context_pct / 100) if context_pct else 0
     lines.append(f"context: {context_pct}% ({used_tokens}/{budget_total} tokens)")

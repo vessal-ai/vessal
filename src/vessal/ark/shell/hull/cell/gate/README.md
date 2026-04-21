@@ -4,7 +4,7 @@ Safety gate module before action / state execution. Provides ActionGate (before 
 
 Responsible for:
 - ActionGate: checks action code before it enters Kernel.exec_operation()
-- StateGate: checks state string before it enters Core.run()
+- StateGate: checks state string before it enters Core.step()
 - Three modes: auto (pass through directly), safe (rule checking), human (reserved)
 - Built-in rule set (rules.py): intercepts high-risk filesystem and process operations
 - add_rule / remove_rule: user-defined rule injection

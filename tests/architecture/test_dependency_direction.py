@@ -92,6 +92,15 @@ def test_cell_imports_no_hull_or_shell():
     assert violations == [], "Cell isolation violations:\n" + "\n".join(violations)
 
 
+def test_cell_imports_no_util_logging():
+    """Cell must not import ark.util.logging (TracerLike Protocol is the boundary)."""
+    violations = _scan_imports(
+        str(_REPO_ROOT / "src/vessal/ark/shell/hull/cell"),
+        ["vessal.ark.util.logging"],
+    )
+    assert violations == [], "Cell must use TracerLike Protocol, not ark.util.logging directly:\n" + "\n".join(violations)
+
+
 def test_hull_imports_no_shell():
     """Hull does not import Shell boundary code (server/cli)."""
     violations = _scan_imports(

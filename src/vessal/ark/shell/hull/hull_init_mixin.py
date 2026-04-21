@@ -74,6 +74,8 @@ class HullInitMixin:
 
         self._snapshots_dir = self._project_dir / "snapshots"
         self._restore_latest_snapshot()
+        self._cell.set("_token_budget", self._cell.max_tokens)
+        self._cell.set("_error_buffer_cap", cell_cfg.get("error_buffer_cap", 200))
 
         if "language" in agent_cfg:
             self._cell.set("language", agent_cfg["language"])
@@ -115,8 +117,10 @@ class HullInitMixin:
         self._cell.set("_data_dir", str(self._project_dir / "data"))
         compress_threshold = hull_cfg.get("compress_threshold", 50)
         self._cell.set("_compress_threshold", compress_threshold)
-        self._cell.set("_compaction_k", hull_cfg.get("compaction_k", 16))
-        self._cell.set("_compaction_n", hull_cfg.get("compaction_n", 8))
+        if "compaction_k" in hull_cfg:
+            self._cell.set("_compaction_k", hull_cfg["compaction_k"])
+        if "compaction_n" in hull_cfg:
+            self._cell.set("_compaction_n", hull_cfg["compaction_n"])
 
         self._routes: dict[tuple[str, str], object] = {}
         self._running_servers: dict[str, object] = {}
