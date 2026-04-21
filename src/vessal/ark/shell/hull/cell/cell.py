@@ -22,7 +22,7 @@ from vessal.ark.shell.hull.cell.core import Core
 from vessal.ark.shell.hull.cell.gate import ActionGate, StateGate
 from vessal.ark.shell.hull.cell.kernel import Kernel
 from vessal.ark.shell.hull.cell.protocol import ErrorRecord, Ping, Pong, StepResult
-from vessal.ark.util.logging import Tracer
+from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
 
 
 class Cell:
@@ -152,7 +152,7 @@ class Cell:
         """
         self._kernel.restore(path)
 
-    def step(self, tracer: Tracer | None = None) -> StepResult:
+    def step(self, tracer: TracerLike | None = None) -> StepResult:
         """Execute one frame.
 
         Flow:
@@ -167,7 +167,7 @@ class Cell:
         state_gate block does not terminate the frame: _error is injected and execution continues so the LLM sees it.
 
         Args:
-            tracer: Optional Tracer instance passed in by Hull.
+            tracer: Optional TracerLike instance passed in by Hull.
 
         Returns:
             StepResult containing protocol_error (frame was not committed if non-None).

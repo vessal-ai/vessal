@@ -29,7 +29,7 @@ from openai import (
     BadRequestError,
 )
 
-from vessal.ark.util.logging import Tracer
+from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
 from vessal.ark.shell.hull.cell.protocol import Ping, Pong
 from vessal.ark.shell.hull.cell.core.retry import is_retryable_error, calculate_backoff_seconds
 from vessal.ark.shell.hull.cell.core.parser import ParseError, parse_response
@@ -89,7 +89,7 @@ class Core:
     def run(
         self,
         ping: Ping,
-        tracer: Tracer | None = None,
+        tracer: TracerLike | None = None,
         frame: int = 0,
     ) -> tuple[Pong, int | None, int | None]:
         """Call the LLM, parse the response, and return a Pong.
@@ -99,7 +99,7 @@ class Core:
 
         Args:
             ping:   Perceptual input rendered by Kernel (contains system_prompt/state).
-            tracer: Optional Tracer.
+            tracer: Optional TracerLike.
             frame:  Frame number, used for trace recording.
 
         Returns:

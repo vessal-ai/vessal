@@ -39,7 +39,7 @@ from vessal.ark.shell.hull.cell.protocol import (
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
-from vessal.ark.util.logging import Tracer
+from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,7 @@ class Kernel:
         self,
         operation: str,
         frame_number: int,
-        tracer: Tracer | None = None,
+        tracer: TracerLike | None = None,
     ) -> ExecResult:
         """Execute operation code. Does not increment _frame or append _frame_log.
 
@@ -165,7 +165,7 @@ class Kernel:
         Args:
             operation: Python code string to execute.
             frame_number: Current frame number; written to ns["_frame"] and passed to _ns_meta.
-            tracer: Optional Tracer for recording execution time.
+            tracer: Optional TracerLike for recording execution time.
 
         Returns:
             ExecResult containing stdout, diff, and error fields.
@@ -180,7 +180,7 @@ class Kernel:
     def eval_expect(
         self,
         expect: str,
-        tracer: Tracer | None = None,
+        tracer: TracerLike | None = None,
     ) -> Verdict:
         """Evaluate prediction assertions on a shallow copy of the namespace. Does not modify the real namespace.
 
@@ -188,7 +188,7 @@ class Kernel:
 
         Args:
             expect: Expect code string (containing assert statements).
-            tracer: Optional Tracer for recording evaluation time.
+            tracer: Optional TracerLike for recording evaluation time.
 
         Returns:
             Verdict containing total/passed/failures fields.
@@ -404,7 +404,7 @@ class Kernel:
     def run(
         self,
         pong: Pong,
-        tracer: Tracer | None = None,
+        tracer: TracerLike | None = None,
         ping: "Ping | None" = None,
     ) -> None:
         """Single-frame execution: exec → expect → observation → frame → commit.
@@ -417,7 +417,7 @@ class Kernel:
 
         Args:
             pong:   Control signal from the reasoner, containing action.operation / action.expect.
-            tracer: Optional Tracer, forwarded to exec_operation and eval_expect.
+            tracer: Optional TracerLike, forwarded to exec_operation and eval_expect.
             ping:   Perceptual input seen by the model for this frame (optional;
                     used to write into FrameRecord v6).
         """
