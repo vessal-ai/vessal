@@ -6,7 +6,7 @@ Responsible for:
 - hull.toml config parsing and Cell initialization
 - Skill discovery, loading, instantiation, and unloading (via SkillLoader)
 - Event loop driving (via EventLoop, wake/sleep lifecycle)
-- Meta-skill registration (SkillsManager, injected into namespace as `skills`; each frame outputs the available Skill list via _signal(), and injects the guide usage protocol via _prompt())
+- Meta-skill registration (the `skills` Skill is loaded through the normal skill-loader path; there is no dedicated manager class; each frame outputs the available Skill list via _signal(), and injects the guide usage protocol via _prompt())
 - HTTP request routing (handle() is Shell's sole entry point)
 
 Not responsible for:
@@ -27,7 +27,7 @@ Hull runs in an independent subprocess (started by the Shell main process via `s
 
 Hull exists to centralize the configuration work of turning a "generic Cell" into a "specific Agent". Cell is a pure engine that knows nothing about hull.toml, Skill paths, system prompts, or log directories. Without Hull, Shell would have to take on all initialization work, but Shell's responsibility is only the HTTP gateway and guardian; mixing the two would scatter startup logic everywhere.
 
-Hull's shape is "configuration layer + lifecycle manager", not a God Object. It holds references to Cell, EventLoop, SkillLoader, and SkillsManager, but only operates through their public interfaces without crossing into their internals. This design rejected the alternative of "Hull directly manipulating Cell.ns for routing" — routes are maintained dynamically in a `_routes` dict, Skill servers register via HullApi, Hull.handle() dispatches by table lookup, and the routing table and routing logic are independent of each other.
+Hull's shape is "configuration layer + lifecycle manager", not a God Object. It holds references to Cell, EventLoop, and SkillLoader, and operates through their public interfaces without crossing into their internals. This design rejected the alternative of "Hull directly manipulating Cell.ns for routing" — routes are maintained dynamically in a `_routes` dict, Skill servers register via HullApi, Hull.handle() dispatches by table lookup, and the routing table and routing logic are independent of each other.
 
 ```mermaid
 graph LR
@@ -35,15 +35,14 @@ graph LR
     Cell["Cell\n(single-frame execution)"]
     EL["EventLoop\n(frame scheduling)"]
     SM["SkillLoader\n(Skill discovery/loading)"]
-    Meta["SkillsManager\n(Agent's Skill management interface)"]
+    Skills["Skills(SkillBase)\n(Agent's Skill management interface,\nloaded as 'skills' via normal skill-loader path)"]
     HullApi["HullApi\n(Skill route registration)"]
 
     Hull -->|"create + drive"| Cell
     Hull -->|"create + run"| EL
     Hull -->|"create + query"| SM
-    Hull -->|"inject namespace (as skills)"| Meta
+    SM -->|"load + inject namespace as 'skills'"| Skills
     Hull -->|"holds routing table"| HullApi
-    SM -.->|"load/unload"| Meta
     EL -->|"FrameHooks callbacks"| Hull
 ```
 
@@ -51,13 +50,13 @@ There are three key internal decisions. First, runtime-owned variables (`_frame_
 
 ```mermaid
 sequenceDiagram
-    participant Meta as SkillsManager.load()
+    participant Skills as skills.load()
     participant Hull
     participant SM as SkillLoader
     participant NS as Cell namespace
     participant Server as Skill server.py
 
-    Meta->>Hull: _load_and_instantiate_skill(name)
+    Skills->>Hull: _load_and_instantiate_skill(name)
     Hull->>SM: load(name) → SkillClass
     Hull->>Hull: SkillClass() → instance
     Hull->>NS: cell.set(name, instance)
