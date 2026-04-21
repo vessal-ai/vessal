@@ -4,8 +4,8 @@ Replaces the boilerplate module-global state (_hull_api, _static_cache, _make_st
 that otherwise gets copy-pasted into every Skill's server.py. Single source of truth for how
 Skill UIs expose static files.
 
-Route shape: every asset mounts at `{scoped_api._prefix}/ui/<filename>` — e.g. a skill named
-`chat` publishing `index.html` ends up at `/skills/chat/ui/index.html`.
+Route shape: every asset mounts at `/ui/<filename>` under the skill's scoped prefix — e.g. a
+skill named `chat` publishing `index.html` ends up at `/skills/chat/ui/index.html`.
 """
 from __future__ import annotations
 
@@ -58,8 +58,5 @@ class StaticRouter:
 
     def _make_handler(self, filename: str):
         def handler(_body):
-            cached = self._cache.get(filename)
-            if cached is None:
-                return 404, {"error": f"{filename} not found"}
-            return 200, cached
+            return 200, self._cache[filename]
         return handler
