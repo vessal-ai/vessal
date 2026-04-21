@@ -4,52 +4,41 @@ Hull-managed mode: start(hull_api, skill) registers routes.
 GET /         → index.html
 GET /render   → latest render spec (polling)
 POST /events  → receives user events
+Static assets → /ui/<file> (via StaticRouter)
 """
 from __future__ import annotations
 
 from pathlib import Path
 
+from vessal.ark.shell.hull.skill_static import StaticRouter
+
 
 _hull_api = None
 _skill = None
-_static_cache: dict = {}
+_static: StaticRouter | None = None
+_index_html = None
 _last_spec: dict | None = None
 _last_version: int = -1
 
 
-def _make_static_handler(filename: str):
-    def handler(_body):
-        cached = _static_cache.get(filename)
-        if cached is not None:
-            return 200, cached
-        return 404, {"error": f"{filename} not found"}
-    return handler
-
-
 def start(hull_api, skill=None) -> None:
     """Hull-managed entry point."""
-    global _hull_api, _skill
+    global _hull_api, _skill, _static, _index_html
 
     _hull_api = hull_api
     _skill = skill
 
-    # Load index.html
-    static_dir = Path(__file__).parent / "static"
-    index_path = static_dir / "index.html"
-
     from vessal.ark.shell.hull.hull_api import StaticResponse
 
+    static_dir = Path(__file__).parent / "static"
+    index_path = static_dir / "index.html"
     if index_path.exists():
-        _static_cache["index.html"] = StaticResponse(
+        _index_html = StaticResponse(
             index_path.read_bytes(), "text/html; charset=utf-8"
         )
 
-    # Load static assets
-    for fname in ("renderer.js", "avatar.js", "avatar.css", "style.css", "poll.js"):
-        fpath = static_dir / fname
-        if fpath.exists():
-            _static_cache[fname] = StaticResponse.from_file(fpath)
-            hull_api.register_route("GET", f"/{fname}", _make_static_handler(fname))
+    _static = StaticRouter(hull_api, static_dir)
+    _static.register(["renderer.js", "avatar.js", "avatar.css", "style.css", "poll.js"])
 
     hull_api.register_route("GET", "/", _handle_index)
     hull_api.register_route("GET", "/render", _handle_render)
@@ -58,26 +47,25 @@ def start(hull_api, skill=None) -> None:
 
 def stop() -> None:
     """Hull-managed shutdown."""
-    global _hull_api, _skill, _last_spec, _last_version
+    global _hull_api, _skill, _static, _index_html, _last_spec, _last_version
     if _hull_api is not None:
         _hull_api.unregister_route("/")
         _hull_api.unregister_route("/render")
         _hull_api.unregister_route("/events")
-        # unregister_route is idempotent — safe even if file didn't exist at start() time
-        for fname in ("renderer.js", "avatar.js", "avatar.css", "style.css", "poll.js"):
-            _hull_api.unregister_route(f"/{fname}")
-        _static_cache.clear()
+        if _static is not None:
+            _static.unregister()
+            _static = None
         _hull_api = None
         _skill = None
+        _index_html = None
         _last_spec = None
         _last_version = -1
 
 
 def _handle_index(_body):
     """GET / — UI page."""
-    cached = _static_cache.get("index.html")
-    if cached is not None:
-        return 200, cached
+    if _index_html is not None:
+        return 200, _index_html
     return 404, {"error": "index.html not found"}
 
 
