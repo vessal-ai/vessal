@@ -1,26 +1,33 @@
-"""Verify chat skill registers UI routes under /ui/* and no longer at root."""
-from pathlib import Path
-from unittest.mock import MagicMock
+"""test_server_routes — chat/server.py start() mounts expected UI routes."""
+from __future__ import annotations
 
+from vessal.ark.shell.hull.hull_api import HullApi, ScopedHullApi
 from vessal.skills.chat import server as chat_server
 
 
-def test_start_registers_ui_routes():
-    api = MagicMock()
-    skill = MagicMock()
-    skill._data_dir = Path("/tmp")
+def test_start_registers_static_and_api_routes():
+    routes: dict = {}
+    hull_api = HullApi(routes=routes, wake_fn=lambda _r: None)
+    scoped = ScopedHullApi(hull_api, "chat")
 
-    chat_server.start(api, skill)
+    chat_server.start(scoped, skill=None)
+    try:
+        assert ("GET", "/skills/chat/ui/index.html") in routes
+        assert ("GET", "/skills/chat/ui/app.js") in routes
+        assert ("GET", "/skills/chat/ui/style.css") in routes
+        assert ("GET", "/skills/chat/ui/render.js") in routes
+        assert ("POST", "/skills/chat/inbox") in routes
+        assert ("GET", "/skills/chat/outbox") in routes
+        assert ("GET", "/skills/chat/history") in routes
+    finally:
+        chat_server.stop()
 
-    registered = {(call.args[0], call.args[1]) for call in api.register_route.call_args_list}
-    assert ("GET", "/ui/index.html") in registered
-    assert ("GET", "/ui/app.js") in registered
-    assert ("GET", "/ui/style.css") in registered
-    assert ("GET", "/ui/render.js") in registered
-    assert ("POST", "/inbox") in registered
-    assert ("GET", "/outbox") in registered
 
-    # The root path must NOT be registered — discovery points directly to /ui/index.html
-    assert ("GET", "/") not in registered
+def test_stop_unregisters_all_routes():
+    routes: dict = {}
+    hull_api = HullApi(routes=routes, wake_fn=lambda _r: None)
+    scoped = ScopedHullApi(hull_api, "chat")
 
+    chat_server.start(scoped, skill=None)
     chat_server.stop()
+    assert routes == {}

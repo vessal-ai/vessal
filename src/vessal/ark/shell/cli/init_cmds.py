@@ -62,7 +62,7 @@ max_tokens = 4096
 # top_k = 40
 
 [hull]
-skills = ["tasks", "pin", "chat", "heartbeat"]
+skills = ["tasks", "pin", "chat", "heartbeat", "skills"]
 skill_paths = ["skills/bundled", "skills/hub", "skills/local"]
 # compress_threshold = 50  # Context pressure signal threshold (default 50%, read by Memory skill)
 
@@ -266,7 +266,7 @@ Load and call via example.word_count() etc.
 
     print(f"\nDone! Project '{args.name}' is ready.\n")
     print(f"  cd {args.name}")
-    print(f"  cp .env.example .env")
-    print(f"  # Fill in OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL")
+    print("  cp .env.example .env")
+    print("  # Fill in OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL")
     print()
-    print(f"  vessal start")
+    print("  vessal start")

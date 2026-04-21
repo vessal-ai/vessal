@@ -8,7 +8,7 @@ import pytest
 
 from vessal.skills.heartbeat import server as heartbeat_server
 from vessal.skills.heartbeat.server import _HeartbeatServer
-from vessal.skills.heartbeat.skill import Skill
+from vessal.skills.heartbeat.skill import Heartbeat as Skill
 
 
 class _FakeHullApi:

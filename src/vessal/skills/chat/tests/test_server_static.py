@@ -1,7 +1,8 @@
 """test_server_static — chat server static file route tests."""
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
 
 
 @pytest.fixture
@@ -21,15 +22,22 @@ def test_start_registers_static_routes(mock_hull_api):
     assert "/ui/render.js" in registered_paths
 
 
-def test_static_handler_returns_css(tmp_path, monkeypatch):
-    """Static file handler returns correct content_type."""
-    from vessal.skills.chat import server as chat_server
-    # Create a temporary css file in tmp_path, monkeypatch the static cache
+def test_static_handler_returns_css(tmp_path):
+    """StaticRouter serves correct content_type for CSS files."""
+    from vessal.ark.shell.hull.skill_static import StaticRouter
+
     css_file = tmp_path / "style.css"
     css_file.write_text("body { color: red; }", encoding="utf-8")
-    from vessal.ark.shell.hull.hull_api import StaticResponse
-    monkeypatch.setitem(chat_server._static_cache, "style.css", StaticResponse.from_file(css_file))
-    handler = chat_server._make_static_handler("style.css")
+
+    routes: dict = {}
+    from vessal.ark.shell.hull.hull_api import HullApi, ScopedHullApi
+    hull_api = HullApi(routes=routes, wake_fn=lambda _r: None)
+    scoped = ScopedHullApi(hull_api, "chat")
+
+    router = StaticRouter(scoped, tmp_path)
+    router.register(["style.css"])
+
+    handler = routes[("GET", "/skills/chat/ui/style.css")]
     status, resp = handler(None)
     assert status == 200
     assert "text/css" in resp.content_type

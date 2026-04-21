@@ -6,30 +6,20 @@ Standalone mode: python server.py --data-dir <path> runs independently.
 import argparse
 import http.server
 import json
-
-from vessal.ark.shell.http_server import SafeHTTPServer
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+from vessal.ark.shell.http_server import SafeHTTPServer
 
 # ── Hull-managed mode ──
+from vessal.ark.shell.hull.skill_static import StaticRouter
 
 _hull_api = None
 _skill = None  # Chat skill instance reference
 _index_html: bytes | None = None
-_static_cache: dict[str, "StaticResponse"] = {}
-
-
-def _make_static_handler(filename: str):
-    """Create a route handler for the given static file (closure, reads from cache)."""
-    def handler(_body):
-        cached = _static_cache.get(filename)
-        if cached is not None:
-            return 200, cached
-        return 404, {"error": f"{filename} not found"}
-    return handler
+_static: StaticRouter | None = None
 
 
 def start(hull_api, skill=None) -> None:
@@ -39,7 +29,7 @@ def start(hull_api, skill=None) -> None:
         hull_api: ScopedHullApi instance.
         skill: Chat skill instance, used to call receive() directly.
     """
-    global _hull_api, _skill, _index_html
+    global _hull_api, _skill, _index_html, _static
 
     _hull_api = hull_api
     _skill = skill
@@ -49,12 +39,8 @@ def start(hull_api, skill=None) -> None:
     if index_path.exists():
         _index_html = index_path.read_bytes()
 
-    from vessal.ark.shell.hull.hull_api import StaticResponse
-    for static_file in ("style.css", "app.js", "render.js"):
-        file_path = ui_dir / static_file
-        if file_path.exists():
-            _static_cache[static_file] = StaticResponse.from_file(file_path)
-        hull_api.register_route("GET", f"/ui/{static_file}", _make_static_handler(static_file))
+    _static = StaticRouter(hull_api, ui_dir)
+    _static.register(["style.css", "app.js", "render.js"])
 
     hull_api.register_route("GET", "/ui/index.html", _handle_index)
     hull_api.register_route("POST", "/inbox", _handle_inbox)
@@ -64,15 +50,15 @@ def start(hull_api, skill=None) -> None:
 
 def stop() -> None:
     """Hull-managed shutdown. Unregisters routes."""
-    global _hull_api, _skill
+    global _hull_api, _skill, _static
     if _hull_api is not None:
         _hull_api.unregister_route("/ui/index.html")
         _hull_api.unregister_route("/inbox")
         _hull_api.unregister_route("/outbox")
         _hull_api.unregister_route("/history")
-        for static_file in ("style.css", "app.js", "render.js"):
-            _hull_api.unregister_route(f"/ui/{static_file}")
-        _static_cache.clear()
+        if _static is not None:
+            _static.unregister()
+            _static = None
         _hull_api = None
         _skill = None
 
