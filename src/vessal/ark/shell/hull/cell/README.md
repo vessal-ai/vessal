@@ -68,10 +68,31 @@ Cell and Hull relationship: Hull creates Cell, operates it via public interfaces
 
 Stateful single-frame execution engine. Step-based, does not auto-loop.
 
+Constructor: `Cell(api_params=None, timeout=60.0, core_max_retries=3, action_gate="auto", state_gate="auto")`
+
+Key properties and methods:
+
+| Member | Description |
+|--------|-------------|
+| `step(tracer=None) → StepResult` | Run one frame (Ping → LLM → Pong → exec → commit) |
+| `snapshot(path)` / `restore(path)` | Persist / reload namespace bytes via cloudpickle |
+| `ping` / `pong` | Read-only projections of the latest committed FrameRecord |
+| `max_tokens` | Read-only int; proxies to Core |
+| `get(key)` / `set(key, value)` / `keys()` | Controlled namespace access (use these; do not bypass via `cell.ns[]` from Hull) |
+| `ns` | Raw namespace dict; available for Hull's pre-frame writes via `cell.set()` |
+| `action_gate` / `state_gate` | String mode property — "auto" \| "safe" \| "human" |
+| `set_gate(gate_type, fn)` | Supply a custom gate rule function |
+
 ### class StepResult
 
 Return value of Cell.step().
 
+
+## Boundary Rules
+
+See `CONTEXT.md`. Enforcement: `tests/architecture/vessal/test_cell_dependency_tree.py`.
+
+Snapshot note: `cell.snapshot(path)` / `cell.restore(path)` handle namespace bytes only. Before calling `snapshot`, Hull writes `<snap>.skills.json`; before calling `restore`, Hull reads it to prime `sys.path`/`sys.modules`. Cell does not know about this file.
 
 ## Tests
 

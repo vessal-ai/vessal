@@ -6,8 +6,9 @@ Responsible for:
 - Single-frame execution orchestration (step()): prepare, state_gate, core.step, action_gate, kernel.step
 - Lifecycle and mode switching for ActionGate and StateGate
 - Read/write proxy for namespace (get / set / keys / ns pass-through to Kernel)
-- Snapshot serialization and restore (pass-through to Kernel)
+- Snapshot serialization and restore (pass-through to Kernel; Skill manifest is Hull's concern)
 - Frame perception generation (calls kernel.prepare() at the start of each frame to produce a fresh Ping)
+- Exposing cell.ping / cell.pong as read-only projections of the latest committed FrameRecord
 
 Not responsible for:
 - Automatic looping (handled by Hull EventLoop)
@@ -15,13 +16,38 @@ Not responsible for:
 - LLM calls (handled by Core)
 - Namespace execution and frame recording (handled by Kernel)
 - protocol data structure definitions (defined in protocol.py)
+- Skill manifest files (`<snap>.skills.json`) — written/read by Hull before cell.snapshot()/cell.restore()
 
 ## Constraints
 
+Cell is a leaf: execution engine only. These constraints are executable — see `tests/architecture/vessal/test_cell_dependency_tree.py`.
+
 1. Does not import Hull or Shell layer code — dependency direction: Hull depends on Cell, Cell depends on Core/Kernel, not the reverse
-2. Each step() call produces exactly one FrameRecord (committed by Kernel), or commits nothing on protocol_error
-3. All public methods must have complete docstrings and type annotations
-4. cell.py must not exceed 300 lines
+2. Does not import `vessal.ark.util.logging` — use `TracerLike` Protocol instead (`_tracer_protocol.py`)
+3. Each step() call produces exactly one FrameRecord (committed by Kernel), or commits nothing on protocol_error
+4. All public methods must have complete docstrings and type annotations
+5. cell.py must not exceed 300 lines
+
+## Forbidden imports
+
+- `vessal.ark.util.logging` — use `TracerLike` Protocol instead (`_tracer_protocol.py`)
+- `vessal.ark.shell.hull.*` (other than `cell` itself) — Cell must not know Hull exists
+
+## Forbidden patterns
+
+- `Core._DEFAULT_API_PARAMS` — private to Core; Cell passes `api_params=None` and reads `cell.max_tokens`
+- `fs._hot[...]` — use `FrameStream.latest_hot_frame()` / `hot_head_len()` / `find_creation()`
+- `gate._rules.clear()` — use `gate.replace_rules([])`
+- `ns["_max_tokens"]` — banned; use `cell.max_tokens` or `ns["_token_budget"]`
+
+## Invariants
+
+- `ns["_frame"]` increments exactly once per frame, inside `_commit_frame`. The in-progress frame number is an explicit parameter passed through the call chain.
+- `ns["sleep"]` is `Kernel.sleep` bound method. Re-bound by `_migrate_snapshot()` after restore so closures do not capture stale state.
+- `ns["_errors"]` capped by `ns["_error_buffer_cap"]` (default 200) via `append_error()` in `_errors_helper.py`.
+- `cell.ping` / `cell.pong` are projections from `FrameStream.latest_hot_frame()`, updated at the end of each `step()`.
+- Compaction defaults K=16 / N=8 are defined once in `Kernel.__init__`; no other site sets them.
+- Single-frame execution method: `Kernel.step`, `Core.step`. Long-running loop: `run_forever` (Hull EventLoop). These names are enforced by `tests/architecture/vessal/test_cell_dependency_tree.py`.
 
 ## Design
 
