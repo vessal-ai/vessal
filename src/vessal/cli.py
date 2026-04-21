@@ -81,9 +81,8 @@ def main() -> None:
     upgrade_parser = subparsers.add_parser("upgrade", help="Upgrade vessal to the latest release")
     upgrade_parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
 
-    # vessal create (interactive wizard)
-    create_parser = subparsers.add_parser("create", help="Interactive new-project wizard")
-    create_parser.add_argument("name", nargs="?", default=None, help="Project name (skipped in wizard if provided)")
+    # vessal create (interactive wizard — no positional args per C7)
+    subparsers.add_parser("create", help="Interactive new-project wizard")
 
     # vessal skill
     skill_parser = subparsers.add_parser("skill", help="Skill management")
