@@ -34,6 +34,6 @@ def test_no_server_uses_static_cache_pattern():
         if "_static_cache" in globals_ and "_make_static_handler" in src:
             offenders.append(str(server_py))
     assert not offenders, (
-        f"server.py using legacy static-route boilerplate (use StaticRouter instead):\n"
+        "server.py using legacy static-route boilerplate (use StaticRouter instead):\n"
         + "\n".join(offenders)
     )

@@ -4,7 +4,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
 
 
 HULL_INIT_MIXIN = Path(__file__).resolve().parents[1] / "hull_init_mixin.py"
@@ -20,7 +19,7 @@ def test_no_skills_manager_import():
         mod = getattr(n, "module", "") or ""
         names = [a.name for a in n.names]
         assert "skills_manager" not in mod, f"hull_init_mixin still imports {mod}"
-        assert "SkillsManager" not in names, f"hull_init_mixin still imports SkillsManager"
+        assert "SkillsManager" not in names, "hull_init_mixin still imports SkillsManager"
 
 
 def test_hull_skills_absent_from_ns_when_not_configured(tmp_path, monkeypatch):
