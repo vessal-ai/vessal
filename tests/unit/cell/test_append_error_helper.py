@@ -16,3 +16,13 @@ def test_append_error_respects_override_cap_arg():
     for i in range(5):
         append_error(ns, {"i": i}, cap=2)
     assert len(ns["_errors"]) == 2
+
+
+def test_append_error_uses_default_cap_when_key_absent():
+    from vessal.ark.shell.hull.cell._errors_helper import append_error
+    ns = {"_errors": []}  # no _error_buffer_cap key
+    for i in range(201):
+        append_error(ns, {"i": i})
+    assert len(ns["_errors"]) == 200
+    assert ns["_errors"][0]["i"] == 1
+    assert ns["_errors"][-1]["i"] == 200

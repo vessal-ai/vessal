@@ -57,7 +57,6 @@ class HullInitMixin:
             core_max_retries=core_cfg.get("max_retries", 3),
             api_params=api_params,
         )
-        self._cell.set("_error_buffer_cap", cell_cfg.get("error_buffer_cap", 200))
 
         self._log_dir = str(self._project_dir / "logs")
         self._max_frames = cell_cfg.get("max_frames", 100)
@@ -76,6 +75,7 @@ class HullInitMixin:
         self._snapshots_dir = self._project_dir / "snapshots"
         self._restore_latest_snapshot()
         self._cell.set("_token_budget", self._cell.max_tokens)
+        self._cell.set("_error_buffer_cap", cell_cfg.get("error_buffer_cap", 200))
 
         if "language" in agent_cfg:
             self._cell.set("language", agent_cfg["language"])

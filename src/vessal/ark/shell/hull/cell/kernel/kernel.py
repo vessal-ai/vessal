@@ -127,7 +127,7 @@ class Kernel:
         ns["_operation"] = ""                     # operation code executed in the previous frame
         ns["_stdout"] = ""                        # stdout from this frame
         ns["_error"] = None                       # exception from this frame
-        ns["_errors"] = []                        # error history, list[ErrorRecord], capped at 50
+        ns["_errors"] = []                        # error history, list[ErrorRecord]; cap enforced by append_error() via _error_buffer_cap
         ns["_actual_tokens_in"] = None            # actual input token count returned by API (None if unavailable)
         ns["_actual_tokens_out"] = None           # actual output token count returned by API (None if unavailable)
         ns["_diff"] = ""                          # change summary for this frame (git-style +/- format)
@@ -356,17 +356,18 @@ class Kernel:
                 k=self.ns.get("_compaction_k", 16),
                 n=self.ns.get("_compaction_n", 8),
             )
-            return
-        try:
-            d = fs.to_dict()
-            if d.get("schema_version") != FRAME_SCHEMA_VERSION:
-                raise ValueError("schema mismatch")
-        except Exception:
-            self.ns["_frame_stream"] = FrameStream(
-                k=self.ns.get("_compaction_k", 16),
-                n=self.ns.get("_compaction_n", 8),
-            )
-            logger.info("Cleared incompatible frame_stream (schema mismatch)")
+        else:
+            try:
+                d = fs.to_dict()
+                if d.get("schema_version") != FRAME_SCHEMA_VERSION:
+                    raise ValueError("schema mismatch")
+            except Exception:
+                self.ns["_frame_stream"] = FrameStream(
+                    k=self.ns.get("_compaction_k", 16),
+                    n=self.ns.get("_compaction_n", 8),
+                )
+                logger.info("Cleared incompatible frame_stream (schema mismatch)")
+        self.ns["sleep"] = self.sleep
 
     def sleep(self) -> None:
         """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
