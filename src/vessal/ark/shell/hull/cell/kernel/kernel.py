@@ -226,6 +226,10 @@ class Kernel:
                 fn_name = getattr(fn, "__name__", repr(fn))
                 logger.warning("Base signal '%s' failed: %s", fn_name, e)
 
+        # TODO: future optimization — switch to explicit registry via
+        # ns["_signal_sources"] when O(|ns|) full scan becomes measurable.
+        # Current duck-typing scan is intentional design — see console/1-active/
+        # 20260421-cell-architecture-review.md C16.
         # Duck-typing signal scan: any object in namespace with a _signal method
         for obj in list(self.ns.values()):
             if hasattr(obj, "_signal") and callable(getattr(obj, "_signal")):
