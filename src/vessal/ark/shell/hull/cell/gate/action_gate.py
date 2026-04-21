@@ -112,6 +112,14 @@ class ActionGate:
         """
         self._rules = [(n, fn) for n, fn in self._rules if n != name]
 
+    def replace_rules(self, rules: list[tuple[str, Callable[[str], str | None]]]) -> None:
+        """Replace all rules atomically.
+
+        Args:
+            rules: New rule list. Each entry is a (name, check_fn) tuple.
+        """
+        self._rules = list(rules)
+
     def _load_builtin_rules(self) -> None:
         """Load the built-in safety rules."""
         from vessal.ark.shell.hull.cell.gate.rules import BUILTIN_RULES

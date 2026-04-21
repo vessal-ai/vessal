@@ -107,3 +107,11 @@ class StateGate:
             name: Name of the rule to remove. Silently does nothing if not found.
         """
         self._rules = [(n, fn) for n, fn in self._rules if n != name]
+
+    def replace_rules(self, rules: list[tuple[str, Callable[[str], str | None]]]) -> None:
+        """Replace all rules atomically.
+
+        Args:
+            rules: New rule list. Each entry is a (name, check_fn) tuple.
+        """
+        self._rules = list(rules)

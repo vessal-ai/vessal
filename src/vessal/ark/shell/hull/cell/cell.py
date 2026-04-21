@@ -227,12 +227,10 @@ class Cell:
 
         if gate_type == "action":
             self._action_gate = ActionGate(mode="safe")
-            self._action_gate._rules.clear()
-            self._action_gate.add_rule("custom", _wrap(fn))
+            self._action_gate.replace_rules([("custom", _wrap(fn))])
         elif gate_type == "state":
             self._state_gate = StateGate(mode="safe")
-            self._state_gate._rules.clear()
-            self._state_gate.add_rule("custom", _wrap(fn))
+            self._state_gate.replace_rules([("custom", _wrap(fn))])
         else:
             raise ValueError(f"Unknown gate type: {gate_type!r}. Use 'action' or 'state'.")
 
