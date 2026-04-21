@@ -140,11 +140,7 @@ class Kernel:
 
         # Lifecycle variables
         ns["_sleeping"] = False                   # set to True when Agent sleeps → frame loop pauses
-
-        def _sleep_fn():
-            ns["_sleeping"] = True
-
-        ns["sleep"] = _sleep_fn
+        ns["sleep"] = self.sleep
         ns["_next_wake"] = None                  # next wake time set by Agent (absolute timestamp)
 
         # Protected keys: all keys present at namespace init time.
@@ -371,6 +367,10 @@ class Kernel:
                 n=self.ns.get("_compaction_n", 8),
             )
             logger.info("Cleared incompatible frame_stream (schema mismatch)")
+
+    def sleep(self) -> None:
+        """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
+        self.ns["_sleeping"] = True
 
     # ------------------------------------------------------------------ High-level interface
 
