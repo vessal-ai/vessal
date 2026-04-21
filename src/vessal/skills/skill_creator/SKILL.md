@@ -6,7 +6,7 @@ description: Create a new skill scaffold
 # skill_creator
 
 Generates a Skill directory scaffold under `skill_paths[0]`. Delegates to the same generator used by
-the `vessal skill init` CLI, so the two surfaces always produce the same layout.
+the `vessal skill create` CLI, so the two surfaces always produce the same layout.
 
 ## Methods
 

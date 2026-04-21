@@ -70,7 +70,7 @@ def test_create_no_skill_paths():
 
 
 def test_matches_cli_scaffolder_output(tmp_path):
-    """skill_creator.create and `vessal skill init` write the same file set — R1 invariant."""
+    """skill_creator.create and `vessal skill create` write the same file set — R1 invariant."""
     from vessal.skills.skill_creator.skill import SkillCreator
     from vessal.ark.shell.cli.scaffold import write_skill_scaffold
 

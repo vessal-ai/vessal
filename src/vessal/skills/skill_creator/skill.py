@@ -8,7 +8,7 @@ from vessal.ark.shell.hull.skill import SkillBase
 
 
 class SkillCreator(SkillBase):
-    """Skill scaffold generator. Delegates to the same scaffolder used by `vessal skill init` so the two
+    """Skill scaffold generator. Delegates to the same scaffolder used by `vessal skill create` so the two
     surfaces cannot drift (single source of truth: ark.shell.cli.write_skill_scaffold).
 
     Attributes:
@@ -27,7 +27,7 @@ class SkillCreator(SkillBase):
     def create(self, name: str, description: str) -> str:
         """Create a Skill scaffold under `skill_paths[0]`.
 
-        The scaffold is identical to what `vessal skill init <name>` produces; `description` is
+        The scaffold is identical to what `vessal skill create <name>` produces; `description` is
         written into the generated skill.py/SKILL.md so Agent does not need to edit them manually.
 
         Args:
