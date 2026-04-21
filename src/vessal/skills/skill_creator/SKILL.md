@@ -10,7 +10,7 @@ the `vessal skill create` CLI, so the two surfaces always produce the same layou
 
 ## Methods
 
-skill_creator.create(name, description) — Create a scaffold directory
+skill_creator.create(name) — Create a scaffold directory
 
 ## Generated Structure
 
@@ -28,10 +28,10 @@ skill_creator.create(name, description) — Create a scaffold directory
 ## Usage
 
 ```python
-skill_creator.create("code_review", "code review tool")
+skill_creator.create("code_review")
 # → Creates code_review/ under skill_paths[0]
-# 1. Edit skill.py to implement
-# 2. Edit SKILL.md to describe methods
+# 1. Edit skill.py to fill in `description` and implement the tool
+# 2. Edit SKILL.md to describe methods and replace the placeholder description
 # 3. Edit tests/test_code_review.py
 # 4. skills.load("code_review") to load
 ```
