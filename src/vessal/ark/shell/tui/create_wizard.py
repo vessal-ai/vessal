@@ -96,22 +96,13 @@ def run(cwd: Path | None = None) -> int:
 
 
 def _scaffold(target: Path, answers: dict) -> None:
-    """Create project directory + baseline files.
-
-    Delegates to `vessal init` for the bulk of the scaffold (which already
-    writes a canonical .env.example with all three fields), then writes .env
-    based on wizard answers. Does not touch .env.example.
-    """
-    import subprocess
-    import sys
+    """Create project directory + baseline files + wizard-specific .env."""
+    from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
 
     if target.exists():
         raise CliUserError(f"{target} already exists")
 
-    subprocess.check_call(
-        [sys.executable, "-m", "vessal.cli", "init", answers["name"], "--no-venv"],
-        cwd=str(target.parent),
-    )
+    write_project_scaffold(target, install_venv=False)
 
     env_path = target / ".env"
     env_path.write_text(
