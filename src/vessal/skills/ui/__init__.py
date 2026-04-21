@@ -1,5 +1,4 @@
 """ui — cyber-embodied agent Skill."""
-from .skill import UI
-from .skill import UI as Skill  # compatibility alias
+from .skill import UI as Skill
 
-__all__ = ["UI"]
+__all__ = ["Skill"]
