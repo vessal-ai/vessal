@@ -56,9 +56,9 @@ def test_scaffold_emits_tutorial_when_flag_true(tmp_path):
     base.mkdir()
     write_skill_scaffold(base, "demo", with_tutorial=True)
     text = (base / "TUTORIAL.md").read_text(encoding="utf-8")
-    assert "# demo \u2014 Tutorial" in text
-    assert "## External references" in text
-    assert "## Common pitfalls" in text
+    assert "# demo \u2014 Development Guide" in text
+    assert "SORA" in text                      # mental model section present
+    assert "Checklist before publishing" in text
 
 
 def test_scaffold_emits_ui_when_flag_true(tmp_path):
