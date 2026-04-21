@@ -26,10 +26,11 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
 
     builtin_skills_src = Path(__file__).resolve().parent.parent.parent.parent / "skills"
     if builtin_skills_src.exists():
+        # ui, search, audio, vision are distributed via SkillHub — not bundled
         shutil.copytree(
             str(builtin_skills_src),
             str(bundled_dir),
-            ignore=shutil.ignore_patterns("__pycache__"),
+            ignore=shutil.ignore_patterns("__pycache__", "ui", "search", "audio", "vision"),
         )
     else:
         bundled_dir.mkdir(parents=True)
