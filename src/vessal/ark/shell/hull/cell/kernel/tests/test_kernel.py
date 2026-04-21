@@ -710,7 +710,7 @@ class TestKernel:
             os.unlink(snap_path)
 
     def test_snapshot_restore_no_skills(self, tmp_path):
-        """snapshot/restore works normally without Skills; header is an empty dict."""
+        """snapshot/restore works normally without Skills present in the namespace."""
         k = Kernel()
         k.exec_operation("x = 42", frame_number=1)
         snap = str(tmp_path / "test.pkl")
@@ -731,17 +731,20 @@ class TestKernel:
         k2.restore(snap)
         assert isinstance(k2.ns["_builtin_names"], list)
 
-    def test_snapshot_header_is_plain_dict(self, tmp_path):
-        """The snapshot file header is a plain string dict, readable without sys.path repair."""
+    def test_snapshot_is_single_blob_of_ns_dict(self, tmp_path):
+        """The snapshot file is a single cloudpickle blob containing the ns dict."""
         import cloudpickle as _cp
+        import io
         k = _kw()
         snap = str(tmp_path / "test.pkl")
         k.snapshot(snap)
 
-        with open(snap, "rb") as f:
-            header = _cp.load(f)
-
-        assert isinstance(header, dict)
+        raw = Path(snap).read_bytes()
+        buf = io.BytesIO(raw)
+        ns = _cp.load(buf)
+        # Exactly one blob: reading it consumes all bytes
+        assert buf.tell() == len(raw)
+        assert isinstance(ns, dict)
 
     def test_snapshot_restore_with_skill(self, tmp_path):
         """After loading a Skill and doing snapshot/restore, the Skill class object is correctly restored."""
@@ -1096,6 +1099,35 @@ def test_restore_keeps_current_schema_frame_stream(tmp_path):
     assert isinstance(k.ns["_frame_stream"], FrameStream)
     assert k.ns["_frame_stream"].hot_frame_count() == 1
     assert k.ns["_frame_stream"]._hot[0][0]["schema_version"] == FRAME_SCHEMA_VERSION
+
+
+def test_restore_migrates_legacy_two_blob_format(tmp_path):
+    """Legacy snapshot format: [skills_header_blob][ns_blob] is migrated to single-blob on restore.
+
+    The legacy format wrote a header dict (first blob) followed by the real namespace dict
+    (second blob). restore() detects remaining bytes after reading the first blob, discards
+    the header, loads the namespace from the second blob, and rewrites the file in the
+    current single-blob format so subsequent restores use the fast path.
+    """
+    import cloudpickle
+
+    header_bytes = cloudpickle.dumps({"chat": {"parent_path": "/skills"}})
+    ns_bytes = cloudpickle.dumps({"x": 99, "_sleeping": False})
+    legacy_path = tmp_path / "legacy.pkl"
+    legacy_path.write_bytes(header_bytes + ns_bytes)
+
+    k = Kernel()
+    k.restore(str(legacy_path))
+
+    assert k.ns["x"] == 99
+
+    # File must be rewritten in new single-blob format (fast path on subsequent restore)
+    raw = legacy_path.read_bytes()
+    import io
+    buf = io.BytesIO(raw)
+    restored_ns = cloudpickle.load(buf)
+    assert buf.tell() == len(raw), "expected exactly one blob in migrated file"
+    assert restored_ns["x"] == 99
 
 
 def test_snapshot_tracks_dropped_keys(tmp_path):
