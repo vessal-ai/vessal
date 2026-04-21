@@ -67,7 +67,7 @@ def bare_ns_v3() -> dict:
         "_frame_stream": FrameStream(),
         "_system_prompt": "",
         "_context_budget": 128000,
-        "_max_tokens": 4096,
+        "_token_budget": 4096,
         "_builtin_names": [],
         "_context_pct": 0,
         "_ns_meta": {},
@@ -88,7 +88,7 @@ def minimal_ns():
         "_frame_stream": FrameStream(),
         "_system_prompt": "",
         "_context_budget": 128000,
-        "_max_tokens": 4096,
+        "_token_budget": 4096,
         "_builtin_names": [],
         "_context_pct": 0,
         "_ns_meta": {},
@@ -367,7 +367,7 @@ class TestRenderFrameStream:
             fs.commit_frame(make_frame_record(number=i, stdout="x" * 500))
         ns["_frame_stream"] = fs
         ns["_context_budget"] = 2000
-        ns["_max_tokens"] = 500
+        ns["_token_budget"] = 500
         result = _render_frame_stream(ns, 1)
         # the frame stream header is present (at least 1 frame rendered)
         assert "══════ frame stream ══════" in result
@@ -458,7 +458,7 @@ class TestRender:
     def test_context_pct_nonzero_when_content(self):
         ns = bare_ns_v3()
         ns["_context_budget"] = 1000
-        ns["_max_tokens"] = 100
+        ns["_token_budget"] = 100
         fs = FrameStream(k=16, n=8)
         fs.commit_frame(make_frame_record(number=1, operation="x = 1"))
         ns["_frame_stream"] = fs
@@ -492,7 +492,7 @@ class TestRender:
     def test_invalid_budget_raises(self):
         ns = bare_ns_v3()
         ns["_context_budget"] = 1000
-        ns["_max_tokens"] = 4096
+        ns["_token_budget"] = 4096
         with pytest.raises(ValueError, match="context_budget.*<=.*max_tokens"):
             render(ns)
 
@@ -508,7 +508,7 @@ class TestRender:
     def test_render_writes_budget_total_to_ns(self):
         ns = bare_ns_v3()
         ns["_context_budget"] = 10000
-        ns["_max_tokens"] = 2000
+        ns["_token_budget"] = 2000
         render(ns)
         assert ns["_budget_total"] == 8000  # 10000 - 2000
 
@@ -539,7 +539,7 @@ class TestDroppedFrameCount:
             fs.commit_frame(make_frame_record(number=i, stdout="x" * 500))
         ns["_frame_stream"] = fs
         ns["_context_budget"] = 2000
-        ns["_max_tokens"] = 500
+        ns["_token_budget"] = 500
         render(ns)
         assert ns["_dropped_frame_count"] > 0
 
@@ -702,7 +702,7 @@ def test_renderer_output_order_system_stream_signals():
         "_frame_stream": fs,
         "_system_prompt": "SYS_SENTINEL",
         "_context_budget": 128000,
-        "_max_tokens": 4096,
+        "_token_budget": 4096,
         "_builtin_names": [],
         "_context_pct": 0,
         "_ns_meta": {},

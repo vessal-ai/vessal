@@ -120,7 +120,7 @@ class Kernel:
 
         # Context budget (used by renderer to calculate utilization)
         ns["_context_budget"] = 128000            # total context window (estimated tokens); Hull can override
-        ns["_max_tokens"] = 4096                  # reserved for LLM reply; Cell will override with actual value
+        ns["_token_budget"] = 4096                # reserved for LLM reply; Hull writes via cell.set("_token_budget", cell.max_tokens)
 
         # Initial values of side-effect variables written by executor
         # (ensures fields exist when rendering the first frame)

@@ -80,7 +80,7 @@ def render(ns: dict, config: RenderConfig | None = None) -> Ping:
     system_prompt = kernel_protocol
 
     context_budget = ns.get("_context_budget", 128000)
-    max_tokens = ns.get("_max_tokens", 4096)
+    max_tokens = ns.get("_token_budget", 4096)
     if context_budget <= max_tokens:
         raise ValueError(
             f"context_budget ({context_budget}) <= max_tokens ({max_tokens})"

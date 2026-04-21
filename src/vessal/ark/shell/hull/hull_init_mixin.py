@@ -57,6 +57,7 @@ class HullInitMixin:
             core_max_retries=core_cfg.get("max_retries", 3),
             api_params=api_params,
         )
+        self._cell.set("_token_budget", self._cell.max_tokens)
 
         self._log_dir = str(self._project_dir / "logs")
         self._max_frames = cell_cfg.get("max_frames", 100)

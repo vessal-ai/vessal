@@ -86,6 +86,12 @@ class Core:
         self._max_retries = max_retries
         self._api_params = dict(api_params) if api_params else dict(self._DEFAULT_API_PARAMS)
 
+    @property
+    def max_tokens(self) -> int:
+        """Token budget derived from api_params. OpenAI parameter naming stays local to Core."""
+        return self._api_params.get("max_tokens",
+                self._api_params.get("max_completion_tokens", 4096))
+
     def run(
         self,
         ping: Ping,

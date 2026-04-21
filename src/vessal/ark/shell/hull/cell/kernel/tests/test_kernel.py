@@ -40,7 +40,7 @@ def bare_ns() -> dict:
         "_error": None,
         "_diff": "",
         "_context_budget": 128000,
-        "_max_tokens": 4096,
+        "_token_budget": 4096,
         "_system_prompt": "",
         "_pins": set(),
         "_log_path": "",

@@ -59,9 +59,6 @@ class Cell:
             state_gate: StateGate initial mode, "auto" | "safe" | "human".
         """
         self._kernel = Kernel(snapshot_path=snapshot_path)
-        effective_params = api_params or Core._DEFAULT_API_PARAMS
-        self._kernel.ns["_max_tokens"] = effective_params.get("max_tokens",
-                                            effective_params.get("max_completion_tokens", 4096))
         self._core = Core(
             timeout=timeout,
             max_retries=core_max_retries,
@@ -73,6 +70,11 @@ class Cell:
         self._pong: Pong | None = None
 
     # ------------------------------------------------------------------ Public interface
+
+    @property
+    def max_tokens(self) -> int:
+        """Token budget from Core. Cell has no OpenAI parameter knowledge."""
+        return self._core.max_tokens
 
     @property
     def action_gate(self) -> str:

@@ -642,9 +642,9 @@ class TestRealTokenPassthrough:
 
     def test_context_pct_overwritten_by_real_data(self):
         cell = _make_cell()
-        # Set context_budget and max_tokens so renderer computes budget_total = 100000
+        # Set context_budget and token_budget so renderer computes budget_total = 100000
         cell.ns["_context_budget"] = 104096
-        cell.ns["_max_tokens"] = 4096
+        cell.ns["_token_budget"] = 4096
         pong = _make_pong(_action("x = 1"))
         cell._core.run = MagicMock(return_value=(pong, 50000, 200))
         cell.step()
