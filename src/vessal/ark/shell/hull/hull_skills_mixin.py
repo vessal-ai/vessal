@@ -70,7 +70,12 @@ class HullSkillsMixin:
         return True
 
     def _load_and_instantiate_skill(self, name: str) -> None:
-        """Load and instantiate a Skill. Pre-loaded skills are automatically placed into namespace."""
+        """Load and instantiate a Skill. Pre-loaded skills are automatically placed into namespace.
+
+        After setting the instance into namespace, calls instance._bind_hull(self) if the method
+        exists. This allows Skills that need a Hull handle (e.g. the merged Skills(SkillBase) class)
+        to receive it without exposing Hull in the user-facing namespace.
+        """
         import inspect
         try:
             skill_cls = self._skill_manager.load(name)
@@ -81,6 +86,9 @@ class HullSkillsMixin:
             else:
                 instance = skill_cls()
             self._cell.set(name, instance)
+            bind = getattr(instance, "_bind_hull", None)
+            if callable(bind):
+                bind(self)
             description = getattr(skill_cls, "description", "")
             print(f"{name} loaded — {description}")
         except Exception as e:
