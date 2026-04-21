@@ -336,7 +336,7 @@ Each agent project is a self-contained directory with an isolated Python virtual
 
 ```
 my_agent/
-    .venv/                  isolated Python environment created by vessal init
+    .venv/                  isolated Python environment created by vessal create
         bin/python          interpreter used to launch the Hull subprocess
         lib/.../site-packages/   Skill dependencies installed here
     snapshots/              namespace snapshots (timestamped .pkl files)
