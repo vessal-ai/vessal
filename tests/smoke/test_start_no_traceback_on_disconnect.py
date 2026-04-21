@@ -30,18 +30,15 @@ def _wait_for_port(port: int, host: str = "127.0.0.1", timeout: float = 30.0) ->
 
 @pytest.fixture
 def agent_project(tmp_path: Path):
-    """Scaffold a minimal project via ``vessal init --no-venv`` and return its path.
+    """Scaffold a minimal project and return its path.
 
     Writes a stub .env so openai.OpenAI() initialises without a real key.
     The test never makes an LLM call; it only verifies the HTTP layer.
     """
-    subprocess.run(
-        [sys.executable, "-m", "vessal.cli", "init", "agent", "--no-venv"],
-        cwd=str(tmp_path),
-        check=True,
-        capture_output=True,
-    )
+    from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+
     project = tmp_path / "agent"
+    write_project_scaffold(project, install_venv=False)
     (project / ".env").write_text(
         "OPENAI_API_KEY=sk-smoke-test-stub\n"
         "OPENAI_BASE_URL=http://127.0.0.1:1\n"

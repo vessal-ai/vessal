@@ -20,7 +20,7 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
 def test_top_level_help() -> None:
     r = _run("--help")
     assert r.returncode == 0, r.stderr
-    assert "start" in r.stdout and "skill" in r.stdout and "init" in r.stdout
+    assert "start" in r.stdout and "skill" in r.stdout
 
 
 def test_start_help() -> None:
@@ -39,9 +39,22 @@ def test_status_help() -> None:
     assert r.returncode == 0, r.stderr
 
 
-def test_init_help() -> None:
-    r = _run("init", "--help")
-    assert r.returncode == 0, r.stderr
+def test_vessal_create_has_no_positional_arg() -> None:
+    """`vessal create foo` must fail — name is wizard-only (C7)."""
+    import subprocess
+    result = subprocess.run(
+        [sys.executable, "-m", "vessal.cli", "create", "foo"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0, "create should reject positional arg"
+
+
+def test_vessal_init_removed() -> None:
+    """`vessal init` must no longer be a recognized subcommand."""
+    r = _run("init", "demo-proj")
+    assert r.returncode != 0
 
 
 def test_skill_list_help() -> None:
@@ -49,8 +62,8 @@ def test_skill_list_help() -> None:
     assert r.returncode == 0, r.stderr
 
 
-def test_skill_init_help() -> None:
-    r = _run("skill", "init", "--help")
+def test_skill_create_help() -> None:
+    r = _run("skill", "create", "--help")
     assert r.returncode == 0, r.stderr
 
 

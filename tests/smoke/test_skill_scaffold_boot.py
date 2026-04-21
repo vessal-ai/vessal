@@ -19,7 +19,7 @@ def hull_from_scaffold(tmp_path, monkeypatch):
     skills_dir = tmp_path / "skills" / "local"
     skill_pkg = skills_dir / skill_name
     skill_pkg.mkdir(parents=True)
-    write_skill_scaffold(skill_pkg, skill_name, "smoke placeholder")
+    write_skill_scaffold(skill_pkg, skill_name)
 
     (tmp_path / "hull.toml").write_text(
         f'[hull]\n'
@@ -41,7 +41,7 @@ def test_scaffold_module_imports(tmp_path):
     skill_name = "demo_import"
     skill_pkg = tmp_path / skill_name
     skill_pkg.mkdir()
-    write_skill_scaffold(skill_pkg, skill_name, "demo")
+    write_skill_scaffold(skill_pkg, skill_name)
 
     sys.path.insert(0, str(tmp_path))
     try:
@@ -68,7 +68,7 @@ def test_scaffolded_skill_accepts_ns_kwarg(tmp_path):
     skill_name = "demo_sig"
     skill_pkg = tmp_path / skill_name
     skill_pkg.mkdir()
-    write_skill_scaffold(skill_pkg, skill_name, "demo")
+    write_skill_scaffold(skill_pkg, skill_name)
 
     sys.path.insert(0, str(tmp_path))
     try:
