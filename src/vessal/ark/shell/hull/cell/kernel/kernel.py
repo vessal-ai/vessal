@@ -253,14 +253,8 @@ class Kernel:
         return _render(self.ns, self.ns.get("_render_config"))
 
     def snapshot(self, path: str) -> None:
-        """Serialize the namespace to a file.
+        """Serialize namespace to file. Pure bytes — no Skill awareness.
 
-        Uses cloudpickle, supporting functions, classes, lambdas, closures, and
-        all other callables. The file is written in two parts: first _loaded_skills
-        metadata (header), then the full ns (body). The header is used at restore
-        time to repair sys.path before deserialization, ensuring __import__ succeeds.
-        Module objects are recorded by cloudpickle under their names and re-imported
-        from disk at restore time.
         Atomic write: first writes to a temp file; replaces the target only on full
         success; the original file is unaffected on failure.
 
@@ -278,7 +272,6 @@ class Kernel:
         import tempfile
         path = str(path)
 
-        header_bytes = cloudpickle.dumps(self.ns.get("_loaded_skills", {}))
         try:
             body_bytes = cloudpickle.dumps(self.ns)
         except Exception as e:
@@ -302,7 +295,6 @@ class Kernel:
         fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as f:
-                f.write(header_bytes)
                 f.write(body_bytes)
             os.replace(tmp_path, path)
         except Exception:
@@ -313,31 +305,29 @@ class Kernel:
             raise
 
     def restore(self, path: str) -> None:
-        """Restore namespace from a file, completely replacing the current state.
-
-        Reads the header (Skill metadata) first, repairs sys.path and clears
-        sys.modules cache, then reads the body (full ns). cloudpickle deserializes
-        the body with __import__ for modules, by which point sys.path is ready.
+        """Restore ns from file. Caller MUST have prepared sys.path / sys.modules.
 
         Args:
             path: File path written by snapshot().
 
         Side effects:
-            Completely replaces self.ns. Modifies sys.path and sys.modules.
+            Completely replaces self.ns.
         """
-        import sys as _sys
+        import io as _io
         with open(path, "rb") as f:
-            loaded_skills = cloudpickle.load(f)
-            for name, info in loaded_skills.items():
-                parent_path = info.get("parent_path", "")
-                if parent_path and parent_path not in _sys.path:
-                    _sys.path.insert(0, parent_path)
-                # Clear sys.modules cache to ensure latest code is loaded from disk
-                stale = [k for k in _sys.modules
-                         if k == name or k.startswith(name + ".")]
-                for k in stale:
-                    del _sys.modules[k]
-            self.ns = cloudpickle.load(f)
+            raw = f.read()
+        buf = _io.BytesIO(raw)
+        first = cloudpickle.load(buf)
+        remaining = len(raw) - buf.tell()
+        if remaining > 0:
+            # Legacy layout: [cloudpickle(header_dict)][cloudpickle(ns)]
+            # Discard header; load the actual namespace from remaining bytes.
+            self.ns = cloudpickle.load(buf)
+            # Write back in new format so subsequent restores use fast path.
+            with open(path, "wb") as f:
+                f.write(cloudpickle.dumps(self.ns))
+        else:
+            self.ns = first
         self._migrate_snapshot()
 
     def _find_creation_operation(self, key: str) -> str:
