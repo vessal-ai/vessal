@@ -15,8 +15,6 @@ from vessal.ark.shell.cli.skill_cmds import (
     _cmd_skill_list,
     _cmd_skill_publish,
 )
-from vessal.ark.shell.cli.init_cmds import _cmd_init
-
 
 def main() -> None:
     """CLI entry function. Called by pyproject.toml [project.scripts]."""
@@ -57,14 +55,6 @@ def main() -> None:
     status_parser.add_argument(
         "--port", type=int, default=8420,
         help="Listen port (default: 8420)",
-    )
-
-    # vessal init
-    init_parser = subparsers.add_parser("init", help="Create project scaffold")
-    init_parser.add_argument("name", type=str, help="Project name")
-    init_parser.add_argument(
-        "--no-venv", action="store_true",
-        help="Skip virtual environment creation and dependency installation"
     )
 
     # vessal skill
@@ -111,8 +101,6 @@ def main() -> None:
         _cmd_stop(args)
     elif args.command == "status":
         _cmd_status(args)
-    elif args.command == "init":
-        _cmd_init(args)
     elif args.command == "skill":
         if args.skill_command == "create":
             _cmd_skill_create(args)

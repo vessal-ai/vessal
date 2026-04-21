@@ -20,7 +20,7 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
 def test_top_level_help() -> None:
     r = _run("--help")
     assert r.returncode == 0, r.stderr
-    assert "start" in r.stdout and "skill" in r.stdout and "init" in r.stdout
+    assert "start" in r.stdout and "skill" in r.stdout
 
 
 def test_start_help() -> None:
@@ -39,9 +39,10 @@ def test_status_help() -> None:
     assert r.returncode == 0, r.stderr
 
 
-def test_init_help() -> None:
-    r = _run("init", "--help")
-    assert r.returncode == 0, r.stderr
+def test_vessal_init_removed() -> None:
+    """`vessal init` must no longer be a recognized subcommand."""
+    r = _run("init", "demo-proj")
+    assert r.returncode != 0
 
 
 def test_skill_list_help() -> None:

@@ -13,7 +13,6 @@ Container commands (require Docker):
   vessal run       Start an Agent Docker container
 
 Development tools (do not require ARK runtime):
-  vessal init      Create project scaffold
   vessal skill     Skill management (create, check)
 """
 from __future__ import annotations
@@ -74,14 +73,6 @@ def main() -> None:
     run_parser.add_argument("-e", "--env", action="append", default=[], help="Environment variable KEY=VALUE (repeatable)")
 
     # ── Development tools ──
-
-    # vessal init
-    init_parser = subparsers.add_parser("init", help="Create project scaffold")
-    init_parser.add_argument("name", type=str, help="Project name")
-    init_parser.add_argument(
-        "--no-venv", action="store_true",
-        help="Skip virtual environment creation and dependency installation"
-    )
 
     # vessal check-update
     subparsers.add_parser("check-update", help="Check PyPI for a newer version")
@@ -147,8 +138,6 @@ def main() -> None:
             _cmd_build(args)
         elif args.command == "run":
             _cmd_container_run(args)
-        elif args.command == "init":
-            _cmd_init(args)
         elif args.command == "check-update":
             _cmd_check_update()
         elif args.command == "upgrade":
@@ -260,11 +249,6 @@ def _cmd_container_run(args: argparse.Namespace) -> None:
 
 
 # ── Development tool implementations ──
-
-def _cmd_init(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.init_cmds import _cmd_init as shell_init
-    shell_init(args)
-
 
 def _cmd_skill_create(args: argparse.Namespace) -> None:
     from vessal.ark.shell.cli.skill_cmds import _cmd_skill_create as shell_skill_create
