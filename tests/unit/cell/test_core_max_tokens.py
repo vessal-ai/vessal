@@ -1,7 +1,5 @@
 from unittest.mock import patch, MagicMock
 
-import pytest
-
 
 def _make_core(api_params=None, **kwargs):
     """Construct a Core instance with the OpenAI client patched out."""
@@ -23,6 +21,11 @@ def test_core_max_tokens_reads_max_tokens_key():
 def test_core_max_tokens_falls_back_to_max_completion_tokens():
     core = _make_core(api_params={"max_completion_tokens": 16000})
     assert core.max_tokens == 16000
+
+
+def test_core_max_tokens_prefers_max_tokens_over_max_completion_tokens():
+    core = _make_core(api_params={"max_tokens": 1000, "max_completion_tokens": 2000})
+    assert core.max_tokens == 1000
 
 
 def test_cell_proxies_max_tokens_from_core():

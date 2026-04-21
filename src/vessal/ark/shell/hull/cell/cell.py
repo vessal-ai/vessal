@@ -73,7 +73,6 @@ class Cell:
 
     @property
     def max_tokens(self) -> int:
-        """Token budget from Core. Cell has no OpenAI parameter knowledge."""
         return self._core.max_tokens
 
     @property
