@@ -62,7 +62,7 @@ max_tokens = 4096
 # top_k = 40
 
 [hull]
-skills = ["tasks", "pin", "chat", "heartbeat"]
+skills = ["tasks", "pin", "chat", "heartbeat", "skills"]
 skill_paths = ["skills/bundled", "skills/hub", "skills/local"]
 # compress_threshold = 50  # Context pressure signal threshold (default 50%, read by Memory skill)
 
