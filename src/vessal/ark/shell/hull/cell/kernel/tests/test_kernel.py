@@ -926,7 +926,7 @@ class TestKernel:
             return mock_result
 
         with patch.object(k, "exec_operation", side_effect=_fake_exec) as mock_exec:
-            result = k.run(pong)
+            result = k.step(pong)
 
         assert result is None
         assert k.ns["_frame"] == frame_before + 1
@@ -1036,21 +1036,21 @@ class TestExprCapture:
 
 
 # ─────────────────────────────────────────────
-# kernel.run() return value
+# kernel.step() return value
 # ─────────────────────────────────────────────
 
-class TestRunReturnsNone:
-    """kernel.run() no longer returns a Ping — it returns None."""
+class TestStepReturnsNone:
+    """kernel.step() no longer returns a Ping — it returns None."""
 
-    def test_run_returns_none(self):
-        """run() returns None after eliminating pre-render."""
+    def test_step_returns_none(self):
+        """step() returns None after eliminating pre-render."""
         from vessal.ark.shell.hull.cell.kernel import Kernel
         from vessal.ark.shell.hull.cell.protocol import Action, Pong
 
         k = Kernel()
         k.ns["_system_prompt"] = "test"
         pong = Pong(think="t", action=Action(operation="x = 1", expect=""))
-        result = k.run(pong)
+        result = k.step(pong)
         assert result is None, f"Expected None, got {type(result)}"
 
 

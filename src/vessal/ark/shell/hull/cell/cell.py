@@ -1,7 +1,7 @@
 """cell.py — Stateful execution engine: Kernel + Core + single-frame step(); does not auto-loop."""
 #
 # Single-frame execution order:
-#   prepare (each frame) → state_gate → core.run → action_gate → kernel.run → return StepResult
+#   prepare (each frame) → state_gate → core.step → action_gate → kernel.step → return StepResult
 #
 # Public interface:
 #   ns              namespace dict (property, proxied from Kernel)
@@ -160,9 +160,9 @@ class Cell:
         Flow:
             1. prepare (each frame)  — generate a fresh Ping (with latest signals)
             2. state_gate            — state gating (using the cached Ping)
-            3. core.run              — call LLM (Core handles parsing internally)
+            3. core.step             — call LLM (Core handles parsing internally)
             4. action_gate           — action gating
-            5. kernel.run            — exec → expect → frame → commit
+            5. kernel.step           — exec → expect → frame → commit
             6. return StepResult
 
         Returns StepResult(protocol_error=...) on network error, parse failure, or action_gate block.
@@ -181,7 +181,7 @@ class Cell:
         frame_number = self._kernel.ns["_frame"] + 1
 
         try:
-            self._pong, prompt_tokens, completion_tokens = self._core.run(
+            self._pong, prompt_tokens, completion_tokens = self._core.step(
                 self._ping, tracer, frame_number,
             )
         except Exception as e:
@@ -205,7 +205,7 @@ class Cell:
         if self._check_action_gate(self._pong.action.operation) is None:
             return StepResult(protocol_error="Action gate blocked")
 
-        self._kernel.run(self._pong, tracer, ping=self._ping, frame_number=frame_number)
+        self._kernel.step(self._pong, tracer, ping=self._ping, frame_number=frame_number)
 
         fs = self._kernel.ns.get("_frame_stream")
         latest = fs.latest_hot_frame() if fs is not None else None

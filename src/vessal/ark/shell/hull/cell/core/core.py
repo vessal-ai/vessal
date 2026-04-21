@@ -16,7 +16,7 @@
 #
 # Public interface:
 #   Core(timeout, max_retries, api_params)    constructor
-#   run(ping, tracer, frame) -> Pong          call LLM, return parsed Pong
+#   step(ping, tracer, frame) -> Pong         call LLM, return parsed Pong
 
 import logging
 import os
@@ -49,7 +49,7 @@ class Core:
     or providers, only api_params and environment variables need to be updated;
     Core code itself requires no modification.
 
-    Stateless: each run() is an independent API call; no conversation history
+    Stateless: each step() is an independent API call; no conversation history
     is maintained and no responses are cached.
     """
 
@@ -92,7 +92,7 @@ class Core:
         return self._api_params.get("max_tokens",
                 self._api_params.get("max_completion_tokens", 4096))
 
-    def run(
+    def step(
         self,
         ping: Ping,
         tracer: TracerLike | None = None,

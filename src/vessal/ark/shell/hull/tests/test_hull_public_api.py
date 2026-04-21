@@ -127,7 +127,7 @@ class TestHullNextAlarm:
 
 
 class TestHullRunMethods:
-    """Hull.run() and Hull.run_once() — lifecycle methods."""
+    """Hull.run() and Hull.step() — lifecycle methods."""
 
     def test_hull_has_run_method(self, tmp_path):
         """Hull has a run() method (replaces the old run_forever)."""
@@ -135,11 +135,11 @@ class TestHullRunMethods:
         assert hasattr(hull, "run")
         assert callable(hull.run)
 
-    def test_hull_has_run_once_method(self, tmp_path):
-        """Hull has a run_once() method (single wake cycle)."""
+    def test_hull_has_step_method(self, tmp_path):
+        """Hull has a step() method (single wake cycle)."""
         hull = _make_hull_with_mock_cell(tmp_path)
-        assert hasattr(hull, "run_once")
-        assert callable(hull.run_once)
+        assert hasattr(hull, "step")
+        assert callable(hull.step)
 
     def test_hull_no_run_forever(self, tmp_path):
         """Hull no longer has a run_forever() method."""

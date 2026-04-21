@@ -11,7 +11,7 @@ Responsible for:
 
 Not responsible for:
 - Gate checking (handled by Gate)
-- Frame log archiving (handled by Cell; _commit_frame is triggered by Cell but executes within kernel.run())
+- Frame log archiving (handled by Cell; _commit_frame is triggered by Cell but executes within kernel.step())
 - LLM calls (handled by Core)
 - HTTP communication (handled by Shell)
 
@@ -80,9 +80,9 @@ flowchart TD
     CheckDropped -->|no| Done
 ```
 
-_frame_log invariants: frame records are indirectly constructed by Cell via kernel.run(); _commit_frame handles FrameRecord assembly, but the append logic is inside kernel.py; max capacity _FRAME_LOG_MAX=200 frames. On schema version mismatch after restore, _frame_log is cleared to prevent old format frames from polluting new logic.
+_frame_log invariants: frame records are indirectly constructed by Cell via kernel.step(); _commit_frame handles FrameRecord assembly, but the append logic is inside kernel.py; max capacity _FRAME_LOG_MAX=200 frames. On schema version mismatch after restore, _frame_log is cleared to prevent old format frames from polluting new logic.
 
-Kernel and adjacent component relationships: Cell calls Kernel.run() to complete single-frame execution; Gate intercepts at the Cell layer and does not enter Kernel. Core receives Ping (the output of Kernel.render()) and returns Pong, which is then passed into Kernel.run(). Kernel does not reference Cell, Core, or Gate.
+Kernel and adjacent component relationships: Cell calls Kernel.step() to complete single-frame execution; Gate intercepts at the Cell layer and does not enter Kernel. Core receives Ping (the output of Kernel.render()) and returns Pong, which is then passed into Kernel.step(). Kernel does not reference Cell, Core, or Gate.
 
 Known scale issue: kernel.py is close to the 400-line limit; describe/ + render/ together exceed 700 lines; total exceeds 1100 lines. The scale comes from the inherent complexity of namespace management; not splitting for now, but new features must be evaluated for extraction into sub-modules.
 

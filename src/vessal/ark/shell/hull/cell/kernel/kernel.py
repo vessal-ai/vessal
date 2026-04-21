@@ -387,7 +387,7 @@ class Kernel:
         self.update_signals()
         return self.render()
 
-    def run(
+    def step(
         self,
         pong: Pong,
         tracer: TracerLike | None = None,

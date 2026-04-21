@@ -16,8 +16,8 @@ def _fixed_pong(code: str = "pass") -> Pong:
 
 
 def _stub_core(cell: Cell, pong: Pong) -> None:
-    """Replace cell._core.run with a stub that returns a fixed Pong."""
-    cell._core.run = MagicMock(return_value=(pong, None, None))
+    """Replace cell._core.step with a stub that returns a fixed Pong."""
+    cell._core.step = MagicMock(return_value=(pong, None, None))
 
 
 def test_ns_frame_increments_exactly_once_per_step():
@@ -38,16 +38,16 @@ def test_ns_frame_increments_exactly_once_over_multiple_steps():
     _stub_core(cell, _fixed_pong("pass"))
 
     for step_n in range(1, 4):
-        cell._core.run = MagicMock(return_value=(_fixed_pong("pass"), None, None))
+        cell._core.step = MagicMock(return_value=(_fixed_pong("pass"), None, None))
         result = cell.step()
         assert result.protocol_error is None
         assert cell.ns["_frame"] == step_n
 
 
 def test_ns_frame_not_incremented_on_core_error():
-    """ns["_frame"] must not change when core.run raises an exception."""
+    """ns["_frame"] must not change when core.step raises an exception."""
     cell = _make_cell()
-    cell._core.run = MagicMock(side_effect=RuntimeError("network failure"))
+    cell._core.step = MagicMock(side_effect=RuntimeError("network failure"))
 
     initial = cell.ns["_frame"]
     result = cell.step()
@@ -57,7 +57,7 @@ def test_ns_frame_not_incremented_on_core_error():
 
 
 def test_frame_number_passed_to_core_equals_ns_frame_plus_one():
-    """Core.run receives frame_number == ns["_frame"] + 1 (the about-to-be-committed number)."""
+    """Core.step receives frame_number == ns["_frame"] + 1 (the about-to-be-committed number)."""
     cell = _make_cell()
     pong = _fixed_pong("pass")
     received_frames: list[int] = []
@@ -66,7 +66,7 @@ def test_frame_number_passed_to_core_equals_ns_frame_plus_one():
         received_frames.append(frame)
         return (pong, None, None)
 
-    cell._core.run = MagicMock(side_effect=_capture_frame)
+    cell._core.step = MagicMock(side_effect=_capture_frame)
 
     initial = cell.ns["_frame"]
     cell.step()
@@ -87,7 +87,7 @@ def test_ns_frame_write_is_single_source_commit_frame():
 
     cell = _make_cell()
     pong = _fixed_pong("pass")
-    cell._core.run = MagicMock(return_value=(pong, None, None))
+    cell._core.step = MagicMock(return_value=(pong, None, None))
 
     initial = cell.ns["_frame"]
     frame_after_execute: list[int] = []

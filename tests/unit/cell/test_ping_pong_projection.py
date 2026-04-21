@@ -20,13 +20,13 @@ def _fixed_pong(code: str = "pass") -> Pong:
 
 
 def _stub_core(cell: Cell, pong: Pong) -> None:
-    cell._core.run = MagicMock(return_value=(pong, None, None))
+    cell._core.step = MagicMock(return_value=(pong, None, None))
 
 
 def test_ping_is_frame_stream_projection():
     """cell.ping must be re-derived from frame_stream after step(), not retained from prepare().
 
-    We simulate a divergence: after kernel.run() commits the frame, we overwrite the
+    We simulate a divergence: after kernel.step() commits the frame, we overwrite the
     frame's ping in the stream with a sentinel value. If cell.ping is truly a projection,
     it will reflect the sentinel. If cell.ping is just the pre-commit cached value, it won't.
     """
@@ -65,9 +65,9 @@ def test_ping_is_frame_stream_projection():
 
 
 def test_pong_is_frame_stream_projection():
-    """cell.pong must be re-derived from frame_stream after step(), not retained from core.run().
+    """cell.pong must be re-derived from frame_stream after step(), not retained from core.step().
 
-    We simulate a divergence: after kernel.run() commits the frame, we overwrite the
+    We simulate a divergence: after kernel.step() commits the frame, we overwrite the
     frame's pong in the stream with a sentinel. If cell.pong is truly a projection,
     it will reflect the sentinel. If it's just the pre-commit Pong, it won't.
     """

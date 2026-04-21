@@ -19,7 +19,7 @@ Not responsible for:
 
 1. Hull does not import the Shell layer — dependency direction: Shell depends on Hull, Hull depends on Cell, no reverse
 2. All public methods must have complete docstrings and type annotations
-3. Shell only accesses Hull through its public methods (handle / wake / status / frames / next_alarm / run / run_once / stop / snapshot)
+3. Shell only accesses Hull through its public methods (handle / wake / status / frames / next_alarm / run / step / stop / snapshot)
 
 ## Design
 

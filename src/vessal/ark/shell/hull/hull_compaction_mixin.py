@@ -95,7 +95,7 @@ class HullCompactionMixin:
         ping = self._build_compression_ping(payload, layer)
         t0 = time.monotonic()
         try:
-            pong, _p, _c = self._compression_core.run(ping, tracer=self._tracer, frame=frame_number)
+            pong, _p, _c = self._compression_core.step(ping, tracer=self._tracer, frame=frame_number)
             raw_json = pong.action.operation
             record = parse_compaction_json(raw_json, layer=layer, compacted_at=frame_number)
             elapsed_ms = int((time.monotonic() - t0) * 1000)

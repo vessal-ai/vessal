@@ -102,7 +102,7 @@ def test_metric_latency_ms_emitted_on_worker_completion(tmp_path):
         "outcomes": "", "artifacts": [], "notable": "",
     })
     fake_pong = Pong(think="", action=Action(operation=valid_json, expect=""))
-    hull._compression_core.run = MagicMock(return_value=(fake_pong, None, None))
+    hull._compression_core.step = MagicMock(return_value=(fake_pong, None, None))
 
     from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
     frame = {

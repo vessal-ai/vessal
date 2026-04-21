@@ -1,6 +1,6 @@
 """state_gate.py — Gate for state before it is sent to the LLM.
 
-StateGate checks the state string before it is sent to Core.run().
+StateGate checks the state string before it is sent to Core.step().
 Goal: intercept abnormally large context to protect API budget.
 
 Design principles:

@@ -98,7 +98,7 @@ class EventLoop:
             self.inject_wake(event)
             await asyncio.to_thread(self._run_wake_cycle)
 
-    async def run_once(self) -> None:
+    async def step(self) -> None:
         """Execute one wake cycle and return.
 
         Waits for one event, runs the frame loop until idle, saves a snapshot, then returns.

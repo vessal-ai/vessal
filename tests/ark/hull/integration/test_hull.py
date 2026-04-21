@@ -1,12 +1,12 @@
 # test_hull.py — Hull module tests (merged from test_hull.py + test_hull_v3.py)
 #
 # Strategy: build project directory using real filesystem (tmp_path fixture), mock Cell's
-# _core.run to avoid real API calls. Kernel uses real instances; snapshot/restore follow
+# _core.step to avoid real API calls. Kernel uses real instances; snapshot/restore follow
 # real paths.
 #
 # Hull.run_forever() is an async method — sync tests use hull._event_loop._frame_loop().
 # Agent signals completion via sleep(), no longer uses finished/result/goal.
-# Tests build project directories using real filesystem, mock Cell's _core.run to avoid
+# Tests build project directories using real filesystem, mock Cell's _core.step to avoid
 # real API calls.
 
 import json
@@ -49,7 +49,7 @@ def _make_hull(tmp_path, toml_content="", skills=None, env_content=None, soul_co
 
 
 def _set_responses(hull, responses):
-    """Set mock return values for Hull's internal Cell's _core.run ((Pong, None, None) triples).
+    """Set mock return values for Hull's internal Cell's _core.step ((Pong, None, None) triples).
 
     Bare Python strings are auto-wrapped in <action>...</action> format to pass parse_response.
     """
@@ -63,7 +63,7 @@ def _set_responses(hull, responses):
             return (parse_response(resp), None, None)
         return resp
 
-    hull._cell._core.run = MagicMock(side_effect=[make_result(r) for r in responses])
+    hull._cell._core.step = MagicMock(side_effect=[make_result(r) for r in responses])
 
 
 def _run_frame_loop(hull):
@@ -190,7 +190,7 @@ class TestRunLoop:
         hull = _make_hull(tmp_path, toml_content=toml)
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = "<action>\npass\n</action>"
-        hull._cell._core.run = MagicMock(
+        hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
         hull._cell.ns["_wake"] = "user_message"
@@ -213,7 +213,7 @@ class TestRunLoop:
         hull._cell.step = capturing_step
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = '<action>\nsleep()\n</action>'
-        hull._cell._core.run = MagicMock(
+        hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
         hull._cell.ns["_wake"] = "user_message"
@@ -544,7 +544,7 @@ class TestWake:
         hull._cell.step = capturing_step
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = '<action>\nsleep()\n</action>'
-        hull._cell._core.run = MagicMock(
+        hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
         hull._cell.ns["_wake"] = "user_message"
