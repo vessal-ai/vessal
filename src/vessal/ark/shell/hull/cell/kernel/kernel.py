@@ -186,6 +186,7 @@ class Kernel:
         self,
         expect: str,
         tracer: TracerLike | None = None,
+        frame_number: int | None = None,
     ) -> Verdict:
         """Evaluate prediction assertions on a shallow copy of the namespace. Does not modify the real namespace.
 
@@ -198,10 +199,10 @@ class Kernel:
         Returns:
             Verdict containing total/passed/failures fields.
         """
-        frame = self.ns.get("_frame", 0)
+        frame = frame_number if frame_number is not None else self.ns.get("_frame", 0) + 1
         if tracer:
             tracer.start(frame, "kernel.eval_expect")
-        result = evaluate_expect(expect, self.ns)
+        result = evaluate_expect(expect, self.ns, frame)
         if tracer:
             tracer.end(frame, "kernel.eval_expect")
         return result
@@ -428,7 +429,7 @@ class Kernel:
         exec_result = self.exec_operation(pong.action.operation, frame_number, tracer)
 
         if exec_result.error is None and pong.action.expect.strip():
-            verdict = self.eval_expect(pong.action.expect, tracer)
+            verdict = self.eval_expect(pong.action.expect, tracer, frame_number)
         else:
             verdict = None
 
