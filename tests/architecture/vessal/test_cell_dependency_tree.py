@@ -70,3 +70,27 @@ def test_cell_does_not_use_forbidden_patterns():
             if pattern in src:
                 offenders.append(f"{path}: contains `{pattern}`")
     assert offenders == [], "Cell contains forbidden patterns:\n  " + "\n  ".join(offenders)
+
+
+def test_cell_outside_kernel_does_not_import_sqlite3() -> None:
+    """sqlite3 is a Kernel-frame_log internal. Cell-level code (cell.py, gate/, etc.)
+    must not import it directly — frame persistence is Kernel's responsibility.
+    """
+    offenders = []
+    for path in _iter_python_files(CELL_ROOT):
+        # Kernel package may import sqlite3; skip it.
+        if "kernel" in path.parts:
+            continue
+        src = path.read_text(encoding="utf-8")
+        if not src.strip():
+            continue
+        tree = ast.parse(src, filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "sqlite3":
+                        offenders.append(f"{path}: import sqlite3")
+            elif isinstance(node, ast.ImportFrom):
+                if node.module == "sqlite3":
+                    offenders.append(f"{path}: from sqlite3")
+    assert offenders == [], "Cell (outside kernel/) imports sqlite3:\n  " + "\n  ".join(offenders)
