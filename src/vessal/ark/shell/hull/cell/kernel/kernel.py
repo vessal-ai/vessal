@@ -498,7 +498,7 @@ class Kernel:
         verdict_value: str | None = None
         if obs.verdict is not None:
             verdict_value = _json.dumps(obs.verdict.to_dict())
-        diff_json = obs.diff if obs.diff else "{}"
+        diff_json = obs.diff
         return FrameWriteSpec(
             n=record.number,
             pong_think=record.pong.think,
