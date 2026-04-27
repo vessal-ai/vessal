@@ -341,7 +341,8 @@ my_agent/
         lib/.../site-packages/   Skill dependencies installed here
     snapshots/              namespace snapshots (timestamped .pkl files)
     logs/
-        frames.jsonl        frame log (JSONL, all runs append here)
+        frame_log.db        frame log (SQLite, 5 tables; all runs append here)
+        frames.jsonl        optional JSONL companion log
     data/
         vessal.lock         flock process lock
     skills/                 user Skills

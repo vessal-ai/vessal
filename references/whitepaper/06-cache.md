@@ -378,11 +378,15 @@ Cascading is strict serial. Layer `L_{i+1}` consumes the output of `L_i`; runnin
 
 **Shift gating.**
 
-Semantic summarization runs as an async task, outside the main frame loop. The SORA loop never blocks on it. When compression lags behind frame production, the system must neither drop frames nor corrupt layer order. One invariant handles both:
+Semantic summarization does not live inside the main SORA loop. It runs in a **second Cell instance** — the compaction Cell — that reuses exactly the same Cell / Core / Kernel code as the main Cell, but is configured with a compaction-specific system prompt, a single `CompactionSkill`, and a distinct SQLite `table_prefix`. The two Cells share one SQLite file and communicate only through two system-level tables, `cold_summaries` (written by compaction, read by main) and `watermark` (per-layer consumption pointer). This is not an ad-hoc "background task": it is a full Agent in its own right, whose job happens to be compressing frames rather than serving the user. Framing compaction as another Cell keeps the framework surface minimal — there is no second abstraction to maintain — and generalizes cleanly to future sub-agents (search workers, audit Cells, etc.), which simply join the Hull's `cells: list[Cell]`.
+
+The SORA loop never blocks on compaction. When compression lags behind frame production, the system must neither drop frames nor corrupt layer order. One invariant handles both:
 
 > A bucket shift is permitted only when `len(B_0) ≥ k`, the compression zone is empty, and no compaction task is in flight.
 
 If any precondition fails, the shift is deferred. New frames keep arriving at `B_0`, which is allowed to exceed k for as long as necessary. This is classical pipeline backpressure: a stalled downstream lets the upstream buffer grow until drainage catches up. When compression completes and the compression zone clears, the pending frames shift in a single batch — possibly advancing multiple buckets at once.
+
+The split of labor between the two Cells is clean: **mechanical stripping** is a deterministic pure function, so it belongs to the main Cell's Kernel and runs every frame as part of the free `FrameStream` projection; **semantic summarization** is an LLM call, so it belongs to the compaction Cell and advances whenever Hull detects pending work. The main Cell's Kernel simply reads whatever layer state is currently committed in `cold_summaries` / `watermark` at the moment of its own `ping()`. Because both reads and the compaction commit happen inside SQLite transactions, the main Cell never observes a half-written layer.
 
 **Classical algorithm backing.**
 
@@ -544,6 +548,12 @@ If these protocols could be trained into model parameters through fine-tuning or
 The prerequisite is a sufficiently stable Agent framework and protocol. Vessal's SORA loop and frame protocol are converging toward that stability. When capabilities like computer use can be trained into the model rather than constrained by thousands of tokens of prompting, Agent efficiency will undergo a qualitative shift.
 
 Near-term, Vessal addresses "transmitted but computed less" through P1–P5 and the four-layer strategy. Mid-term, it explores prefix tuning or distillation experiments for core protocols. Long-term, when model fine-tuning APIs mature and framework protocols solidify, protocol into parameters will become the ultimate form of Agent framework optimization.
+
+### Per-Cell and Per-Frame Model Routing
+
+A second corollary of framing compaction as its own Cell is that model choice becomes a per-Cell configuration, not a global session setting. The main Cell may run a strong reasoning model with a mid-sized context window; the compaction Cell naturally runs a cheaper long-context summarization model, since its only job is folding k entries into one YAML record. Each Cell owns an independent `llm_config` (model, base URL, key, decoding parameters); neither inherits from the other. Because the two Cells interact purely through SQLite, nothing in the framework assumes they share a backend at all.
+
+The same decoupling points at a longer-term direction: **per-frame model routing within a single Cell**. Different moments of the SORA loop have different cost profiles — routine tool dispatch is cheap, cross-frame reflection is expensive, compaction itself is bulk throughput. Once a Cell can declare "this frame runs on model A, the next on model B" based on a signal the Kernel surfaces, the framework gains a price/quality dial that is orthogonal to compaction. Nothing in P1–P5 or hierarchical compaction forbids it — Ping is a structured object, and which model consumes that object is a downstream Core decision. This is not implemented today, but the architecture already admits it: multi-Cell routing is the coarse version, per-frame routing is the fine version, and both reduce to "select the right model for the work at hand."
 
 ```mermaid
 graph LR

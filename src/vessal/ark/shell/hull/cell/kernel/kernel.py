@@ -36,6 +36,7 @@ from vessal.ark.shell.hull.cell.protocol import (
     State,
     Verdict,
 )
+from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
@@ -78,19 +79,26 @@ class Kernel:
     Construction and appending of _frame_log is Cell's responsibility (Phase 3 implementation).
     """
 
-    def __init__(self, snapshot_path: str | None = None) -> None:
+    def __init__(self, snapshot_path: str | None = None, *, db_path: str | None = None) -> None:
         """Initialize Kernel.
 
         Args:
             snapshot_path: If provided, restore namespace from this file (continuing
                            a previous session). Otherwise, start a fresh namespace
                            with factory defaults.
+            db_path: Optional path to a SQLite database for the frame_log. When set,
+                     opens (or creates) the database and exposes a FrameLog via
+                     self.frame_log. When None (default), self.frame_log is None and
+                     no database is opened.
         """
         self.ns: dict = {}
         if snapshot_path:
             self.restore(snapshot_path)
         else:
             self._init_namespace()
+        self.frame_log: FrameLog | None = None
+        if db_path is not None:
+            self.frame_log = FrameLog(open_db(db_path))
 
     def _init_namespace(self) -> None:
         """Inject system variable factory defaults into an empty namespace."""
@@ -466,3 +474,41 @@ class Kernel:
         fs.commit_frame(record.to_dict())
         ns["_frame"] = frame_number
         ns["_verdict"] = observation.verdict
+        if self.frame_log is not None:
+            self.frame_log.write_frame(self._build_frame_write_spec(record))
+
+    def _build_frame_write_spec(self, record: FrameRecord) -> "FrameWriteSpec":
+        """Translate a FrameRecord into a FrameWriteSpec for the frame_log writer.
+
+        Args:
+            record: Completed FrameRecord from this frame.
+
+        Returns:
+            FrameWriteSpec ready to pass to FrameLog.write_frame().
+        """
+        import json as _json
+        from vessal.ark.shell.hull.cell.kernel.frame_log.types import ErrorOnSource, FrameWriteSpec
+
+        obs = record.observation
+        operation_error = (
+            ErrorOnSource("operation", None, obs.error)
+            if obs.error is not None
+            else None
+        )
+        verdict_value: str | None = None
+        if obs.verdict is not None:
+            verdict_value = _json.dumps(obs.verdict.to_dict())
+        diff_json = obs.diff
+        return FrameWriteSpec(
+            n=record.number,
+            pong_think=record.pong.think,
+            pong_operation=record.pong.action.operation,
+            pong_expect=record.pong.action.expect,
+            obs_stdout=obs.stdout or "",
+            obs_stderr="",
+            obs_diff_json=diff_json,
+            operation_error=operation_error,
+            verdict_value=verdict_value,
+            verdict_error=None,
+            signals=[],
+        )
