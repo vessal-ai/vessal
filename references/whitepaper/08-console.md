@@ -163,6 +163,29 @@ sequenceDiagram
 ```
 
 
+### 8.3.1 The frames domain wire shape
+
+The `/frames` endpoint and the `frame` SSE event payload use a flat shape that mirrors the SQLite `frame_content` columns defined in `docs/architecture/kernel/04-frame-log.md` §4.3. One source of truth for field naming spans disk, HTTP wire, and browser:
+
+| Wire field | Type | Meaning |
+|---|---|---|
+| `n` | int | Frame number (= `frame_content.n` = `entries.n_start` for layer=0). |
+| `layer` | int | Always 0 for hot-zone frames; reserved for future SQLite-sourced reads. |
+| `n_start`, `n_end` | int | Both equal `n` for layer=0 (Entry-model invariant I-1). |
+| `pong_think` | str | LLM thought text. May be empty. |
+| `pong_operation` | str | Python code executed this frame. |
+| `pong_expect` | str | Assertion code verified after operation. |
+| `obs_stdout` | str | print() output + last expression value. |
+| `obs_stderr` | str | Currently always `""` (in-memory frames don't capture stderr separately). |
+| `obs_diff_json` | str | Namespace diff (git-style text; column name preserved despite text content). |
+| `obs_error` | str \| null | Operation traceback text, or null. |
+| `verdict_value` | object \| null | Verdict `{total, passed, failures}` dict, or null. |
+| `verdict_error` | str \| null | Expect-block traceback text, or null. |
+| `signals` | array | Per-Skill signal rows. Empty `[]` until SQLite-direct sourcing (PR 4). |
+
+This is a clean break from the legacy nested shape (`pong.action.operation`, `observation.stdout`, `number`) — Hull no longer emits the old shape, and the Console no longer reads it. The flat shape is the contract.
+
+
 ## 8.4 Layer Responsibility Table
 
 Every actor reads from and writes to exactly the layers listed below. Crossing more than one boundary is a protocol violation.
