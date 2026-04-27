@@ -13,10 +13,6 @@
 #       info are retained while library-internal frames are folded.
 #       Bare expressions (e.g. x, data.head()) have their value appended to _stdout
 #       (Jupyter-style).
-#   attach_source(code, ns) -> None
-#       Attaches the source code of each top-level function/class definition in code
-#       as a obj._source attribute on the object.
-#       Called by execute.
 #   is_user_var(name) -> bool
 #       Determines whether a variable name is a user variable (does not start with _).
 #       Shared between executor and renderer.
@@ -193,14 +189,10 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
             frame_number, _time.time(),
         ))
 
-    # Step 7: attach the source of each newly defined function/class to the object's _source attribute
-    # Use the original operation, not modified_operation, to ensure accurate source
-    attach_source(operation, ns)
-
-    # Step 8: compute diff (git-style +/- format), write to _diff
+    # Step 7: compute diff (git-style +/- format), write to _diff
     _compute_diff(ns, before_keys, before_ids, before_values)
 
-    # Step 9: update _ns_meta — variable lifecycle tracking
+    # Step 8: update _ns_meta — variable lifecycle tracking
     ns["_ns_meta"] = _update_ns_meta(ns, before_keys, before_ids, frame_number)
 
     return ExecResult(stdout=ns["_stdout"], diff=ns["_diff"], error=ns["_error"])
@@ -254,50 +246,6 @@ def _maybe_capture_last_expr(action: str) -> str:
 
     replacement = f"_expr_result = ({expr_text})\n"
     return before + replacement + after_same + after_rest
-
-
-def attach_source(code: str, ns: dict) -> None:
-    """Store the source code of each top-level function/class definition in code as the object's _source attribute.
-
-    Source is stored as obj._source on the object itself, not in an external
-    mapping. cloudpickle serialization includes __dict__ automatically, so
-    _source is preserved with the object.
-
-    Design notes:
-    - When a function is redefined, the old object is GC'd and its source
-      disappears; no manual cleanup is needed
-    - After bar = foo, both share the same object and the same _source, as intended
-    - Source includes comments, docstrings, and decorators within the function
-      body — all original text within the ast line range
-
-    Silently skips on ast.parse failure (code with syntax errors will have
-    already failed at exec time).
-
-    Args:
-        code: The code string that was executed.
-        ns: The namespace dict after execution; used to look up objects by name.
-    """
-    try:
-        tree = ast.parse(code)
-        lines = code.splitlines(True)  # keepends=True, preserves line endings
-
-        for node in ast.iter_child_nodes(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                continue
-            name = node.name
-            if name not in ns:
-                continue
-            # When decorators are present, start from the first decorator line;
-            # otherwise start from the def/class line (both are 1-based)
-            start_line = node.decorator_list[0].lineno if node.decorator_list else node.lineno
-            source = "".join(lines[start_line - 1 : node.end_lineno])
-            try:
-                ns[name]._source = source
-            except (AttributeError, TypeError):
-                pass  # C-implemented builtin types (int, len, etc.) cannot have attributes; skip
-
-    except SyntaxError:
-        pass  # syntax error means exec already failed; skip source extraction
 
 
 def _compress_traceback(tb_text: str) -> str:

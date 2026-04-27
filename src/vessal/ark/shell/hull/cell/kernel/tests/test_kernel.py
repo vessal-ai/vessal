@@ -2,10 +2,10 @@
 #
 # Test coverage:
 #   TestIsUserVar       is_user_var helper function
-#   TestAttachSource    attach_source() — source attached to object attributes
 #   TestExecute         execute() — execute code, side effects written to ns
 #   TestCompressTraceback  _compress_traceback() — long traceback compression
 #   TestKernel          Kernel class integration tests (including ns exposure, render method)
+import inspect
 import os
 import sys
 import tempfile
@@ -17,7 +17,7 @@ import pytest
 from vessal.ark.shell.hull.cell.kernel import Kernel
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
-from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, attach_source, execute, _compress_traceback, _maybe_capture_last_expr
+from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, execute, _compress_traceback, _maybe_capture_last_expr
 from vessal.ark.shell.hull.cell.kernel.render import render
 from vessal.ark.shell.hull.skill_loader import SkillLoader
 
@@ -80,118 +80,6 @@ class TestIsUserVar:
 
     def test_long_user_name(self):
         assert is_user_var("my_long_variable_name") is True
-
-
-
-class TestAttachSource:
-    def test_function_gets_source(self):
-        ns = bare_ns()
-        code = "def foo():\n    return 1"
-        exec(code, ns)
-        attach_source(code, ns)
-        assert hasattr(ns["foo"], "_source")
-        assert "def foo" in ns["foo"]._source
-
-    def test_class_gets_source(self):
-        ns = bare_ns()
-        code = "class Bar:\n    pass"
-        exec(code, ns)
-        attach_source(code, ns)
-        assert hasattr(ns["Bar"], "_source")
-        assert "class Bar" in ns["Bar"]._source
-
-    def test_async_function_gets_source(self):
-        ns = bare_ns()
-        code = "async def async_fn():\n    pass"
-        exec(code, ns)
-        attach_source(code, ns)
-        assert hasattr(ns["async_fn"], "_source")
-        assert "async def async_fn" in ns["async_fn"]._source
-
-    def test_precise_single_function(self):
-        """With multiple functions, each function only saves its own source."""
-        ns = bare_ns()
-        code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
-        exec(code, ns)
-        attach_source(code, ns)
-        assert "def bar" not in ns["foo"]._source
-        assert "def foo" not in ns["bar"]._source
-
-    def test_source_includes_comments(self):
-        """_source includes comments inside the function body."""
-        ns = bare_ns()
-        code = "def with_comment():\n    # internal comment\n    return 42"
-        exec(code, ns)
-        attach_source(code, ns)
-        assert "internal comment" in ns["with_comment"]._source
-
-    def test_source_includes_docstring(self):
-        ns = bare_ns()
-        code = "def documented():\n    \"\"\"function docstring\"\"\"\n    pass"
-        exec(code, ns)
-        attach_source(code, ns)
-        assert "function docstring" in ns["documented"]._source
-
-    def test_syntax_error_silently_skipped(self):
-        """Syntax errors are silently skipped without raising."""
-        ns = bare_ns()
-        # attach_source should not crash on code with syntax errors
-        attach_source("def broken(:\n    pass", ns)  # syntax error
-
-    def test_name_not_in_ns_skipped(self):
-        """Names not in ns are skipped without raising."""
-        ns = bare_ns()
-        code = "def foo():\n    pass"
-        # do not exec; foo is not in ns
-        attach_source(code, ns)  # should not crash
-
-    def test_source_survives_reassignment(self):
-        """After redefining a function, the new object has new source; old source is not left behind."""
-        ns = bare_ns()
-        exec("def greet():\n    return 'old'", ns)
-        attach_source("def greet():\n    return 'old'", ns)
-        old_fn = ns["greet"]
-
-        exec("def greet():\n    return 'new'", ns)
-        attach_source("def greet():\n    return 'new'", ns)
-
-        assert "new" in ns["greet"]._source
-        # old function object still has old source (if a reference remains)
-        assert "old" in old_fn._source
-
-    def test_decorated_function_source_includes_decorator(self):
-        """For decorated functions, _source must include the decorator line; otherwise semantics are incomplete."""
-        ns = bare_ns()
-        # staticmethod is a builtin decorator that can be used directly
-        code = "def my_decorator(fn):\n    return fn\n\n@my_decorator\ndef decorated():\n    return 42"
-        exec(code, ns)
-        attach_source(code, ns)
-        assert "@my_decorator" in ns["decorated"]._source
-        assert "def decorated" in ns["decorated"]._source
-
-    def test_multiple_decorators_source_starts_from_first(self):
-        """With multiple decorators, _source starts from the outermost (first) decorator."""
-        ns = bare_ns()
-        code = (
-            "def d1(fn): return fn\n"
-            "def d2(fn): return fn\n"
-            "@d1\n"
-            "@d2\n"
-            "def multi_decorated():\n"
-            "    pass"
-        )
-        exec(code, ns)
-        attach_source(code, ns)
-        source = ns["multi_decorated"]._source
-        assert source.startswith("@d1")
-
-    def test_non_settable_attribute_skipped(self):
-        """Silently skips objects with non-settable attributes (e.g. int, builtin_function); does not crash."""
-        ns = bare_ns()
-        code = "def foo():\n    pass\nfoo = len"
-        exec(code, ns)
-        # should not raise AttributeError
-        attach_source(code, ns)
 
 
 # ─────────────────────────────────────────────
@@ -323,43 +211,42 @@ class TestExecute:
         assert ns["_frame_stream"].hot_frame_count() == 0
 
     def test_source_function_on_object(self):
-        """Function source is stored on obj._source, not in ns['_source']."""
+        """Function source is recoverable via inspect.getsource (linecache)."""
         ns = bare_ns()
         code = "def add(a, b):\n    return a + b"
         execute(code, ns, frame_number=1)
-        assert hasattr(ns["add"], "_source")
-        assert "def add(a, b):" in ns["add"]._source
-        assert "return a + b" in ns["add"]._source
+        src = inspect.getsource(ns["add"])
+        assert "def add(a, b):" in src
+        assert "return a + b" in src
 
     def test_source_class_on_object(self):
+        """Class source is recoverable via inspect.getsource (linecache)."""
         ns = bare_ns()
         code = "class Foo:\n    def bar(self):\n        pass"
         execute(code, ns, frame_number=1)
-        assert hasattr(ns["Foo"], "_source")
-        assert "class Foo:" in ns["Foo"]._source
-
-    def test_source_no_external_mapping(self):
-        """v2 does not use ns['_source'] external mapping."""
-        ns = bare_ns()
-        execute("def foo():\n    pass", ns, frame_number=1)
-        assert "_source" not in ns
+        src = inspect.getsource(ns["Foo"])
+        assert "class Foo:" in src
 
     def test_source_precise_multiple_functions(self):
-        """When a code block defines multiple functions, each saves only its own source."""
+        """Each function's inspect.getsource returns its own definition span."""
         ns = bare_ns()
         code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
         execute(code, ns, frame_number=1)
-        assert "def foo" in ns["foo"]._source
-        assert "def bar" not in ns["foo"]._source
-        assert "def bar" in ns["bar"]._source
-        assert "def foo" not in ns["bar"]._source
+        foo_src = inspect.getsource(ns["foo"])
+        bar_src = inspect.getsource(ns["bar"])
+        assert "def foo" in foo_src
+        assert "def bar" not in foo_src
+        assert "def bar" in bar_src
+        assert "def foo" not in bar_src
 
     def test_source_redefine(self):
-        """After redefinition, the new object has new source."""
+        """After redefinition under a different frame number, inspect.getsource
+        on the new function returns the new source."""
         ns = bare_ns()
         execute("def greet():\n    return 'old'", ns, frame_number=1)
         execute("def greet():\n    return 'new'", ns, frame_number=2)
-        assert "new" in ns["greet"]._source
+        src = inspect.getsource(ns["greet"])
+        assert "new" in src
 
     def test_function_callable_after_execute(self):
         ns = bare_ns()
@@ -690,27 +577,6 @@ class TestKernel:
         finally:
             os.unlink(snap_path)
 
-    def test_snapshot_restores_function_and_source(self):
-        """cloudpickle restores dynamically defined functions; _source attribute is also preserved."""
-        k = Kernel()
-        k.exec_operation("def triple(x):\n    return x * 3", frame_number=1)
-
-        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
-            snap_path = f.name
-
-        try:
-            k.snapshot(snap_path)
-            k2 = Kernel()
-            k2.restore(snap_path)
-            # function is callable
-            k2.exec_operation("val = triple(5)", frame_number=1)
-            assert k2.ns["val"] == 15
-            # _source is preserved
-            assert hasattr(k2.ns["triple"], "_source")
-            assert "def triple" in k2.ns["triple"]._source
-        finally:
-            os.unlink(snap_path)
-
     def test_snapshot_restore_no_skills(self, tmp_path):
         """snapshot/restore works normally without Skills present in the namespace."""
         k = Kernel()
@@ -995,11 +861,16 @@ class TestExprCapture:
         assert ns["_error"] is not None
 
     def test_source_uses_original_action(self):
-        """attach_source uses the original action, not the rewritten one — function source is accurate."""
+        """source_cache registers the original operation text (NOT the
+        bare-expression-rewritten modified_operation). For pure-def code
+        the two are identical, but the registration target is operation;
+        verify via inspect.getsource."""
         ns = bare_ns()
         code = "def add(a, b):\n    return a + b"
         execute(code, ns, frame_number=1)
-        assert "def add(a, b):" in ns["add"]._source
+        src = inspect.getsource(ns["add"])
+        assert "def add(a, b):" in src
+        assert "return a + b" in src
 
     def test_expr_result_not_in_namespace(self):
         """_expr_result does not persist in namespace."""
@@ -1188,3 +1059,73 @@ def test_init_namespace_has_compaction_defaults():
     k = Kernel()
     assert k.ns["_compaction_k"] == 16
     assert k.ns["_compaction_n"] == 8
+
+
+# ─────────────────────────────────────────────
+# inspect.getsource — linecache-backed source recovery (PR 2 contract)
+# ─────────────────────────────────────────────
+
+class TestInspectGetSource:
+    """Lock in the contract that PR 2 (cf5836f) established: stdlib
+    inspect.getsource works on Kernel-defined functions and classes,
+    both immediately after exec and after a snapshot/restore round trip
+    backed by a SQLite frame_log.
+
+    These tests deliberately avoid asserting anything about a `_source`
+    attribute — that mechanism was retired in this PR. The contract is
+    purely on inspect.getsource against linecache.
+    """
+
+    def test_inspect_getsource_function_after_execute(self):
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        k.exec_operation("def add(a, b):\n    return a + b", frame_number=1)
+        src = inspect.getsource(k.ns["add"])
+        assert "def add(a, b):" in src
+        assert "return a + b" in src
+
+    def test_inspect_getsource_class_after_execute(self):
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        k.exec_operation("class Bar:\n    def m(self):\n        return 1", frame_number=2)
+        src = inspect.getsource(k.ns["Bar"])
+        assert "class Bar:" in src
+        assert "def m(self):" in src
+
+    def test_inspect_getsource_async_function(self):
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        k.exec_operation("async def waiter():\n    return 42", frame_number=3)
+        src = inspect.getsource(k.ns["waiter"])
+        assert "async def waiter" in src
+
+    def test_inspect_getsource_decorated_function_includes_decorator(self):
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        code = (
+            "def my_decorator(fn):\n"
+            "    return fn\n"
+            "\n"
+            "@my_decorator\n"
+            "def decorated():\n"
+            "    return 42"
+        )
+        k.exec_operation(code, frame_number=4)
+        src = inspect.getsource(k.ns["decorated"])
+        assert "@my_decorator" in src
+        assert "def decorated" in src
+
+    def test_inspect_getsource_distinct_per_function(self):
+        """Two functions defined in the same operation each map to the
+        single shared <frame-N> source; inspect.getsource returns the
+        function's own definition span via the function's lineno."""
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
+        k.exec_operation(code, frame_number=5)
+        foo_src = inspect.getsource(k.ns["foo"])
+        bar_src = inspect.getsource(k.ns["bar"])
+        assert "def foo" in foo_src
+        assert "def bar" not in foo_src
+        assert "def bar" in bar_src
+        assert "def foo" not in bar_src
