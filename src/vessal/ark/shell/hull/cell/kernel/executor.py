@@ -131,16 +131,18 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
     # below; compile against the same filename so co_filename matches.
     source_cache.register(frame_number, operation, None)
     filename = f"<frame-{frame_number}>"
-    code = compile(modified_operation, filename, "exec")
-    # Set __name__ so classes defined in this exec record __module__ = filename,
-    # enabling inspect.getsource(SomeClass) via the sys.modules entry registered above.
-    ns["__name__"] = filename
 
     # Step 5: execute code, capture stdout and exceptions
     stdout_buffer = io.StringIO()
     error = None
 
     try:
+        # SyntaxError from compile() is a user error; catch it here so the
+        # error handling path below formats and stores it like any runtime error.
+        code = compile(modified_operation, filename, "exec")
+        # Set __name__ so classes defined in this exec record __module__ = filename,
+        # enabling inspect.getsource(SomeClass) via the sys.modules entry registered above.
+        ns["__name__"] = filename
         with redirect_stdout(stdout_buffer):
             exec(code, ns)  # noqa: S102
     except KeyboardInterrupt:
