@@ -339,12 +339,12 @@ my_agent/
     .venv/                  isolated Python environment created by vessal create
         bin/python          interpreter used to launch the Hull subprocess
         lib/.../site-packages/   Skill dependencies installed here
-    snapshots/              namespace snapshots (timestamped .pkl files)
-    logs/
-        frame_log.db        frame log (SQLite, 5 tables; all runs append here)
-        frames.jsonl        optional JSONL companion log
+    snapshots/              namespace snapshots (timestamped .pkl files) [pre-relocation]
     data/
         vessal.lock         flock process lock
+        main/               primary Cell persistent storage
+            frame_log.sqlite    frame log (SQLite, 5 tables; all runs append here)
+            snapshot.cloudpickle    namespace L snapshot [post-relocation target]
     skills/                 user Skills
     hull.toml               configuration
 ```
