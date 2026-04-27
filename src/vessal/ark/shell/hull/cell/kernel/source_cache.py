@@ -18,6 +18,21 @@ from __future__ import annotations
 
 import linecache
 import sqlite3
+import sys
+import types
+
+
+def _register_module(filename: str) -> None:
+    """Register a synthetic module in sys.modules so inspect.getsource works on classes.
+
+    inspect.getsource(SomeClass) resolves via SomeClass.__module__ → sys.modules[mod].__file__
+    → linecache. Without a sys.modules entry the class appears built-in and getsource raises
+    TypeError. The synthetic module holds only __file__; it is never imported as a real package.
+    """
+    if filename not in sys.modules:
+        mod = types.ModuleType(filename)
+        mod.__file__ = filename
+        sys.modules[filename] = mod
 
 
 def register(n: int, operation: str | None, expect: str | None) -> None:
@@ -41,10 +56,12 @@ def register(n: int, operation: str | None, expect: str | None) -> None:
         filename = f"<frame-{n}>"
         lines = operation.splitlines(keepends=True)
         linecache.cache[filename] = (len(operation), None, lines, filename)
+        _register_module(filename)
     if expect:
         filename = f"<frame-{n}-expect>"
         lines = expect.splitlines(keepends=True)
         linecache.cache[filename] = (len(expect), None, lines, filename)
+        _register_module(filename)
 
 
 def reload_from_db(conn: sqlite3.Connection) -> int:
