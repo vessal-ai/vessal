@@ -45,6 +45,7 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
     _write_gitignore(project_dir)
     _write_example_skill(local_dir)
     _write_gates(project_dir)
+    _write_main_cell_data_dir(project_dir)
 
     if install_venv:
         _install_dependencies(project_dir)
@@ -78,6 +79,11 @@ def _write_hull_toml(project_dir: Path, project_name: str) -> None:
         f'skills = ["tasks", "pin", "chat", "heartbeat", "skills"]\n'
         f'skill_paths = ["skills/bundled", "skills/hub", "skills/local"]\n'
         f'# compress_threshold = 50  # Context pressure signal threshold (default 50%, read by Memory skill)\n'
+        f'\n'
+        f'[cells.main]\n'
+        f'# Per-Cell data directory; relative to project root.\n'
+        f'# Hosts frame_log.sqlite (Kernel\'s durable frame archive).\n'
+        f'data_dir = "data/main"\n'
         f'\n'
         f'[gates]\n'
         f'# Gate conditions (see docs)\n',
@@ -130,7 +136,8 @@ def _write_gitignore(project_dir: Path) -> None:
         ".venv/\n"
         "snapshots/\n"
         "logs/\n"
-        "__pycache__/\n",
+        "__pycache__/\n"
+        "data/*/frame_log.sqlite-*\n",
         encoding="utf-8",
     )
 
@@ -252,6 +259,16 @@ def _write_gates(project_dir: Path) -> None:
         '    # if len(state) > 500_000:\n'
         '    #     return False, "context is too long"\n'
         '    return True, ""\n',
+        encoding="utf-8",
+    )
+
+
+def _write_main_cell_data_dir(project_dir: Path) -> None:
+    main_data = project_dir / "data" / "main"
+    main_data.mkdir(parents=True, exist_ok=True)
+    (main_data / ".gitkeep").write_text(
+        "# Placeholder so the directory is committed even when empty.\n"
+        "# Kernel writes frame_log.sqlite here at runtime.\n",
         encoding="utf-8",
     )
 
