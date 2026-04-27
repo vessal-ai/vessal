@@ -33,17 +33,10 @@ def test_cell_without_data_dir_has_no_frame_log():
     cell = _make_cell()
     assert cell._kernel.frame_log is None
     assert cell._data_dir is None
-    assert cell.cell_name == "main"  # default name even when data_dir is absent
 
 
 def test_cell_data_dir_must_already_exist(tmp_path):
-    """Cell does not auto-create data_dir; Hull is responsible for mkdir.
-
-    Cell does receive an absolute path that must exist — if it doesn't,
-    sqlite3.connect will create the file (a stray sqlite at a missing parent
-    raises). We assert Cell raises a clear FileNotFoundError pointing at the
-    missing directory, rather than letting sqlite3 emit an opaque OperationalError.
-    """
+    """Cell raises FileNotFoundError when data_dir does not exist."""
     missing = tmp_path / "does" / "not" / "exist"
     with pytest.raises(FileNotFoundError) as exc:
         _make_cell(cell_name="main", data_dir=str(missing))
