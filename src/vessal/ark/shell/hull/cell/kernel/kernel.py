@@ -195,6 +195,8 @@ class Kernel:
         Args:
             expect: Expect code string (containing assert statements).
             tracer: Optional TracerLike for recording evaluation time.
+            frame_number: Current frame number for linecache registration. When None,
+                falls back to ns["_frame"] + 1 (next frame).
 
         Returns:
             Verdict containing total/passed/failures fields.
