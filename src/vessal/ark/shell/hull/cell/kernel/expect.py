@@ -22,6 +22,8 @@ import textwrap
 from typing import Any
 
 from vessal.ark.shell.hull.cell.protocol import Verdict, VerdictFailure
+from vessal.ark.shell.hull.cell.kernel import source_cache
+
 
 class ExpectValidationError(ValueError):
     """expect code is invalid.
@@ -118,7 +120,7 @@ def _assert_to_source(node: ast.Assert) -> str:
         return "<assert>"
 
 
-def evaluate_expect(expect: str, ns: dict[str, Any]) -> Verdict:
+def evaluate_expect(expect: str, ns: dict[str, Any], frame_number: int) -> Verdict:
     """Evaluate expect assertions on a shallow copy of the namespace.
 
     Evaluation steps:
@@ -133,6 +135,9 @@ def evaluate_expect(expect: str, ns: dict[str, Any]) -> Verdict:
     Args:
         expect: expect code string.
         ns: Namespace after operation execution (shallow-copied; original not modified).
+        frame_number: Current frame number; used as the linecache filename suffix
+            (`<frame-{n}-expect>`) so inspect.getsource and traceback show
+            the right context.
 
     Returns:
         Verdict containing total/passed/failures.
@@ -142,6 +147,9 @@ def evaluate_expect(expect: str, ns: dict[str, Any]) -> Verdict:
         code but should not be written to (validate_expect_ast blocks assignment
         statements).
     """
+    # Register the expect text into linecache so inspect.getsource and
+    # traceback line printing work for any functions/classes in expect.
+    source_cache.register(frame_number, None, expect)
     # Validation phase: syntax/safety errors → overall failure
     try:
         tree = validate_expect_ast(expect)
@@ -179,7 +187,7 @@ def evaluate_expect(expect: str, ns: dict[str, Any]) -> Verdict:
         mini_module = ast.Module(body=[stmt], type_ignores=[])
         ast.fix_missing_locations(mini_module)
         try:
-            code = compile(mini_module, filename="<expect>", mode="exec")
+            code = compile(mini_module, filename=f"<frame-{frame_number}-expect>", mode="exec")
             exec(code, eval_ns)  # noqa: S102
         except AssertionError as exc:
             msg = str(exc) if str(exc) else f"Assertion is False: {source}"

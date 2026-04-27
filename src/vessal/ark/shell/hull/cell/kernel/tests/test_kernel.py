@@ -416,7 +416,7 @@ class TestCompressTraceback:
             lines.append(f'  File "/lib/mod_{i}.py", line {i + 1}, in func_{i}')
             lines.append(f"    call_{i}()")
         if has_user_frame:
-            lines.append('  File "<string>", line 5, in <module>')
+            lines.append('  File "<frame-1>", line 5, in <module>')
             lines.append("    result = bad_function()")
         lines.append("ValueError: something went wrong")
         return "\n".join(lines)
@@ -433,7 +433,7 @@ class TestCompressTraceback:
         assert len(result) < len(tb)
         assert result.startswith("Traceback (most recent call last):")
         assert "lines omitted" in result
-        assert 'File "<string>"' in result
+        assert 'File "<frame-1>"' in result
         assert "ValueError: something went wrong" in result
 
     def test_omitted_count_accurate(self):

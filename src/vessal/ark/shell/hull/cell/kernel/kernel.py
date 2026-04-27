@@ -37,6 +37,7 @@ from vessal.ark.shell.hull.cell.protocol import (
     Verdict,
 )
 from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
+from vessal.ark.shell.hull.cell.kernel import source_cache
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
@@ -98,7 +99,9 @@ class Kernel:
             self._init_namespace()
         self.frame_log: FrameLog | None = None
         if db_path is not None:
-            self.frame_log = FrameLog(open_db(db_path))
+            conn = open_db(db_path)
+            source_cache.reload_from_db(conn)
+            self.frame_log = FrameLog(conn)
 
     def _init_namespace(self) -> None:
         """Inject system variable factory defaults into an empty namespace."""
@@ -186,6 +189,7 @@ class Kernel:
         self,
         expect: str,
         tracer: TracerLike | None = None,
+        frame_number: int | None = None,
     ) -> Verdict:
         """Evaluate prediction assertions on a shallow copy of the namespace. Does not modify the real namespace.
 
@@ -194,14 +198,16 @@ class Kernel:
         Args:
             expect: Expect code string (containing assert statements).
             tracer: Optional TracerLike for recording evaluation time.
+            frame_number: Current frame number for linecache registration. When None,
+                falls back to ns["_frame"] + 1 (next frame).
 
         Returns:
             Verdict containing total/passed/failures fields.
         """
-        frame = self.ns.get("_frame", 0)
+        frame = frame_number if frame_number is not None else self.ns.get("_frame", 0) + 1
         if tracer:
             tracer.start(frame, "kernel.eval_expect")
-        result = evaluate_expect(expect, self.ns)
+        result = evaluate_expect(expect, self.ns, frame)
         if tracer:
             tracer.end(frame, "kernel.eval_expect")
         return result
@@ -428,7 +434,7 @@ class Kernel:
         exec_result = self.exec_operation(pong.action.operation, frame_number, tracer)
 
         if exec_result.error is None and pong.action.expect.strip():
-            verdict = self.eval_expect(pong.action.expect, tracer)
+            verdict = self.eval_expect(pong.action.expect, tracer, frame_number)
         else:
             verdict = None
 

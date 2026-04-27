@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
+import linecache
+import sys
+
 import pytest
 
 from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, execute, is_user_var
@@ -286,3 +290,62 @@ class TestErrorRecording:
         execute("del sleep", ns, frame_number=1)
         errors = ns["_errors"]
         assert any(e.type == "builtin_restored" for e in errors)
+
+
+class TestLinecacheRegistration:
+    """executor registers operation source into linecache under '<frame-N>' so
+    inspect.getsource works on classes/functions defined in operation."""
+
+    def _clear(self, n: int) -> None:
+        linecache.cache.pop(f"<frame-{n}>", None)
+        sys.modules.pop(f"<frame-{n}>", None)
+
+    def test_operation_lines_in_linecache(self):
+        ns = _ns()
+        self._clear(42)
+        execute("x = 1\ny = 2\n", ns, frame_number=42)
+        assert linecache.getlines("<frame-42>") == ["x = 1\n", "y = 2\n"]
+
+    def test_inspect_getsource_works_on_class_defined_in_operation(self):
+        """The whole point of the PR — agent code defines a class, inspect can fetch source."""
+        ns = _ns()
+        self._clear(42)
+        execute(
+            "class Planner:\n    def plan(self):\n        return [1, 2, 3]\n",
+            ns,
+            frame_number=42,
+        )
+        Planner = ns["Planner"]
+        src = inspect.getsource(Planner)
+        assert "class Planner" in src
+        assert "return [1, 2, 3]" in src
+
+    def test_co_filename_is_frame_n(self):
+        """compile() uses <frame-N>; functions defined in operation inherit it via co_filename."""
+        ns = _ns()
+        self._clear(42)
+        execute("def helper():\n    return 99\n", ns, frame_number=42)
+        assert ns["helper"].__code__.co_filename == "<frame-42>"
+
+    def test_traceback_text_references_frame_n(self):
+        """Tracebacks now point at <frame-N>, not <string>."""
+        ns = _ns()
+        self._clear(42)
+        execute("raise ValueError('boom')\n", ns, frame_number=42)
+        err = ns["_error"]
+        assert err is not None
+        assert '"<frame-42>"' in err
+
+    def test_empty_operation_does_not_register(self):
+        """No-op operation does not pollute linecache."""
+        self._clear(99)
+        ns = _ns()
+        execute("", ns, frame_number=99)
+        assert "<frame-99>" not in linecache.cache
+
+    def test_dunder_name_not_leaked_into_ns(self):
+        """__name__ set for class __module__ resolution must not persist in ns after execute."""
+        ns = _ns()
+        assert "__name__" not in ns
+        execute("x = 1\n", ns, frame_number=5)
+        assert "__name__" not in ns

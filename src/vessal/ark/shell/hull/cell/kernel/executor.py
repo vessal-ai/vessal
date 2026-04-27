@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from vessal.ark.shell.hull.cell._errors_helper import append_error
+from vessal.ark.shell.hull.cell.kernel import source_cache
 from vessal.ark.shell.hull.cell.kernel.describe import render_value
 from vessal.ark.shell.hull.cell.protocol import ErrorRecord
 
@@ -125,13 +126,25 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
     # Step 3.5: check if the last statement is a bare expression; rewrite as assignment if so
     modified_operation = _maybe_capture_last_expr(operation)
 
-    # Step 4: execute code, capture stdout and exceptions
+    # Step 4: register the original operation text into linecache under
+    # <frame-N> so inspect.getsource() works on classes/functions defined
+    # below; compile against the same filename so co_filename matches.
+    source_cache.register(frame_number, operation, None)
+    filename = f"<frame-{frame_number}>"
+
+    # Step 5: execute code, capture stdout and exceptions
     stdout_buffer = io.StringIO()
     error = None
 
     try:
+        # SyntaxError from compile() is a user error; catch it here so the
+        # error handling path below formats and stores it like any runtime error.
+        code = compile(modified_operation, filename, "exec")
+        # Set __name__ so classes defined in this exec record __module__ = filename,
+        # enabling inspect.getsource(SomeClass) via the sys.modules entry registered above.
+        ns["__name__"] = filename
         with redirect_stdout(stdout_buffer):
-            exec(modified_operation, ns)  # noqa: S102
+            exec(code, ns)  # noqa: S102
     except KeyboardInterrupt:
         raise  # User interrupt (Ctrl+C); do not catch; allow Agent to be stopped
     except BaseException:
@@ -143,7 +156,7 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
             error = traceback.format_exc()  # use raw traceback if compression itself fails
         append_error(ns, ErrorRecord("runtime", error, frame_number, _time.time()))
 
-    # Step 4.5: if there is a bare expression result, append it to stdout
+    # Step 5.5: if there is a bare expression result, append it to stdout
     expr_result = ns.pop("_expr_result", None)
     captured_stdout = stdout_buffer.getvalue()
     if expr_result is not None and error is None:
@@ -157,12 +170,15 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
     ns["_stdout"] = captured_stdout
     ns["_error"] = error
 
-    # Step 5: clean up __builtins__ injected by exec
-    # exec() injects __builtins__ into ns; remove it if it wasn't there before
+    # Step 6: clean up __builtins__ and __name__ injected by exec
+    # exec() injects __builtins__ into ns; __name__ was set for class __module__ resolution.
+    # Remove both if they weren't in ns before this execute() call.
     if "__builtins__" in ns and "__builtins__" not in before_keys:
         del ns["__builtins__"]
+    if "__name__" in ns and "__name__" not in before_keys:
+        del ns["__name__"]
 
-    # Step 5.5: restore protected keys deleted by agent code
+    # Step 6.5: restore protected keys deleted by agent code
     restored_keys = []
     for k, v in protected_snapshot.items():
         if k not in ns:
@@ -177,14 +193,14 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
             frame_number, _time.time(),
         ))
 
-    # Step 6: attach the source of each newly defined function/class to the object's _source attribute
+    # Step 7: attach the source of each newly defined function/class to the object's _source attribute
     # Use the original operation, not modified_operation, to ensure accurate source
     attach_source(operation, ns)
 
-    # Step 7: compute diff (git-style +/- format), write to _diff
+    # Step 8: compute diff (git-style +/- format), write to _diff
     _compute_diff(ns, before_keys, before_ids, before_values)
 
-    # Step 8: update _ns_meta — variable lifecycle tracking
+    # Step 9: update _ns_meta — variable lifecycle tracking
     ns["_ns_meta"] = _update_ns_meta(ns, before_keys, before_ids, frame_number)
 
     return ExecResult(stdout=ns["_stdout"], diff=ns["_diff"], error=ns["_error"])
@@ -290,7 +306,7 @@ def _compress_traceback(tb_text: str) -> str:
     Returns unchanged when <= _TRACEBACK_COMPRESS_THRESHOLD lines — shallow call
     stacks need no compression. For longer tracebacks, retains:
       1. First line "Traceback (most recent call last):"
-      2. Last File "<string>" frame (user code error location) and its code line
+      2. Last File "<frame-*>" frame (user code error location) and its code line
       3. Last line (exception type and message)
     Intermediate library-internal frames are folded as "... (N lines omitted)".
 
@@ -304,10 +320,11 @@ def _compress_traceback(tb_text: str) -> str:
     if len(lines) <= _TRACEBACK_COMPRESS_THRESHOLD:
         return tb_text
 
-    # Last user code frame (LLM's code executes in "<string>")
+    # Last user code frame (LLM's code executes under "<frame-N>" filenames
+    # registered into linecache by source_cache.register).
     user_frame_idx = -1
     for i, line in enumerate(lines):
-        if 'File "<string>"' in line:
+        if 'File "<frame-' in line:
             user_frame_idx = i
 
     # Last line is the exception type and message (skip trailing blank lines)
