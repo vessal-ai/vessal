@@ -36,9 +36,9 @@
         <template x-if="current === 'frames'">
           <section class="frames-layout" x-init="loadFrames()">
             <ol class="frame-list">
-              <template x-for="f in frames" :key="f.number">
-                <li :class="{active: selectedFrame === f.number}" @click="selectFrame(f)">
-                  <span class="n" x-text="'#' + f.number"></span>
+              <template x-for="f in frames" :key="f.n">
+                <li :class="{active: selectedFrame === f.n}" @click="selectFrame(f)">
+                  <span class="n" x-text="'#' + f.n"></span>
                   <span class="excerpt" x-text="frameExcerpt(f)"></span>
                 </li>
               </template>
@@ -46,26 +46,26 @@
             <aside class="frame-detail">
               <template x-if="currentFrame">
                 <div>
-                  <h3 x-text="'Frame #' + currentFrame.number + (currentFrame.wake ? '  ·  ' + currentFrame.wake : '')"></h3>
-                  <template x-if="currentFrame.pong?.think">
+                  <h3 x-text="'Frame #' + currentFrame.n"></h3>
+                  <template x-if="currentFrame.pong_think">
                     <div class="frame-section"><div class="frame-label">think</div>
-                      <pre class="think" x-text="currentFrame.pong.think"></pre></div>
+                      <pre class="think" x-text="currentFrame.pong_think"></pre></div>
                   </template>
-                  <template x-if="currentFrame.pong?.action">
-                    <div class="frame-section"><div class="frame-label">action</div>
-                      <pre class="action" x-text="actionText(currentFrame.pong.action)"></pre></div>
+                  <template x-if="currentFrame.pong_operation">
+                    <div class="frame-section"><div class="frame-label">operation</div>
+                      <pre class="action" x-text="currentFrame.pong_operation"></pre></div>
                   </template>
-                  <template x-if="currentFrame.pong?.action?.expect">
+                  <template x-if="currentFrame.pong_expect">
                     <div class="frame-section"><div class="frame-label">expect</div>
-                      <pre class="expect" x-text="currentFrame.pong.action.expect"></pre></div>
+                      <pre class="expect" x-text="currentFrame.pong_expect"></pre></div>
                   </template>
-                  <template x-if="currentFrame.observation?.stdout">
+                  <template x-if="currentFrame.obs_stdout">
                     <div class="frame-section"><div class="frame-label">stdout</div>
-                      <pre class="observation" x-text="currentFrame.observation.stdout"></pre></div>
+                      <pre class="observation" x-text="currentFrame.obs_stdout"></pre></div>
                   </template>
-                  <template x-if="currentFrame.observation?.error">
+                  <template x-if="currentFrame.obs_error">
                     <div class="frame-section"><div class="frame-label">error</div>
-                      <pre class="error" x-text="currentFrame.observation.error"></pre></div>
+                      <pre class="error" x-text="currentFrame.obs_error"></pre></div>
                   </template>
                 </div>
               </template>
