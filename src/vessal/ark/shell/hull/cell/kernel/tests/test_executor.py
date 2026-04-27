@@ -290,6 +290,7 @@ class TestErrorRecording:
 
 import inspect
 import linecache
+import sys
 
 
 class TestLinecacheRegistration:
@@ -298,6 +299,7 @@ class TestLinecacheRegistration:
 
     def _clear(self, n: int) -> None:
         linecache.cache.pop(f"<frame-{n}>", None)
+        sys.modules.pop(f"<frame-{n}>", None)
 
     def test_operation_lines_in_linecache(self):
         ns = _ns()

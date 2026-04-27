@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import linecache
 import sqlite3
+import sys
 
 import pytest
 
@@ -16,6 +17,8 @@ def clean_cache():
     yield
     for key in [k for k in list(linecache.cache.keys()) if k.startswith("<frame-")]:
         linecache.cache.pop(key, None)
+    for key in [k for k in list(sys.modules.keys()) if k.startswith("<frame-")]:
+        sys.modules.pop(key, None)
 
 
 class TestRegister:
