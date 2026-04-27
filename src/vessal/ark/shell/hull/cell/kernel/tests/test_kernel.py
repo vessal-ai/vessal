@@ -5,6 +5,7 @@
 #   TestExecute         execute() — execute code, side effects written to ns
 #   TestCompressTraceback  _compress_traceback() — long traceback compression
 #   TestKernel          Kernel class integration tests (including ns exposure, render method)
+import inspect
 import os
 import sys
 import tempfile
@@ -211,7 +212,6 @@ class TestExecute:
 
     def test_source_function_on_object(self):
         """Function source is recoverable via inspect.getsource (linecache)."""
-        import inspect
         ns = bare_ns()
         code = "def add(a, b):\n    return a + b"
         execute(code, ns, frame_number=1)
@@ -220,7 +220,7 @@ class TestExecute:
         assert "return a + b" in src
 
     def test_source_class_on_object(self):
-        import inspect
+        """Class source is recoverable via inspect.getsource (linecache)."""
         ns = bare_ns()
         code = "class Foo:\n    def bar(self):\n        pass"
         execute(code, ns, frame_number=1)
@@ -229,7 +229,6 @@ class TestExecute:
 
     def test_source_precise_multiple_functions(self):
         """Each function's inspect.getsource returns its own definition span."""
-        import inspect
         ns = bare_ns()
         code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
         execute(code, ns, frame_number=1)
@@ -243,7 +242,6 @@ class TestExecute:
     def test_source_redefine(self):
         """After redefinition under a different frame number, inspect.getsource
         on the new function returns the new source."""
-        import inspect
         ns = bare_ns()
         execute("def greet():\n    return 'old'", ns, frame_number=1)
         execute("def greet():\n    return 'new'", ns, frame_number=2)
@@ -867,7 +865,6 @@ class TestExprCapture:
         bare-expression-rewritten modified_operation). For pure-def code
         the two are identical, but the registration target is operation;
         verify via inspect.getsource."""
-        import inspect
         ns = bare_ns()
         code = "def add(a, b):\n    return a + b"
         execute(code, ns, frame_number=1)
@@ -1080,7 +1077,6 @@ class TestInspectGetSource:
     """
 
     def test_inspect_getsource_function_after_execute(self):
-        import inspect
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.exec_operation("def add(a, b):\n    return a + b", frame_number=1)
@@ -1089,7 +1085,6 @@ class TestInspectGetSource:
         assert "return a + b" in src
 
     def test_inspect_getsource_class_after_execute(self):
-        import inspect
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.exec_operation("class Bar:\n    def m(self):\n        return 1", frame_number=2)
@@ -1098,7 +1093,6 @@ class TestInspectGetSource:
         assert "def m(self):" in src
 
     def test_inspect_getsource_async_function(self):
-        import inspect
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.exec_operation("async def waiter():\n    return 42", frame_number=3)
@@ -1106,7 +1100,6 @@ class TestInspectGetSource:
         assert "async def waiter" in src
 
     def test_inspect_getsource_decorated_function_includes_decorator(self):
-        import inspect
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         code = (
@@ -1126,7 +1119,6 @@ class TestInspectGetSource:
         """Two functions defined in the same operation each map to the
         single shared <frame-N> source; inspect.getsource returns the
         function's own definition span via the function's lineno."""
-        import inspect
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
