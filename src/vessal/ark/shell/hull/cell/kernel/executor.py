@@ -18,7 +18,7 @@
 #       Shared between executor and renderer.
 #
 # This is the mechanism layer (fixed, unchanging); it has no dependencies on
-# other Kernel modules, only on describe.renderers.
+# other Kernel modules, only on describe.
 
 from __future__ import annotations
 
