@@ -10,11 +10,6 @@ from vessal.ark.shell.hull.cell.kernel import source_cache
 from vessal.ark.shell.hull.cell.kernel.frame_log.schema import DDL
 
 
-def _clear_linecache_for(*filenames: str) -> None:
-    for fn in filenames:
-        linecache.cache.pop(fn, None)
-
-
 @pytest.fixture
 def clean_cache():
     """Remove any frame-* entries before and after each test."""
