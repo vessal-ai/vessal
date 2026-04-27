@@ -331,13 +331,14 @@ class Kernel:
         import io as _io
         with open(path, "rb") as f:
             raw = f.read()
+        from .lenient import LenientUnpickler
         buf = _io.BytesIO(raw)
-        first = cloudpickle.load(buf)
+        first = LenientUnpickler(buf).load()
         remaining = len(raw) - buf.tell()
         if remaining > 0:
             # Legacy layout: [cloudpickle(header_dict)][cloudpickle(ns)]
             # Discard header; load the actual namespace from remaining bytes.
-            self.ns = cloudpickle.load(buf)
+            self.ns = LenientUnpickler(buf).load()
             # Write back in new format so subsequent restores use fast path.
             with open(path, "wb") as f:
                 f.write(cloudpickle.dumps(self.ns))
