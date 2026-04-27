@@ -43,10 +43,32 @@ class HullInitMixin:
         self._activate_venv()
         return config
 
-    def _init_cell(self, core_cfg: dict, cell_cfg: dict, agent_cfg: dict) -> None:
-        """Phase 2: Create Cell, setup logging/tracer, restore snapshot, inject agent vars."""
+    def _init_cell(
+        self,
+        core_cfg: dict,
+        cell_cfg: dict,
+        agent_cfg: dict,
+        cells_cfg: dict | None = None,
+    ) -> None:
+        """Phase 2: Create Cell, setup logging/tracer, restore snapshot, inject agent vars.
+
+        cells_cfg is the [cells] table from hull.toml. The main Cell reads
+        [cells.main]; missing entries fall back to defaults (data_dir = "data/main").
+        """
         from vessal.ark.shell.hull.cell import Cell
         from vessal.ark.util.logging import Tracer
+
+        cells_cfg = cells_cfg or {}
+        main_cfg = cells_cfg.get("main", {})
+        cell_name = "main"
+        data_dir_rel = main_cfg.get("data_dir", "data/main")
+        if Path(data_dir_rel).is_absolute():
+            raise ValueError(
+                f"[cells.main] data_dir must be relative to project_dir; "
+                f"got absolute path {data_dir_rel!r}"
+            )
+        data_dir_abs = (self._project_dir / data_dir_rel).resolve()
+        data_dir_abs.mkdir(parents=True, exist_ok=True)
 
         api_params = core_cfg.get("api_params", {
             "temperature": cell_cfg.get("temperature", 0.7),
@@ -56,6 +78,8 @@ class HullInitMixin:
             timeout=core_cfg.get("timeout", 60.0),
             core_max_retries=core_cfg.get("max_retries", 3),
             api_params=api_params,
+            cell_name=cell_name,
+            data_dir=str(data_dir_abs),
         )
 
         self._log_dir = str(self._project_dir / "logs")
