@@ -51,6 +51,7 @@ def test_flatten_promotes_pong_fields_to_top_level() -> None:
     assert flat["pong_operation"] == "op"
     assert flat["pong_expect"] == "ex"
     assert "pong" not in flat
+    assert "ping" not in flat
 
 
 def test_flatten_promotes_observation_fields_to_top_level() -> None:

@@ -525,4 +525,5 @@ __all__ = [
     "Verdict", "VerdictFailure",
     "ErrorRecord",
     "CompactionRecord",
+    "flatten_frame_dict",
 ]
