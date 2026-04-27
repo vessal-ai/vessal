@@ -96,3 +96,26 @@ class FrameLog:
             "VALUES (?,?,?,?,?,?)",
             (n, sig.class_name, sig.var_name, sig.scope, sig.payload_json, error_id),
         )
+
+    def last_committed_frame(self) -> int | None:
+        """Return MAX(n_start) over layer=0 entries, or None if empty.
+
+        On boot, the next frame number is `(last_committed_frame() or 0) + 1`.
+        """
+        row = self._conn.execute(
+            "SELECT MAX(n_start) FROM entries WHERE layer = 0"
+        ).fetchone()
+        return None if row is None or row[0] is None else int(row[0])
+
+    def cleanup_partial(self) -> int:
+        """DELETE frame_content rows whose n exceeds the last committed frame.
+
+        These are orphans from a process that crashed between INSERT frame_content
+        (Phase 1 in §4.6) and INSERT entries (Phase 4). Returns count of rows deleted.
+        """
+        last = self.last_committed_frame()
+        threshold = -1 if last is None else last
+        cur = self._conn.execute(
+            "DELETE FROM frame_content WHERE n > ?", (threshold,)
+        )
+        return cur.rowcount
