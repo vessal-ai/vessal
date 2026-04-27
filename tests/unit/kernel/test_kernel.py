@@ -617,7 +617,7 @@ class TestKernel:
     def test_snapshot_restore_with_skill(self, tmp_path):
         """After loading a Skill and doing snapshot/restore, the Skill class object is correctly restored."""
         from vessal.ark.shell.hull.skill import SkillBase
-        skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
+        skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
             sm = SkillLoader(skill_paths=[skills_root])
@@ -639,7 +639,7 @@ class TestKernel:
     def test_snapshot_restore_skill_with_data(self, tmp_path):
         """Skill-produced data and instances are correctly restored together."""
         from vessal.ark.shell.hull.skill import SkillBase
-        skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
+        skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
             sm = SkillLoader(skill_paths=[skills_root])
@@ -695,7 +695,7 @@ class TestKernel:
     def test_restore_cleans_sys_modules(self, tmp_path):
         """restore clears sys.modules cache; does not use stale in-process modules."""
         from vessal.ark.shell.hull.skill import SkillBase
-        skills_root = str(Path(__file__).resolve().parents[8] / "src" / "vessal" / "skills")
+        skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
             sm = SkillLoader(skill_paths=[skills_root])
