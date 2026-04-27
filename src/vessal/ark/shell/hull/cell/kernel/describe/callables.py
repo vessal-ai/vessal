@@ -17,10 +17,13 @@ import types
 
 
 def _get_source(obj) -> str | None:
-    """Try to get the source code of a function or class; returns None on failure."""
-    source = getattr(obj, "_source", None)
-    if source is not None:
-        return source
+    """Return the source text for a function or class via stdlib inspect.
+
+    Returns None for built-ins, C extensions, or any object whose
+    co_filename is not registered in linecache. Kernel-defined
+    functions and classes resolve via the linecache + sys.modules
+    entries created by source_cache.register().
+    """
     try:
         return inspect.getsource(obj)
     except (OSError, TypeError):

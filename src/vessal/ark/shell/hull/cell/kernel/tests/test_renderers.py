@@ -288,3 +288,48 @@ class TestRenderValueFallback:
             def __repr__(self): return "i_am_weird"
         result = render_value(Weird(), "directory")
         assert isinstance(result, str)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# render_function / render_class — linecache-backed source (no _source attr)
+# ──────────────────────────────────────────────────────────────────────────────
+
+class TestCallableSourceFromLinecache:
+    """render_function and render_class must read source via inspect.getsource
+    (linecache-backed) — they no longer rely on a _source attribute."""
+
+    def test_render_function_pin_uses_linecache(self):
+        import linecache, sys, types
+        from vessal.ark.shell.hull.cell.kernel.describe import render_value
+        filename = "<frame-9001>"
+        source = "def hello():\n    return 'world'"
+        linecache.cache[filename] = (len(source), None, source.splitlines(keepends=True), filename)
+        if filename not in sys.modules:
+            mod = types.ModuleType(filename)
+            mod.__file__ = filename
+            sys.modules[filename] = mod
+        ns = {"__name__": filename}
+        code = compile(source, filename, "exec")
+        exec(code, ns)
+        assert not hasattr(ns["hello"], "_source")
+        rendered = render_value(ns["hello"], "pin")
+        assert "def hello" in rendered
+        assert "return 'world'" in rendered
+
+    def test_render_class_pin_uses_linecache(self):
+        import linecache, sys, types
+        from vessal.ark.shell.hull.cell.kernel.describe import render_value
+        filename = "<frame-9002>"
+        source = "class Greeter:\n    def hi(self):\n        return 1"
+        linecache.cache[filename] = (len(source), None, source.splitlines(keepends=True), filename)
+        if filename not in sys.modules:
+            mod = types.ModuleType(filename)
+            mod.__file__ = filename
+            sys.modules[filename] = mod
+        ns = {"__name__": filename}
+        code = compile(source, filename, "exec")
+        exec(code, ns)
+        assert not hasattr(ns["Greeter"], "_source")
+        rendered = render_value(ns["Greeter"], "pin")
+        assert "class Greeter" in rendered
+        assert "def hi" in rendered
