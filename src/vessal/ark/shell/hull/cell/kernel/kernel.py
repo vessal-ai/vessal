@@ -39,6 +39,7 @@ from vessal.ark.shell.hull.cell.protocol import (
 from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
 from vessal.ark.shell.hull.cell.kernel import source_cache
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
+from vessal.ark.shell.hull.cell.kernel.lenient import LenientUnpickler
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
 from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
@@ -331,7 +332,6 @@ class Kernel:
         import io as _io
         with open(path, "rb") as f:
             raw = f.read()
-        from .lenient import LenientUnpickler
         buf = _io.BytesIO(raw)
         first = LenientUnpickler(buf).load()
         remaining = len(raw) - buf.tell()
