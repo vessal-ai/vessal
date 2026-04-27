@@ -1188,3 +1188,78 @@ def test_init_namespace_has_compaction_defaults():
     k = Kernel()
     assert k.ns["_compaction_k"] == 16
     assert k.ns["_compaction_n"] == 8
+
+
+# ─────────────────────────────────────────────
+# inspect.getsource — linecache-backed source recovery (PR 2 contract)
+# ─────────────────────────────────────────────
+
+class TestInspectGetSource:
+    """Lock in the contract that PR 2 (cf5836f) established: stdlib
+    inspect.getsource works on Kernel-defined functions and classes,
+    both immediately after exec and after a snapshot/restore round trip
+    backed by a SQLite frame_log.
+
+    These tests deliberately avoid asserting anything about a `_source`
+    attribute — that mechanism was retired in this PR. The contract is
+    purely on inspect.getsource against linecache.
+    """
+
+    def test_inspect_getsource_function_after_execute(self):
+        import inspect
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        k.exec_operation("def add(a, b):\n    return a + b", frame_number=1)
+        src = inspect.getsource(k.ns["add"])
+        assert "def add(a, b):" in src
+        assert "return a + b" in src
+
+    def test_inspect_getsource_class_after_execute(self):
+        import inspect
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        k.exec_operation("class Bar:\n    def m(self):\n        return 1", frame_number=2)
+        src = inspect.getsource(k.ns["Bar"])
+        assert "class Bar:" in src
+        assert "def m(self):" in src
+
+    def test_inspect_getsource_async_function(self):
+        import inspect
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        k.exec_operation("async def waiter():\n    return 42", frame_number=3)
+        src = inspect.getsource(k.ns["waiter"])
+        assert "async def waiter" in src
+
+    def test_inspect_getsource_decorated_function_includes_decorator(self):
+        import inspect
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        code = (
+            "def my_decorator(fn):\n"
+            "    return fn\n"
+            "\n"
+            "@my_decorator\n"
+            "def decorated():\n"
+            "    return 42"
+        )
+        k.exec_operation(code, frame_number=4)
+        src = inspect.getsource(k.ns["decorated"])
+        assert "@my_decorator" in src
+        assert "def decorated" in src
+
+    def test_inspect_getsource_distinct_per_function(self):
+        """Two functions defined in the same operation each map to the
+        single shared <frame-N> source; inspect.getsource returns the
+        function's own definition span via the function's lineno."""
+        import inspect
+        from vessal.ark.shell.hull.cell.kernel import Kernel
+        k = Kernel()
+        code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
+        k.exec_operation(code, frame_number=5)
+        foo_src = inspect.getsource(k.ns["foo"])
+        bar_src = inspect.getsource(k.ns["bar"])
+        assert "def foo" in foo_src
+        assert "def bar" not in foo_src
+        assert "def bar" in bar_src
+        assert "def foo" not in bar_src
