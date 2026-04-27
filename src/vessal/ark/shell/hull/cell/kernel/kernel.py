@@ -37,6 +37,7 @@ from vessal.ark.shell.hull.cell.protocol import (
     Verdict,
 )
 from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
+from vessal.ark.shell.hull.cell.kernel import source_cache
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
@@ -98,7 +99,9 @@ class Kernel:
             self._init_namespace()
         self.frame_log: FrameLog | None = None
         if db_path is not None:
-            self.frame_log = FrameLog(open_db(db_path))
+            conn = open_db(db_path)
+            source_cache.reload_from_db(conn)
+            self.frame_log = FrameLog(conn)
 
     def _init_namespace(self) -> None:
         """Inject system variable factory defaults into an empty namespace."""
