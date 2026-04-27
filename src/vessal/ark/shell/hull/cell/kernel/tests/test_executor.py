@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
+import linecache
+import sys
+
 import pytest
 
 from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, execute, is_user_var
@@ -288,11 +292,6 @@ class TestErrorRecording:
         assert any(e.type == "builtin_restored" for e in errors)
 
 
-import inspect
-import linecache
-import sys
-
-
 class TestLinecacheRegistration:
     """executor registers operation source into linecache under '<frame-N>' so
     inspect.getsource works on classes/functions defined in operation."""
@@ -343,3 +342,10 @@ class TestLinecacheRegistration:
         ns = _ns()
         execute("", ns, frame_number=99)
         assert "<frame-99>" not in linecache.cache
+
+    def test_dunder_name_not_leaked_into_ns(self):
+        """__name__ set for class __module__ resolution must not persist in ns after execute."""
+        ns = _ns()
+        assert "__name__" not in ns
+        execute("x = 1\n", ns, frame_number=5)
+        assert "__name__" not in ns

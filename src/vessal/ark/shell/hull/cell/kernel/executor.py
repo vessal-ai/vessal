@@ -170,10 +170,13 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
     ns["_stdout"] = captured_stdout
     ns["_error"] = error
 
-    # Step 6: clean up __builtins__ injected by exec
-    # exec() injects __builtins__ into ns; remove it if it wasn't there before
+    # Step 6: clean up __builtins__ and __name__ injected by exec
+    # exec() injects __builtins__ into ns; __name__ was set for class __module__ resolution.
+    # Remove both if they weren't in ns before this execute() call.
     if "__builtins__" in ns and "__builtins__" not in before_keys:
         del ns["__builtins__"]
+    if "__name__" in ns and "__name__" not in before_keys:
+        del ns["__name__"]
 
     # Step 6.5: restore protected keys deleted by agent code
     restored_keys = []
