@@ -1,4 +1,4 @@
-# tests/test_kernel.py — Kernel unit tests (v3 renderer)
+# tests/unit/kernel/test_kernel.py — Kernel unit tests
 #
 # Test coverage:
 #   TestIsUserVar       is_user_var helper function
