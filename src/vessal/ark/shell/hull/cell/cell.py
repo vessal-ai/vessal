@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import time as _time
+from pathlib import Path
 from typing import Any
 
 from vessal.ark.shell.hull.cell._errors_helper import append_error
@@ -74,13 +75,12 @@ class Cell:
 
         db_path: str | None = None
         if data_dir is not None:
-            from pathlib import Path as _Path
-            if not _Path(data_dir).is_dir():
+            if not Path(data_dir).is_dir():
                 raise FileNotFoundError(
                     f"Cell data_dir does not exist: {data_dir!r}. "
                     f"Hull is responsible for creating it before constructing Cell."
                 )
-            db_path = str(_Path(data_dir) / "frame_log.sqlite")
+            db_path = str(Path(data_dir) / "frame_log.sqlite")
 
         self._kernel = Kernel(snapshot_path=snapshot_path, db_path=db_path)
         self._core = Core(
