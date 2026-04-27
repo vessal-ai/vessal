@@ -474,3 +474,41 @@ class Kernel:
         fs.commit_frame(record.to_dict())
         ns["_frame"] = frame_number
         ns["_verdict"] = observation.verdict
+        if self.frame_log is not None:
+            self.frame_log.write_frame(self._build_frame_write_spec(record))
+
+    def _build_frame_write_spec(self, record: FrameRecord) -> "FrameWriteSpec":
+        """Translate a FrameRecord into a FrameWriteSpec for the frame_log writer.
+
+        Args:
+            record: Completed FrameRecord from this frame.
+
+        Returns:
+            FrameWriteSpec ready to pass to FrameLog.write_frame().
+        """
+        import json as _json
+        from vessal.ark.shell.hull.cell.kernel.frame_log.types import ErrorOnSource, FrameWriteSpec
+
+        obs = record.observation
+        operation_error = (
+            ErrorOnSource("operation", None, obs.error)
+            if obs.error is not None
+            else None
+        )
+        verdict_value: str | None = None
+        if obs.verdict is not None:
+            verdict_value = _json.dumps(obs.verdict.to_dict())
+        diff_json = obs.diff if obs.diff else "{}"
+        return FrameWriteSpec(
+            n=record.number,
+            pong_think=record.pong.think,
+            pong_operation=record.pong.action.operation,
+            pong_expect=record.pong.action.expect,
+            obs_stdout=obs.stdout or "",
+            obs_stderr="",
+            obs_diff_json=diff_json,
+            operation_error=operation_error,
+            verdict_value=verdict_value,
+            verdict_error=None,
+            signals=[],
+        )
