@@ -20,11 +20,11 @@ def test_subscribe_receives_published_event():
     t = threading.Thread(target=consumer, daemon=True)
     t.start()
     time.sleep(0.05)
-    bus.publish({"type": "frame", "ts": 1.0, "payload": {"number": 1}})
-    bus.publish({"type": "frame", "ts": 2.0, "payload": {"number": 2}})
+    bus.publish({"type": "frame", "ts": 1.0, "payload": {"n": 1}})
+    bus.publish({"type": "frame", "ts": 2.0, "payload": {"n": 2}})
     t.join(timeout=2.0)
     assert not t.is_alive()
-    assert [e["payload"]["number"] for e in received] == [1, 2]
+    assert [e["payload"]["n"] for e in received] == [1, 2]
 
 
 def test_multiple_subscribers_each_get_event():
@@ -56,8 +56,8 @@ def test_frame_publisher_emits_new_frames(monkeypatch, tmp_path):
 
     bus = EventBus()
     frames_returned = [
-        [{"number": 1}, {"number": 2}],
-        [{"number": 1}, {"number": 2}, {"number": 3}],
+        [{"n": 1}, {"n": 2}],
+        [{"n": 1}, {"n": 2}, {"n": 3}],
     ]
     calls = iter(frames_returned)
 
@@ -66,7 +66,7 @@ def test_frame_publisher_emits_new_frames(monkeypatch, tmp_path):
             batch = next(calls)
         except StopIteration:
             return []
-        return [f for f in batch if f["number"] > (after or 0)]
+        return [f for f in batch if f["n"] > (after or 0)]
 
     publisher = FramePublisher(
         port_getter=lambda: 9999,
@@ -89,8 +89,8 @@ def test_frame_publisher_emits_new_frames(monkeypatch, tmp_path):
     t.start()
     t.join(timeout=2.0)
     publisher.stop()
-    numbers = [e["payload"]["number"] for e in received if e["type"] == "frame"]
-    assert numbers == [1, 2, 3]
+    ns = [e["payload"]["n"] for e in received if e["type"] == "frame"]
+    assert ns == [1, 2, 3]
 
 
 def test_sse_endpoint_streams_events(tmp_path, monkeypatch):
@@ -107,10 +107,10 @@ def test_sse_endpoint_streams_events(tmp_path, monkeypatch):
         url = f"http://127.0.0.1:{server.port}/events"
         resp = urllib.request.urlopen(url, timeout=2)
 
-        server.event_bus.publish({"type": "frame", "ts": 0.0, "payload": {"number": 7}})
+        server.event_bus.publish({"type": "frame", "ts": 0.0, "payload": {"n": 7}})
         line = resp.readline().decode()
         assert line.startswith("data: ")
         data = json.loads(line[len("data: "):])
-        assert data["payload"]["number"] == 7
+        assert data["payload"]["n"] == 7
     finally:
         server.shutdown()

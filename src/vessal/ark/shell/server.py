@@ -483,7 +483,7 @@ class FramePublisher:
             if port is not None:
                 frames = self._fetch(port, self._last_number)
                 for f in frames:
-                    n = f.get("number", 0)
+                    n = f.get("n", 0)
                     if n <= self._last_number:
                         continue
                     self._last_number = n
