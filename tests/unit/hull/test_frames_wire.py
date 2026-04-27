@@ -52,6 +52,7 @@ def test_frames_endpoint_returns_flat_shape(hull):
     assert f["pong_operation"] == "x = 1"
     assert f["pong_expect"] == "assert x == 1"
     assert f["obs_stdout"] == "out"
+    assert f["obs_stderr"] == ""
     assert f["obs_diff_json"] == "[+x]"
     assert f["obs_error"] is None
     assert f["verdict_value"] is None
