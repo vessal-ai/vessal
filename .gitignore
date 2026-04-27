@@ -24,3 +24,6 @@ logs/
 
 # Git worktrees
 .worktrees/
+
+# Local working docs (not tracked)
+docs/
