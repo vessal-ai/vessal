@@ -392,6 +392,35 @@ class FrameRecord:
         )
 
 
+def flatten_frame_dict(d: dict) -> dict:
+    """Translate a FrameRecord.to_dict() shape to the flat wire shape.
+
+    Wire fields mirror SQLite frame_content columns per docs/architecture/kernel/
+    04-frame-log.md §4.3. obs_error / verdict_error carry resolved error text.
+    signals is always [] until PR 4 SQLite-direct sourcing.
+    """
+    pong = d.get("pong", {}) or {}
+    action = pong.get("action", {}) or {}
+    obs = d.get("observation", {}) or {}
+    n = d["number"]
+    return {
+        "n": n,
+        "layer": 0,
+        "n_start": n,
+        "n_end": n,
+        "pong_think": pong.get("think", ""),
+        "pong_operation": action.get("operation", ""),
+        "pong_expect": action.get("expect", ""),
+        "obs_stdout": obs.get("stdout", ""),
+        "obs_stderr": "",
+        "obs_diff_json": obs.get("diff", ""),
+        "obs_error": obs.get("error"),
+        "verdict_value": obs.get("verdict"),
+        "verdict_error": None,
+        "signals": [],
+    }
+
+
 # ─────────────────────────────────────────────
 # ErrorRecord
 # ─────────────────────────────────────────────
@@ -496,4 +525,5 @@ __all__ = [
     "Verdict", "VerdictFailure",
     "ErrorRecord",
     "CompactionRecord",
+    "flatten_frame_dict",
 ]

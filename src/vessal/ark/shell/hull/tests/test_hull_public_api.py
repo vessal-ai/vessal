@@ -166,7 +166,7 @@ class TestHullFrames:
         hull._cell.ns["_frame_stream"] = fs
         result = hull.frames(after=1)
         assert len(result) == 2
-        assert result[0]["number"] == 2
+        assert result[0]["n"] == 2
 
     def test_frames_returns_copy(self, tmp_path):
         """frames() returns a copy; modifications do not affect internal state."""

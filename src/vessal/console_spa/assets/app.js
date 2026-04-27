@@ -15,7 +15,7 @@ function consoleApp() {
     selectedFrame: null,
     get currentFrame() {
       if (this.selectedFrame == null) return null;
-      return this.frames.find(f => f.number === this.selectedFrame) || null;
+      return this.frames.find(f => f.n === this.selectedFrame) || null;
     },
 
     async init() {
@@ -46,10 +46,10 @@ function consoleApp() {
     handleEvent(ev) {
       if (ev.type === "frame") {
         const f = ev.payload;
-        const idx = this.frames.findIndex(x => x.number === f.number);
+        const idx = this.frames.findIndex(x => x.n === f.n);
         if (idx >= 0) this.frames.splice(idx, 1, f);
         else this.frames.push(f);
-        if (this.selectedFrame == null) this.selectedFrame = f.number;
+        if (this.selectedFrame == null) this.selectedFrame = f.n;
       } else if (ev.type === "agent_crash") {
         this.banner = {
           level: "red",
@@ -65,33 +65,28 @@ function consoleApp() {
     },
 
     async loadFrames() {
-      const last = this.frames.length ? this.frames[this.frames.length - 1].number : 0;
+      const last = this.frames.length ? this.frames[this.frames.length - 1].n : 0;
       try {
         const r = await fetch(`/frames?after=${last}`);
         if (r.ok) {
           const body = await r.json();
           const incoming = body.frames || [];
           for (const f of incoming) {
-            const idx = this.frames.findIndex(x => x.number === f.number);
+            const idx = this.frames.findIndex(x => x.n === f.n);
             if (idx >= 0) this.frames.splice(idx, 1, f);
             else this.frames.push(f);
           }
           if (this.frames.length > 0 && this.selectedFrame == null) {
-            this.selectedFrame = this.frames[this.frames.length - 1].number;
+            this.selectedFrame = this.frames[this.frames.length - 1].n;
           }
         }
       } catch {}
     },
 
-    selectFrame(f) { this.selectedFrame = f.number; },
+    selectFrame(f) { this.selectedFrame = f.n; },
 
     frameExcerpt(f) {
-      return (f.pong?.think || f.pong?.action?.operation || '').toString().slice(0, 80);
-    },
-
-    actionText(action) {
-      if (typeof action === 'string') return action;
-      return action.operation || JSON.stringify(action, null, 2);
+      return (f.pong_think || f.pong_operation || f.obs_stdout || '').toString().slice(0, 80);
     },
 
     async loadSkillUis() {

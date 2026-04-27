@@ -82,24 +82,28 @@ class HullRuntimeMixin:
         return list(self._cell.keys())
 
     def frames(self, after: int | None = None) -> list[dict]:
-        """Query hot-zone frames from the frame stream.
+        """Query hot-zone frames from the frame stream, in flat wire shape.
 
         Args:
-            after: Only return frames with number > after. Returns all if None.
+            after: Only return frames with n > after. Returns all if None.
 
         Returns:
-            A copy of all hot-zone frame dicts, ordered oldest to newest.
+            Frames in the flat wire shape (kernel doc §4.3 frame_content columns),
+            ordered oldest to newest. See cell.protocol.flatten_frame_dict.
         """
+        from vessal.ark.shell.hull.cell.protocol import flatten_frame_dict
+
         fs = self._cell.get("_frame_stream")
         if fs is None:
             return []
         # Flatten hot buckets oldest-first (B_4..B_0) into a single list
-        all_frames: list[dict] = []
+        raw: list[dict] = []
         for bucket in reversed(fs._hot):
-            all_frames.extend(bucket)
+            raw.extend(bucket)
+        flat = [flatten_frame_dict(f) for f in raw]
         if after is not None:
-            all_frames = [f for f in all_frames if f.get("number", 0) > after]
-        return list(all_frames)
+            flat = [f for f in flat if f["n"] > after]
+        return flat
 
     def next_alarm(self) -> float | None:
         """Return the absolute timestamp of the Agent's next scheduled wake-up.
