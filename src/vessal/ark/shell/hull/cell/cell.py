@@ -47,6 +47,9 @@ class Cell:
         api_params: dict[str, object] | None = None,
         action_gate: str = "auto",
         state_gate: str = "auto",
+        *,
+        cell_name: str = "main",
+        data_dir: str | None = None,
     ) -> None:
         """Initialize Cell.
 
@@ -58,8 +61,28 @@ class Cell:
                 chat.completions.create(). Default: {"temperature": 0.7, "max_tokens": 4096}.
             action_gate: ActionGate initial mode, "auto" | "safe" | "human".
             state_gate: StateGate initial mode, "auto" | "safe" | "human".
+            cell_name: Logical Cell name, e.g. "main" or "compaction". Used by callers
+                for logging and by future multi-Cell wiring; does not affect Kernel.
+            data_dir: Absolute filesystem path to this Cell's per-Cell data directory
+                (typically <project>/data/<cell_name>/). When provided, the directory
+                must already exist; Cell forwards <data_dir>/frame_log.sqlite to
+                Kernel as db_path so SQLite frame_log is enabled. When None, no
+                frame_log is opened (back-compat for callers that do not yet pass it).
         """
-        self._kernel = Kernel(snapshot_path=snapshot_path)
+        self.cell_name = cell_name
+        self._data_dir = data_dir
+
+        db_path: str | None = None
+        if data_dir is not None:
+            from pathlib import Path as _Path
+            if not _Path(data_dir).is_dir():
+                raise FileNotFoundError(
+                    f"Cell data_dir does not exist: {data_dir!r}. "
+                    f"Hull is responsible for creating it before constructing Cell."
+                )
+            db_path = str(_Path(data_dir) / "frame_log.sqlite")
+
+        self._kernel = Kernel(snapshot_path=snapshot_path, db_path=db_path)
         self._core = Core(
             timeout=timeout,
             max_retries=core_max_retries,
