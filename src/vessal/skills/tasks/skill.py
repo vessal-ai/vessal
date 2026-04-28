@@ -4,10 +4,10 @@ Tree-structured tasks with hierarchical numeric IDs; current task selected autom
 """
 from __future__ import annotations
 
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
-class Tasks(SkillBase):
+class Tasks(BaseSkill):
     """Hierarchical task management Skill."""
 
     name = "tasks"
@@ -192,22 +192,19 @@ class Tasks(SkillBase):
 
     # ── Signal ──
 
-    def _signal(self) -> tuple[str, str] | None:
+    def signal_update(self) -> None:
         """Per-frame: render task tree + current task."""
         self._ensure_bootstrap()
 
         lines = []
 
-        # Current task
         current = self._current()
-
         if current:
             lines.append(f"current: {current} {self._tree[current]['goal']}")
         else:
             lines.append("(all tasks complete)")
         lines.append("")
 
-        # Tree structure
         def _render(parent_id: str | None, indent: int) -> None:
             children = sorted(
                 (tid for tid, node in self._tree.items()
@@ -222,7 +219,8 @@ class Tasks(SkillBase):
                 _render(tid, indent + 1)
 
         _render(None, 0)
-        return ("tasks", "\n".join(lines))
+        text = "\n".join(lines)
+        self.signal = {"tasks": text} if text else {}
 
     # ── Prompt ──
 

@@ -2,10 +2,10 @@
 import json
 from pathlib import Path
 
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
-class Memory(SkillBase):
+class Memory(BaseSkill):
     """Cross-session key-value memory. Agent calls save/get/delete to manage memory entries.
 
     Attributes:
@@ -100,16 +100,13 @@ class Memory(SkillBase):
                 break
         print(f"Deleted {actual} frame(s) ({fs.hot_frame_count()} hot remaining). Cold storage unaffected.")
 
-    def _signal(self) -> tuple[str, str] | None:
-        """Per-frame: output memory entries + context pressure warning."""
-        lines = []
-
-        # Memory entries
+    def signal_update(self) -> None:
+        """Per-frame: memory entries + context pressure warning."""
+        lines: list[str] = []
         for k, v in self._store.items():
             preview = str(v).replace('\n', '\\n')[:80]
             lines.append(f"  {k}: {preview}")
 
-        # Context pressure detection
         if self._ns is not None:
             pct = self._ns.get("_context_pct", 0)
             threshold = self._ns.get("_compress_threshold", 50)
@@ -118,9 +115,7 @@ class Memory(SkillBase):
                 lines.append(f"⚠ Context {pct}% — consider summarizing old frames then memory.drop(n)")
                 lines.append("  print(memory.guide) to see how")
 
-        if not lines:
-            return None
-        return ("memory", "\n".join(lines))
+        self.signal = {"entries": "\n".join(lines)} if lines else {}
 
     def _persist(self) -> None:
         if self._data_dir is None:

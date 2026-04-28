@@ -251,18 +251,17 @@ class TestSignal:
     def test_signal_empty_shows_bootstrap(self):
         """Empty task list: signal shows the pre-filled bootstrap task."""
         t = make_tasks()
-        result = t._signal()
-        assert result is not None
-        title, body = result
-        assert title == "tasks"
+        t.signal_update()
+        assert t.signal != {}
+        body = t.signal["tasks"]
         assert "Review current situation" in body
         assert "current:" in body
 
     def test_signal_with_tasks(self):
         t = make_tasks()
         t.add("do something")
-        result = t._signal()
-        title, body = result
+        t.signal_update()
+        body = t.signal["tasks"]
         assert "current: 1" in body
         assert "do something" in body
 
@@ -270,7 +269,8 @@ class TestSignal:
         t = make_tasks()
         t.add("parent")
         t.add("child", parent="1")
-        _, body = t._signal()
+        t.signal_update()
+        body = t.signal["tasks"]
         lines = body.strip().split("\n")
         # Child task should be indented (skip lines starting with "current:")
         child_line = [l for l in lines if "1.1" in l and not l.startswith("current:")][0]
@@ -280,22 +280,23 @@ class TestSignal:
         t = make_tasks()
         t.add("task")
         t.done("1")
-        _, body = t._signal()
+        t.signal_update()
+        body = t.signal["tasks"]
         assert "[done]" in body
 
     def test_signal_does_not_write_namespace(self):
-        """_signal() must not write _current_task_id to namespace (P1 fix)."""
+        """signal_update() must not write _current_task_id to namespace (P1 fix)."""
         t, ns = make_tasks_with_ns()
         t.add("task")
-        # Clear ns after add() has written it, then verify _signal() does not re-write
+        # Clear ns after add() has written it, then verify signal_update() does not re-write
         ns.clear()
-        t._signal()
+        t.signal_update()
         assert "_current_task_id" not in ns
 
     def test_isinstance_skillbase(self):
-        from vessal.ark.shell.hull.skill import SkillBase
+        from vessal.skills._base import BaseSkill
         t = Tasks()
-        assert isinstance(t, SkillBase)
+        assert isinstance(t, BaseSkill)
 
 
 class TestNamespaceSync:

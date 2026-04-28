@@ -609,7 +609,7 @@ class TestKernel:
 
     def test_snapshot_restore_with_skill(self, tmp_path):
         """After loading a Skill and doing snapshot/restore, the Skill class object is correctly restored."""
-        from vessal.ark.shell.hull.skill import SkillBase
+        from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
@@ -619,7 +619,7 @@ class TestKernel:
             skill_cls = sm.load("tasks")
             k.L["tasks_cls"] = skill_cls
 
-            assert issubclass(skill_cls, SkillBase)
+            assert issubclass(skill_cls, BaseSkill)
 
             snap = str(tmp_path / "test.pkl")
             k.snapshot(snap)
@@ -627,11 +627,11 @@ class TestKernel:
             k2 = Kernel()
             k2.restore(snap)
 
-            assert issubclass(k2.L["tasks_cls"], SkillBase)
+            assert issubclass(k2.L["tasks_cls"], BaseSkill)
 
     def test_snapshot_restore_skill_with_data(self, tmp_path):
         """Skill-produced data and instances are correctly restored together."""
-        from vessal.ark.shell.hull.skill import SkillBase
+        from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
@@ -651,7 +651,7 @@ class TestKernel:
             k2.restore(snap)
 
             assert k2.L["task_id"] == "1"
-            assert issubclass(k2.L["TasksCls"], SkillBase)
+            assert issubclass(k2.L["TasksCls"], BaseSkill)
 
     def test_snapshot_partial_on_unpicklable(self, tmp_path):
         """When namespace contains unpicklable objects, snapshot does partial save without raising.
@@ -687,7 +687,7 @@ class TestKernel:
 
     def test_restore_cleans_sys_modules(self, tmp_path):
         """restore clears sys.modules cache; does not use stale in-process modules."""
-        from vessal.ark.shell.hull.skill import SkillBase
+        from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
@@ -704,7 +704,7 @@ class TestKernel:
             k2.restore(snap)
 
             # Skill class should be usable after restore
-            assert issubclass(k2.L["TasksCls"], SkillBase)
+            assert issubclass(k2.L["TasksCls"], BaseSkill)
 
     def test_ns_direct_write_affects_exec(self):
         """Writing directly to kernel.L is visible to subsequent ping() calls."""

@@ -47,12 +47,12 @@ class TestGoalSignal:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _run_signal(tasks_instance) -> str:
-    """Call tasks._signal() and return a "title: body" string."""
-    result = tasks_instance._signal()
-    if result is None:
+    """Call tasks.signal_update() and return a "tasks: body" string."""
+    tasks_instance.signal_update()
+    if not tasks_instance.signal:
         return ""
-    title, body = result
-    return f"{title}: {body}"
+    body = tasks_instance.signal.get("tasks", "")
+    return f"tasks: {body}"
 
 
 class TestTasksSignal:
@@ -210,15 +210,15 @@ class TestNamespaceDirSignal:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _run_pin_signal(pins: set, ns: dict) -> str:
-    """Construct a Pin instance, inject ns, pin all variables, call _signal(), and return the result string."""
+    """Construct a Pin instance, inject ns, pin all variables, call signal_update(), and return the result string."""
     p = _Pin(ns=ns)
     for name in pins:
         p.pin(name)
-    result = p._signal()
-    if result is None:
+    p.signal_update()
+    if not p.signal:
         return ""
-    title, body = result
-    return f"{title}:\n{body}"
+    body = p.signal.get("pinned", "")
+    return f"pinned:\n{body}"
 
 
 class TestPinsSignal:

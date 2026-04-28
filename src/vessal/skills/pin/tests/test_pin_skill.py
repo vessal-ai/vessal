@@ -1,11 +1,11 @@
 """test_pin_skill — Pin Skill class-based API tests."""
 import pytest
 from vessal.skills.pin.skill import Pin
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
 def test_pin_is_skillbase():
-    assert issubclass(Pin, SkillBase)
+    assert issubclass(Pin, BaseSkill)
 
 
 def test_pin_has_required_attrs():
@@ -23,25 +23,24 @@ def test_pin_unpin():
 
 def test_signal_no_pins_empty():
     p = Pin(ns={"x": 1})
-    result = p._signal()
-    assert result is None
+    p.signal_update()
+    assert p.signal == {}
 
 
 def test_signal_no_ns_empty():
     p = Pin(ns=None)
     p.pin("x")
-    result = p._signal()
-    assert result is None
+    p.signal_update()
+    assert p.signal == {}
 
 
 def test_signal_with_existing_var():
     ns = {"x": 42}
     p = Pin(ns=ns)
     p.pin("x")
-    result = p._signal()
-    assert result is not None
-    title, body = result
-    assert "pinned" in title
+    p.signal_update()
+    assert p.signal != {}
+    body = p.signal["pinned"]
     assert "x" in body
 
 
@@ -49,9 +48,9 @@ def test_signal_missing_var():
     ns = {}
     p = Pin(ns=ns)
     p.pin("missing_var")
-    result = p._signal()
-    assert result is not None
-    title, body = result
+    p.signal_update()
+    assert p.signal != {}
+    body = p.signal["pinned"]
     assert "not found" in body
 
 
@@ -60,9 +59,9 @@ def test_signal_multiple_pins():
     p = Pin(ns=ns)
     p.pin("a")
     p.pin("b")
-    result = p._signal()
-    assert result is not None
-    title, body = result
+    p.signal_update()
+    assert p.signal != {}
+    body = p.signal["pinned"]
     assert "a" in body
     assert "b" in body
 
@@ -72,9 +71,9 @@ def test_signal_sorted():
     p = Pin(ns=ns)
     p.pin("z")
     p.pin("a")
-    result = p._signal()
-    assert result is not None
-    title, body = result
+    p.signal_update()
+    assert p.signal != {}
+    body = p.signal["pinned"]
     a_pos = body.index("a")
     z_pos = body.index("z")
     assert a_pos < z_pos
@@ -82,4 +81,4 @@ def test_signal_sorted():
 
 def test_isinstance_check():
     p = Pin()
-    assert isinstance(p, SkillBase)
+    assert isinstance(p, BaseSkill)

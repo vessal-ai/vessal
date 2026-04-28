@@ -4,10 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from vessal.ark.shell.cli.scaffold import write_skill_scaffold
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
-class SkillCreator(SkillBase):
+class SkillCreator(BaseSkill):
     """Skill scaffold generator. Delegates to the same scaffolder used by `vessal skill create` so the two
     surfaces cannot drift (single source of truth: ark.shell.cli.write_skill_scaffold).
 

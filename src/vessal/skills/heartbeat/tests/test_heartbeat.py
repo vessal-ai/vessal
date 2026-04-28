@@ -29,8 +29,8 @@ def _reset_module_instance():
 
 
 def test_skill_is_skillbase_subclass():
-    from vessal.ark.shell.hull.skill import SkillBase
-    assert issubclass(Skill, SkillBase)
+    from vessal.skills._base import BaseSkill
+    assert issubclass(Skill, BaseSkill)
 
 
 def test_skill_attributes():

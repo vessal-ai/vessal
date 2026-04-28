@@ -12,10 +12,10 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
-class Chat(SkillBase):
+class Chat(BaseSkill):
     """Bidirectional human communication Skill."""
 
     name = "chat"
@@ -123,26 +123,29 @@ class Chat(SkillBase):
 
     # ── Signal ──
 
-    def _signal(self) -> tuple[str, str] | None:
-        """Per-frame signal: unread count + most recent 5 conversation entries."""
+    def signal_update(self) -> None:
+        """Per-frame: unread count + most recent 5 conversation entries."""
         recent = self._chat_log[-5:]
         if not recent and self._unread_count == 0:
-            return None
+            self.signal = {}
+            return
 
-        lines = []
+        body_lines: list[str] = []
         if self._unread_count > 0:
-            lines.append(
+            body_lines.append(
                 f"[pending] Inbox has {self._unread_count} unread message(s)."
                 f" Must process unread messages this frame. Check guide for instructions."
             )
-
         for entry in recent:
             ts = datetime.fromtimestamp(entry["ts"]).strftime("%H:%M")
             role = entry.get("sender", "agent") if entry["role"] == "user" else "agent"
             preview = entry["content"][:60]
-            lines.append(f"  [{ts}] {role}: {preview}")
+            body_lines.append(f"  [{ts}] {role}: {preview}")
 
-        return ("chat", "\n".join(lines))
+        self.signal = {
+            "unread": self._unread_count,
+            "recent": "\n".join(body_lines),
+        }
 
     # ── Internal ──
 
