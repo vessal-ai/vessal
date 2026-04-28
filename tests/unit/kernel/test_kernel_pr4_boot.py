@@ -1,8 +1,7 @@
 """test_kernel_pr4_boot.py — regression for PR 4 / spec §7 boot."""
 from __future__ import annotations
 
-import os
-import textwrap
+import json
 from pathlib import Path
 
 import pytest
@@ -120,7 +119,7 @@ def test_preset_skills_live_in_G(tmp_path: Path):
     assert "chat" not in k.L
 
 
-def test_systemskill_zero_arg_construction(tmp_path: Path):
+def test_systemskill_zero_arg_construction():
     """Spec §7.4 example: `_system = SystemSkill()` — no arguments."""
     from vessal.skills.system import SystemSkill
     s = SystemSkill()
@@ -188,7 +187,6 @@ def test_restart_obs_diff_json_lists_restored_keys(tmp_path: Path):
         "SELECT obs_diff_json FROM frame_content WHERE n = 2"
     ).fetchone()
     # diff is {key: repr(value), ...} per spec §7.6
-    import json
     parsed = json.loads(diff)
     assert "alpha" in parsed and "'value-a'" in parsed["alpha"]
     assert "beta" in parsed and parsed["beta"] == "7"
