@@ -4,14 +4,15 @@ Agent execution kernel. Holds namespace dict, coordinates code execution, assert
 
 Responsible for:
 - Holding, initializing, snapshotting (cloudpickle), and restoring namespace dict
-- Operation code execution (exec_operation → executor.py)
-- expect assertion evaluation (eval_expect → expect.py)
-- Signal collection (update_signals: BASE_SIGNALS + duck-typing scan)
-- Rendering namespace to Ping (render → render/renderer.py)
+- Single-primitive frame execution: `ping(pong, namespace) -> Ping` (spec §1.2)
+- Operation code execution (executor.py)
+- expect assertion evaluation (expect.py)
+- Signal collection (BASE_SIGNALS + duck-typing scan)
+- Rendering namespace to Ping (render/renderer.py)
 
 Not responsible for:
 - Gate checking (handled by Gate)
-- Frame log archiving (handled by Cell; _commit_frame is triggered by Cell but executes within kernel.step())
+- Frame log archiving (Cell calls kernel.ping(); _commit is triggered inside ping())
 - LLM calls (handled by Core)
 - HTTP communication (handled by Shell)
 
@@ -21,8 +22,8 @@ Not responsible for:
 2. executor.py must not exceed 500 lines
 3. expect.py must not exceed 250 lines
 4. namespace dict is the sole source of Agent state; Kernel itself holds no runtime state beyond ns
-5. eval_expect() never raises exceptions; all errors go into Verdict.failures
-6. execute() does not write _frame_log or construct FrameRecord (that is Cell's responsibility)
+5. evaluate_expect() never raises exceptions; all errors go into Verdict.failures
+6. executor.py does not write _frame_log or construct FrameRecord (that is ping()'s responsibility via _commit)
 7. All public interfaces must have complete docstrings and type annotations
 8. describe/ and render/ are internal implementation sub-packages of Kernel and should not be directly imported from outside Kernel
 9. On snapshot degradation (full serialization failure), lost keys must be recorded in _dropped_keys (list) and _dropped_keys_context (dict); silent discard is not allowed
@@ -37,14 +38,14 @@ Why is executor a separate file rather than a Kernel method? executor.py is a pu
 
 ```mermaid
 graph TD
-    KernelPy["kernel.py\n(main class: coordinator)"]
+    KernelPy["kernel.py\n(main class: coordinator)\nping(pong, namespace) → Ping"]
     Exec["executor.py\n(pure mechanism: exec + side effects)"]
     Expect["expect.py\n(pure function: assertion evaluation)"]
     Describe["describe/\n(pure function: render objects to text)"]
     Render["render/\n(namespace → Ping assembly)"]
 
-    KernelPy -->|"exec_operation()"| Exec
-    KernelPy -->|"eval_expect()"| Expect
+    KernelPy -->|"exec → L['observation']"| Exec
+    KernelPy -->|"eval → L['verdict']"| Expect
     KernelPy -->|"render()"| Render
     Exec -->|"diff computation"| Describe
     Render -->|"namespace display"| Describe
@@ -80,9 +81,9 @@ flowchart TD
     CheckDropped -->|no| Done
 ```
 
-_frame_log invariants: frame records are indirectly constructed by Cell via kernel.step(); _commit_frame handles FrameRecord assembly, but the append logic is inside kernel.py; max capacity _FRAME_LOG_MAX=200 frames. On schema version mismatch after restore, _frame_log is cleared to prevent old format frames from polluting new logic.
+_frame_log invariants: frame records are constructed inside ping() via _commit(); max capacity _FRAME_LOG_MAX=200 frames. On schema version mismatch after restore, _frame_log is cleared to prevent old format frames from polluting new logic.
 
-Kernel and adjacent component relationships: Cell calls Kernel.step() to complete single-frame execution; Gate intercepts at the Cell layer and does not enter Kernel. Core receives Ping (the output of Kernel.render()) and returns Pong, which is then passed into Kernel.step(). Kernel does not reference Cell, Core, or Gate.
+Kernel and adjacent component relationships: Cell calls `kernel.ping(pong, namespace) -> Ping` to complete single-frame execution; Gate intercepts at the Cell layer and does not enter Kernel. Core receives Ping (the return value of ping()) and returns Pong, which is then passed back into ping() on the next frame. Kernel does not reference Cell, Core, or Gate.
 
 Known scale issue: kernel.py is close to the 400-line limit; describe/ + render/ together exceed 700 lines; total exceeds 1100 lines. The scale comes from the inherent complexity of namespace management; not splitting for now, but new features must be evaluated for extraction into sub-modules.
 
@@ -96,4 +97,5 @@ Known scale issue: kernel.py is close to the 400-line limit; describe/ + render/
 - ~~2026-04-09: Constraint #8 violation — hull.py directly imports kernel.render.RenderConfig; pin/skill.py directly imports kernel.describe.render_value~~ [Fixed 2026-04-09: RenderConfig and render_value are now re-exported from kernel/__init__.py; external code updated to import from kernel package top level]
 
 ### Active
-- 2026-04-13: _init_namespace() adds two namespace keys: _protected_keys (list of all keys at initialization time, executor uses this to restore builtins deleted by agent); _errors (list[ErrorRecord], executor and Cell append at runtime/protocol errors). _actual_tokens_in/_actual_tokens_out initialized to None, written by Cell with real values when API returns usage.
+- 2026-04-13: _init_namespace() adds _errors (list[ErrorRecord], executor and Cell append at runtime/protocol errors). Frame outputs land in L["observation"] (Observation dataclass) and L["verdict"] (Verdict | None). _actual_tokens_in/_actual_tokens_out initialized to None, written by Cell with real values when API returns usage.
+- 2026-04-28: Replaced multi-entry surface (prepare/step/exec_operation/eval_expect/update_signals/render/_commit_frame) with single primitive `ping(pong, namespace) -> Ping` (spec §1.2). Deleted _protected_keys, _stdout, _error, _diff, _verdict, _operation init keys.
