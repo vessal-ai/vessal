@@ -6,7 +6,6 @@ Methods here may assume the attributes set by Hull.__init__ are available via se
 from __future__ import annotations
 
 import logging
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -40,34 +39,23 @@ class HullCompactionMixin:
         Returns:
             The actual file path written as a string.
         """
-        from vessal.ark.shell.hull.skills_manifest import write_manifest
         if path is None:
             self._snapshots_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             path = str(self._snapshots_dir / f"{timestamp}.pkl")
-        manifest_path = Path(path).with_suffix(".skills.json")
-        write_manifest(manifest_path, self._skill_manager._loaded)
         self._cell.snapshot(path)
         return path
 
-    def _restore_latest_snapshot(self) -> None:
-        """Detect and restore the latest .pkl file under snapshots/. Silently skips if none exist."""
-        from vessal.ark.shell.hull.skills_manifest import read_manifest
+    def _latest_snapshot_path(self) -> str | None:
+        """Pick the newest .pkl in data/<cell>/snapshots/. None if empty.
+
+        Spec §5.1: snapshot bytes live in data/<cell>/snapshots/<ts>.pkl,
+        sibling of frame_log.sqlite under the per-Cell data tree.
+        """
         if not self._snapshots_dir.exists():
-            return
+            return None
         snapshots = sorted(self._snapshots_dir.glob("*.pkl"))
-        if not snapshots:
-            return
-        snap_path = snapshots[-1]
-        manifest_path = snap_path.with_suffix(".skills.json")
-        for name, info in read_manifest(manifest_path).items():
-            parent = info.get("parent_path")
-            if parent and parent not in sys.path:
-                sys.path.insert(0, parent)
-            stale = [k for k in sys.modules if k == name or k.startswith(name + ".")]
-            for k in stale:
-                del sys.modules[k]
-        self._cell.restore(str(snap_path))
+        return str(snapshots[-1]) if snapshots else None
 
     def _resume_pending_compaction(self) -> None:
         """Re-submit any in-flight compaction that survived in the snapshot after a crash-restart."""
