@@ -77,13 +77,11 @@ sequenceDiagram
 ```mermaid
 graph LR
     Hull["Hull._rewrite_runtime_owned()"]
-    Hull -->|"backfill each frame"| FT["_frame_type"]
-    Hull -->|"backfill each frame"| RC["_render_config"]
     Hull -->|"backfill each frame"| SP["_system_prompt"]
     Hull -->|"check mtime each frame\nre-read on change"| SOUL["_soul"]
 ```
 
-Invariants: Each `wake()` call ultimately produces a complete frame cycle — inject_wake, frame loop until `_sleeping` is set, snapshot save. EventLoop guarantees this process is not interrupted (unless max_frames_per_wake is exceeded). Hull.handle() returns 404 for all unknown routes without throwing exceptions, ensuring the Shell layer always receives a valid response.
+Invariants: Each `wake()` call ultimately produces a complete frame cycle — inject_wake, frame loop until the agent sleeps, snapshot save. EventLoop guarantees this process is not interrupted (unless max_frames_per_wake is exceeded). Hull.handle() returns 404 for all unknown routes without throwing exceptions, ensuring the Shell layer always receives a valid response.
 
 Hull and Cell relationship: Hull creates Cell and operates through public interfaces (`cell.step()`, `cell.G`, `cell.L`, `cell.snapshot()`, `cell.restore()`). Hull does not import Kernel or Core — these are internal to Cell. Hull and EventLoop relationship: Hull creates EventLoop and injects callbacks via FrameHooks (before_frame, snapshot, run_compression); EventLoop does not know Hull exists.
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SRC = REPO_ROOT / "src"
 
@@ -29,6 +31,27 @@ def test_no_source_file_references_dead_l_keys() -> None:
         assert not offenders, (
             f"Dead L key {key!r} still referenced in: {offenders}. "
             "PR 6 deletes all writers and readers."
+        )
+
+
+@pytest.mark.xfail(strict=False, reason="removed in Tasks 9/10")
+def test_no_source_file_references_task9_10_dead_keys() -> None:
+    """_errors / _error_buffer_cap / _sleeping / _next_wake removed in Tasks 9/10."""
+    task_9_10_keys = [
+        "_errors",
+        "_error_buffer_cap",
+        "_sleeping",
+        "_next_wake",
+    ]
+    for key in task_9_10_keys:
+        pattern = re.compile(rf'["\']{re.escape(key)}["\']')
+        offenders: list[str] = []
+        for path in SRC.rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            if pattern.search(text):
+                offenders.append(str(path.relative_to(REPO_ROOT)))
+        assert not offenders, (
+            f"Dead L key {key!r} still referenced in: {offenders}."
         )
 
 

@@ -19,7 +19,6 @@ def _make_stub_cell(responses=None) -> MagicMock:
         "_frame": 0,
         "_sleeping": False,
         "_next_wake": None,
-        "_context_pct": 0,
     }
 
     class _FakeKernel:

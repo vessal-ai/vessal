@@ -1,13 +1,12 @@
 # Memory
 
-File-persisted key-value memory. Agent stores cross-session memories via save(); all memories are displayed in signal each frame. Also monitors context pressure: when it exceeds a threshold, prompts Agent to summarize old frames and delete them.
+File-persisted key-value memory. Agent stores cross-session memories via save(); all memories are displayed in signal each frame.
 
 **Core positioning: search replaces persistent context.** Information that doesn't need to be in context every frame should be stored in memory and retrieved when needed. This is Agent's proactive means of managing its own context.
 
 Responsible for:
 - Key-value storage (save/get/delete)
 - Signal output of all memories each frame
-- Context pressure signal (reads `_context_pct`; warns when it exceeds `_compress_threshold`)
 - Physical frame deletion (drop(n): truncates oldest n frames from `_frame_log`)
 
 Not responsible for:
@@ -23,27 +22,19 @@ Not responsible for:
 4. value can be any JSON-serializable object
 5. drop(n) retains at least 1 frame; clearing the frame stream entirely is not allowed
 6. drop(n) must output a confirmation message before executing deletion
-7. signal threshold defaults to 50%, controlled by `_compress_threshold` namespace variable (configured via hull.toml [cell].compress_threshold)
 
 ## Design
 
 Simplest approach: one JSON file stores all key-value pairs. Signal does a full dump.
 
-Context pressure detection is implemented in `_signal()`: reads `_context_pct` (calculated after Kernel rendering), appends a warning line when it exceeds `_compress_threshold` (default 50), guiding Agent to use drop(n) to manage frame stream.
-
-drop(n) directly operates on `_frame_log` (referenced from ns; Memory saves the ns reference on initialization). After physical deletion, the frame stream shortens; `_context_pct` naturally decreases on the next frame render. Cold storage (FrameLogger JSONL) is not affected.
+drop(n) directly operates on `_frame_log` (referenced from ns; Memory saves the ns reference on initialization). After physical deletion, the frame stream shortens. Cold storage (FrameLogger JSONL) is not affected.
 
 ```mermaid
 flowchart TD
-    A["Agent sees signal each frame: warning Context N%"] --> B["memory.save() saves key info from old frames"]
+    A["Agent decides to manage frame stream"] --> B["memory.save() saves key info from old frames"]
     B --> C["memory.drop(n) physically deletes frames"]
     C --> D["drop outputs confirmation message"]
     D --> E["_frame_log[:n] deletion"]
-    E --> F["Next frame _context_pct naturally decreases"]
-
-    G["_signal() each frame"] --> H{"_context_pct >= _compress_threshold?"}
-    H -->|yes| I["Output warning line"]
-    H -->|no| J["Only output memory entries"]
 ```
 
 ```mermaid

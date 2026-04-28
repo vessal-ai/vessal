@@ -23,6 +23,7 @@ import contextlib
 import io
 import logging
 
+from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
 from vessal.ark.shell.hull.cell.kernel.executor import execute
 from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
 from vessal.ark.shell.hull.cell.protocol import (
@@ -244,8 +245,6 @@ class Kernel:
         """Serialise L to disk; per-key fallback to DeadHandle on cloudpickle failure."""
         import os
         import tempfile
-
-        from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
 
         path = str(path)
         to_dump: dict = {}

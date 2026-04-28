@@ -536,7 +536,6 @@ class TestRealTokenPassthrough:
 
     def test_no_usage_leaves_estimated_context_pct(self):
         cell = _make_cell()
-        cell.L["_budget_total"] = 100000
         pong = _make_pong(_action("x = 1"))
         cell._core.step = MagicMock(return_value=(pong, None, None))
         cell.step()
