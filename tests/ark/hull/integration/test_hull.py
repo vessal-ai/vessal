@@ -323,13 +323,13 @@ class TestSnapshot:
         path = hull.snapshot()
         assert path.endswith(".pkl")
         assert Path(path).exists()
-        assert str(tmp_path / "snapshots") in path
+        assert str(tmp_path / "data" / "main" / "snapshots") in path
 
     def test_snapshots_dir_under_project(self, tmp_path):
-        """Snapshot directory is under the project directory's snapshots/ folder."""
+        """Snapshot directory is under data/<cell>/snapshots/ (spec §5.1)."""
         hull = _make_hull(tmp_path)
         snap_path = hull.snapshot()
-        assert str(tmp_path / "snapshots") in snap_path
+        assert str(tmp_path / "data" / "main" / "snapshots") in snap_path
 
     def test_restore_latest_snapshot(self, tmp_path):
         """Automatically restores the latest .pkl from snapshots/ on startup."""

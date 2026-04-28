@@ -3,7 +3,7 @@ import pytest
 
 from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
 from vessal.skills._base import BaseSkill
-from tests.unit.kernel._ping_helpers import _ns
+from tests.unit.kernel._ping_helpers import _ns, minimal_kernel
 
 
 class FakeSkill(BaseSkill):
@@ -22,7 +22,7 @@ class FakeSkill(BaseSkill):
 
 def test_update_signals_collects_system_skill():
     """SystemSkill in G is always scanned and provides frame/context signal."""
-    k = Kernel()
+    k = minimal_kernel()
     k.ping(None, _ns(k))
     signals = k.L["signals"]
     system_payload = signals.get(("SystemSkill", "_system", "G"), {})
@@ -32,7 +32,7 @@ def test_update_signals_collects_system_skill():
 
 def test_update_signals_scans_skill_instances():
     """BaseSkill instances in namespace have signal_update() called."""
-    k = Kernel()
+    k = minimal_kernel()
     s = FakeSkill()
     s.data = "hello"
     k.L["my_skill"] = s
@@ -44,7 +44,7 @@ def test_update_signals_scans_skill_instances():
 
 def test_update_signals_skips_empty_skill_output():
     """Skill with empty signal dict is still recorded (empty payload)."""
-    k = Kernel()
+    k = minimal_kernel()
     s = FakeSkill()
     s.data = ""  # signal_update() sets signal = {}
     k.L["my_skill"] = s
@@ -62,7 +62,7 @@ def test_update_signals_skill_error_does_not_crash():
         def signal_update(self) -> None:
             raise ValueError("boom")
 
-    k = Kernel()
+    k = minimal_kernel()
     k.L["bad"] = BadSkill()
     k.ping(None, _ns(k))  # should NOT raise
     signals = k.L["signals"]
@@ -72,7 +72,7 @@ def test_update_signals_skill_error_does_not_crash():
 
 def test_update_signals_multiple_skills():
     """Multiple skill instances all contribute."""
-    k = Kernel()
+    k = minimal_kernel()
     s1 = FakeSkill()
     s1.data = "one"
     s2 = FakeSkill()
@@ -87,7 +87,7 @@ def test_update_signals_multiple_skills():
 
 def test_skill_removed_from_ns_stops_signal():
     """Deleting skill from namespace stops its signal."""
-    k = Kernel()
+    k = minimal_kernel()
     s = FakeSkill()
     s.data = "present"
     k.L["s"] = s
@@ -96,12 +96,6 @@ def test_skill_removed_from_ns_stops_signal():
     del k.L["s"]
     k.ping(None, _ns(k))
     assert ("FakeSkill", "s", "L") not in k.L["signals"]
-
-
-def test_init_namespace_no_signal_fns_key():
-    """New namespace should NOT have _signal_fns (old mechanism removed)."""
-    k = Kernel()
-    assert "_signal_fns" not in k.L
 
 
 def test_render_signals_dict_format():

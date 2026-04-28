@@ -17,12 +17,13 @@ from vessal.ark.shell.hull.cell.kernel import Kernel
 from vessal.ark.shell.hull.cell.protocol import (
     Action, Observation, Ping, Pong, Verdict,
 )
+from tests.unit.kernel._ping_helpers import minimal_kernel
 
 
 @pytest.fixture
 def k():
     """Fresh Kernel, no snapshot, no db."""
-    return Kernel()
+    return minimal_kernel()
 
 
 def test_ping_signature_returns_Ping(k):

@@ -5,6 +5,7 @@ import pytest
 
 from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
 from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from tests.unit.kernel._ping_helpers import minimal_kernel
 
 
 def _scan(kernel: Kernel) -> dict:
@@ -34,7 +35,7 @@ def test_baseskill_requires_signal_dict_and_signal_update():
 def test_systemskill_in_G_after_init():
     from vessal.skills.system import SystemSkill
 
-    k = Kernel()
+    k = minimal_kernel()
     assert "_system" in k.G
     assert isinstance(k.G["_system"], SystemSkill)
 
@@ -49,7 +50,7 @@ def test_signals_dict_uses_triple_key():
         def signal_update(self) -> None:
             self.signal = {"hello": "world"}
 
-    k = Kernel()
+    k = minimal_kernel()
     k.L["foo"] = FooSkill()
     signals = _scan(k)
 
@@ -73,7 +74,7 @@ def test_signals_lebg_shadow_L_over_G():
         def signal_update(self) -> None:
             self.signal = {"marker": self._marker}
 
-    k = Kernel()
+    k = minimal_kernel()
     k.G["chat"] = C("from-G")
     k.L["chat"] = C("from-L")
 
@@ -92,7 +93,7 @@ def test_signal_update_exception_isolates_to_error_id():
         def signal_update(self) -> None:
             raise RuntimeError("kaboom")
 
-    k = Kernel()
+    k = minimal_kernel()
     k.L["boom"] = Boom()
     signals = _scan(k)
 
@@ -103,17 +104,17 @@ def test_signal_update_exception_isolates_to_error_id():
 
 
 def test_no_signal_outputs_key_anymore():
-    k = Kernel()
+    k = minimal_kernel()
     assert "_signal_outputs" not in k.L
 
 
 def test_no_wake_ns_key_anymore():
-    k = Kernel()
+    k = minimal_kernel()
     assert "_wake" not in k.L
 
 
 def test_systemskill_set_wake_propagates_to_signal():
-    k = Kernel()
+    k = minimal_kernel()
     k.G["_system"].set_wake("user_message")
     signals = _scan(k)
     payload = signals[("SystemSkill", "_system", "G")]
@@ -123,7 +124,7 @@ def test_systemskill_set_wake_propagates_to_signal():
 def test_systemskill_carries_frame_and_verdict():
     from vessal.ark.shell.hull.cell.protocol import Verdict
 
-    k = Kernel()
+    k = minimal_kernel()
     k.L["_frame"] = 7
     k.L["verdict"] = Verdict(total=2, passed=2, failures=())
 

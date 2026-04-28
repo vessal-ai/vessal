@@ -98,7 +98,8 @@ class TestTasksSignal:
 
 def _run_pin_signal(pins: set, ns: dict) -> str:
     """Construct a Pin instance, inject ns, pin all variables, call signal_update(), and return the result string."""
-    p = _Pin(ns=ns)
+    p = _Pin()
+    p._ns = ns
     for name in pins:
         p.pin(name)
     p.signal_update()

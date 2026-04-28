@@ -563,7 +563,7 @@ class TestDroppedFrameCount:
 # Step 7: TestKernelRenderV3  (filled after step 8 modifications)
 # ──────────────────────────────────────────────────────────────────────────────
 
-from tests.unit.kernel._ping_helpers import _ns, _exec
+from tests.unit.kernel._ping_helpers import _ns, _exec, minimal_kernel
 
 
 class TestKernelRenderV3:
@@ -571,21 +571,21 @@ class TestKernelRenderV3:
 
     def test_kernel_render_returns_string(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
 
     def test_kernel_exec_operation_returns_exec_result(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         from vessal.ark.shell.hull.cell.kernel.executor import ExecResult
-        k = Kernel()
+        k = minimal_kernel()
         # ping(pong, ns) executes operation internally; observation.diff proves it ran
         _exec(k, "x = 1")
         assert k.L["observation"].diff != "" or k.L.get("x") == 1
 
     def test_frame_stream_not_populated_by_exec(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         # ping(pong, ns) DOES commit to _frame_stream (Cell's job moved to Kernel.ping in PR 2)
         before = k.L["_frame_stream"].hot_frame_count()
         _exec(k, "x = 1")
@@ -594,20 +594,20 @@ class TestKernelRenderV3:
 
     def test_system_prompt_key_used(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         k.L["_system_prompt"] = "Test system prompt"
         ping = k.ping(None, _ns(k))
         assert "Test system prompt" in ping.system_prompt
 
     def test_no_tracer_arg_in_render(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
 
     def test_kernel_render_updates_context_pct(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         k.ping(None, _ns(k))
         assert "_context_pct" in k.L
         assert isinstance(k.L["_context_pct"], int)

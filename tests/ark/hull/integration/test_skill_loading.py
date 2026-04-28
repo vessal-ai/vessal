@@ -93,7 +93,8 @@ def test_isinstance_scan_integration(tmp_path):
 
     sm = SkillLoader(skill_paths=[str(tmp_path)])
     cls = sm.load("scan_skill")
-    k = Kernel()
+    from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script
+    k = Kernel(boot_script=compose_boot_script([]))
     k.L["ts"] = cls()
     k.ping(None, {"globals": k.G, "locals": k.L})
     signals = k.L["signals"]

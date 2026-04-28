@@ -18,6 +18,7 @@ import pytest
 
 from vessal.ark.shell.hull.cell.kernel import Kernel
 from vessal.ark.shell.hull.cell.kernel.frame_log.schema import DDL
+from tests.unit.kernel._ping_helpers import minimal_kernel
 
 
 @pytest.fixture
@@ -52,7 +53,7 @@ class TestKernelLinecacheReload:
         db = tmp_path / "frame_log.sqlite"
         _seed_db(db, [(1, "x = 1\n", None), (2, "y = 2\n", None)])
 
-        Kernel(db_path=str(db))
+        minimal_kernel(db_path=str(db))
 
         assert linecache.getlines("<frame-1>") == ["x = 1\n"]
         assert linecache.getlines("<frame-2>") == ["y = 2\n"]
@@ -61,7 +62,7 @@ class TestKernelLinecacheReload:
         db = tmp_path / "frame_log.sqlite"
         _seed_db(db, [(7, None, "assert x == 1\n")])
 
-        Kernel(db_path=str(db))
+        minimal_kernel(db_path=str(db))
 
         assert linecache.getlines("<frame-7-expect>") == ["assert x == 1\n"]
 
@@ -70,7 +71,7 @@ class TestKernelLinecacheReload:
         for k in [k for k in linecache.cache.keys() if k.startswith("<frame-")]:
             linecache.cache.pop(k)
 
-        Kernel()  # no db_path
+        minimal_kernel()  # no db_path
 
         added = [k for k in linecache.cache.keys() if k.startswith("<frame-")]
         assert added == []
@@ -82,7 +83,7 @@ class TestKernelLinecacheReload:
         op = "class Planner:\n    def plan(self):\n        return ['draft']\n"
         _seed_db(db, [(42, op, None)])
 
-        Kernel(db_path=str(db))
+        minimal_kernel(db_path=str(db))
 
         compiled = compile(op, "<frame-42>", "exec")
         ns: dict = {}

@@ -17,6 +17,7 @@ import pytest
 
 from vessal.ark.shell.hull.cell.kernel import Kernel, UnresolvedRef
 from vessal.ark.shell.hull.cell.kernel.lenient import LenientUnpickler
+from tests.unit.kernel._ping_helpers import minimal_kernel
 
 
 # ─── UnresolvedRef invariants ───────────────────────────────────────────
@@ -143,14 +144,14 @@ class TestKernelRestoreLenient:
         sys.modules[mod_name] = mod
 
         try:
-            k = Kernel()
+            k = minimal_kernel()
             k.L["my_skill"] = FakeSkill("hi")
             snap = str(tmp_path / "snap.bin")
             k.snapshot(snap)
         finally:
             del sys.modules[mod_name]
 
-        k2 = Kernel()
+        k2 = minimal_kernel()
         k2.restore(snap)  # must NOT raise
         assert "my_skill" in k2.L
         # By-reference path was forced: placeholder must be UnresolvedRef.
@@ -168,14 +169,14 @@ class TestKernelRestoreLenient:
         sys.modules[mod_name] = mod
 
         try:
-            k = Kernel()
+            k = minimal_kernel()
             k.L["rs"] = ReprSkill()
             snap = str(tmp_path / "snap.bin")
             k.snapshot(snap)
         finally:
             del sys.modules[mod_name]
 
-        k2 = Kernel()
+        k2 = minimal_kernel()
         k2.restore(snap)
         val = k2.L["rs"]
         assert isinstance(val, UnresolvedRef)

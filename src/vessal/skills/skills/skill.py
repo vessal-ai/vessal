@@ -21,10 +21,10 @@ class Skills(BaseSkill):
     description = "skill inventory"
     tools = ["load", "unload", "search_hub", "download_skill", "list_hub"]
 
-    def __init__(self, ns: dict | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._ns = ns
         self._hull: "Hull | None" = None
+        print("skills: load(name)/unload(name)/list() — Skill management")
 
     def _bind_hull(self, hull: "Hull") -> None:
         """Hull loader calls this exactly once after injection into ns."""

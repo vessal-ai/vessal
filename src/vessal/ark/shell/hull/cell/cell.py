@@ -43,7 +43,7 @@ class Cell:
 
     def __init__(
         self,
-        snapshot_path: str | None = None,
+        boot_script: str | None = None,
         timeout: float = 60.0,
         core_max_retries: int = 3,
         api_params: dict[str, object] | None = None,
@@ -52,11 +52,13 @@ class Cell:
         *,
         cell_name: str = "main",
         data_dir: str | None = None,
+        restore_path: str | None = None,
     ) -> None:
         """Initialize Cell.
 
         Args:
-            snapshot_path: If not None, restore namespace from snapshot.
+            boot_script: Python source synthesized by Hull via compose_boot_script().
+                When None, a minimal script (only _system) is used as a safe default.
             timeout: Request timeout in seconds, passed through to Core.
             core_max_retries: Network-layer retry count, passed through to Core.
             api_params: API parameter dict passed through to Core, forwarded as **kwargs to
@@ -70,7 +72,9 @@ class Cell:
                 must already exist; Cell forwards <data_dir>/frame_log.sqlite to
                 Kernel as db_path so SQLite frame_log is enabled. When None, no
                 frame_log is opened (back-compat for callers that do not yet pass it).
+            restore_path: If not None, restore namespace from snapshot after boot.
         """
+        from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
         self.cell_name = cell_name
         self._data_dir = data_dir
 
@@ -83,7 +87,12 @@ class Cell:
                 )
             db_path = str(Path(data_dir) / "frame_log.sqlite")
 
-        self._kernel = Kernel(snapshot_path=snapshot_path, db_path=db_path)
+        if boot_script is None:
+            boot_script = compose_boot_script([
+                BootSkillEntry("_system", "vessal.skills.system", "SystemSkill", ""),
+            ])
+
+        self._kernel = Kernel(boot_script=boot_script, db_path=db_path, restore_path=restore_path)
         self._core = Core(
             timeout=timeout,
             max_retries=core_max_retries,

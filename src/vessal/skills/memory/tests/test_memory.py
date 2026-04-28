@@ -75,30 +75,30 @@ def test_no_persistence_without_ns():
     assert m._data_dir is None
 
 
-def test_persistence_saves_on_save(tmp_path):
-    ns = {"_data_dir": str(tmp_path)}
-    m = Memory(ns=ns)
+def test_persistence_saves_on_save(tmp_path, monkeypatch):
+    monkeypatch.setenv("VESSAL_DATA_DIR", str(tmp_path))
+    m = Memory()
     m.save("key1", "value1")
     mem_file = tmp_path / "memory" / "memory.json"
     data = json.loads(mem_file.read_text())
     assert data["key1"] == "value1"
 
 
-def test_persistence_loads_on_init(tmp_path):
-    ns = {"_data_dir": str(tmp_path)}
-    m1 = Memory(ns=ns)
+def test_persistence_loads_on_init(tmp_path, monkeypatch):
+    monkeypatch.setenv("VESSAL_DATA_DIR", str(tmp_path))
+    m1 = Memory()
     m1.save("key1", "value1")
-    m2 = Memory(ns=ns)
+    m2 = Memory()
     assert m2.get("key1") == "value1"
 
 
-def test_persistence_corrupted_file(tmp_path):
+def test_persistence_corrupted_file(tmp_path, monkeypatch):
     data_dir = tmp_path / "memory"
     data_dir.mkdir(parents=True)
     mem_file = data_dir / "memory.json"
     mem_file.write_text("NOT JSON{{{", encoding="utf-8")
-    ns = {"_data_dir": str(tmp_path)}
-    m = Memory(ns=ns)
+    monkeypatch.setenv("VESSAL_DATA_DIR", str(tmp_path))
+    m = Memory()
     assert m._store == {}
 
 
@@ -123,19 +123,22 @@ class TestDrop:
 
     def test_drop_removes_oldest_frames(self):
         ns = self._make_ns_with_frames(5)
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = ns
         m.drop(2)
         assert ns["_frame_stream"].hot_frame_count() == 3
 
     def test_drop_zero_is_noop(self):
         ns = self._make_ns_with_frames(3)
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = ns
         m.drop(0)
         assert ns["_frame_stream"].hot_frame_count() == 3
 
     def test_drop_more_than_available_keeps_one(self):
         ns = self._make_ns_with_frames(3)
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = ns
         m.drop(100)
         assert ns["_frame_stream"].hot_frame_count() >= 1
 
@@ -146,7 +149,8 @@ class TestDrop:
 
     def test_drop_prints_pre_deletion_prompt(self, capsys):
         ns = self._make_ns_with_frames(5)
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = ns
         m.drop(2)
         output = capsys.readouterr().out
         assert "Have you saved key information to memory" in output
@@ -157,37 +161,37 @@ class TestContextPressureSignal:
     """Memory.signal_update() shows context pressure warning when threshold exceeded."""
 
     def test_no_warning_below_threshold(self):
-        ns = {"_context_pct": 30}
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = {"_context_pct": 30}
         m.signal_update()
         # No memories and no warning → empty signal
         assert m.signal == {}
 
     def test_warning_at_threshold(self):
-        ns = {"_context_pct": 50}
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = {"_context_pct": 50}
         m.signal_update()
         assert m.signal != {}
         body = m.signal["entries"]
         assert "50%" in body
 
     def test_warning_above_threshold(self):
-        ns = {"_context_pct": 70}
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = {"_context_pct": 70}
         m.signal_update()
         assert m.signal != {}
         body = m.signal["entries"]
         assert "70%" in body
 
     def test_custom_threshold(self):
-        ns = {"_context_pct": 40, "_compress_threshold": 30}
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = {"_context_pct": 40, "_compress_threshold": 30}
         m.signal_update()
         assert m.signal != {}  # 40 >= 30, should warn
 
     def test_memories_and_warning_combined(self):
-        ns = {"_context_pct": 60}
-        m = Memory(ns=ns)
+        m = Memory()
+        m._ns = {"_context_pct": 60}
         m.save("key1", "value1")
         m.signal_update()
         assert m.signal != {}

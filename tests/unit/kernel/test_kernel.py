@@ -22,7 +22,7 @@ from vessal.ark.shell.hull.cell.kernel.render import render
 from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
-from tests.unit.kernel._ping_helpers import _ns, _exec
+from tests.unit.kernel._ping_helpers import _ns, _exec, minimal_kernel
 
 # ─────────────────────────────────────────────
 # Helper: construct a minimal namespace (without defaults)
@@ -55,7 +55,7 @@ def bare_ns() -> dict:
 
 def _kw() -> "Kernel":
     """Create Kernel with minimal namespace setup (test helper)."""
-    k = Kernel()
+    k = minimal_kernel()
     k.L["_builtin_names"] = []
     return k
 
@@ -379,7 +379,7 @@ class TestRenderIntegration:
 
     def test_render_returns_str(self):
         from vessal.ark.shell.hull.cell.protocol import Ping
-        k = Kernel()
+        k = minimal_kernel()
         result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
         # After ping(None, ...) signals are always scanned; verify non-empty
@@ -390,20 +390,20 @@ class TestRenderIntegration:
     def test_exec_operation_result_affects_render(self):
         """render reflects state changes after exec via ping."""
         from vessal.ark.shell.hull.cell.protocol import Ping
-        k = Kernel()
+        k = minimal_kernel()
         state = _exec(k, "print('hi')\nx = 1")
         assert isinstance(state, Ping)
 
     def test_stdout_in_ns_after_exec_operation(self):
         """observation.stdout is populated after exec via ping."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "print('hello from kernel')")
         assert "hello from kernel" in k.L["observation"].stdout
 
     def test_frame_stream_in_state(self):
         """Frame stream section appears in the rendered output."""
         from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
-        k = Kernel()
+        k = minimal_kernel()
         # Manually commit a frame dict into _frame_stream to trigger the frame stream section
         k.L["_frame_stream"].commit_frame({
             "schema_version": FRAME_SCHEMA_VERSION,
@@ -417,13 +417,13 @@ class TestRenderIntegration:
 
     def test_context_budget_default_set_by_kernel(self):
         """Kernel init sets the default _context_budget in ns."""
-        k = Kernel()
+        k = minimal_kernel()
         assert "_context_budget" in k.L
         assert k.L["_context_budget"] == 128000
 
     def test_auxiliary_section_in_output(self):
         """Auxiliary section (system variables) appears in render output after ping(None, ...)."""
-        k = Kernel()
+        k = minimal_kernel()
         pong = k.ping(None, _ns(k))
         assert "context" in pong.state.signals
 
@@ -435,7 +435,7 @@ class TestRenderIntegration:
 class TestKernel:
     def test_init_creates_system_vars(self):
         """After init, ns contains all required system variables (v4 format)."""
-        k = Kernel()
+        k = minimal_kernel()
         assert k.L.get("_frame") == 0
         # v4 vars
         assert k.L.get("_system_prompt") == ""
@@ -446,7 +446,7 @@ class TestKernel:
 
     def test_init_creates_lifecycle_vars(self):
         """After init, ns contains _sleeping/_next_wake lifecycle variables."""
-        k = Kernel()
+        k = minimal_kernel()
         assert k.L["_sleeping"] is False
         assert k.L["_next_wake"] is None
         # _wake moved to G["_system"].set_wake() in PR 3
@@ -454,7 +454,7 @@ class TestKernel:
 
     def test_init_from_snapshot(self):
         """snapshot_path parameter: restore namespace from file to continue a previous session."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "counter = 10")
 
         with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
@@ -463,14 +463,14 @@ class TestKernel:
         try:
             k.snapshot(snap_path)
             # Init new Kernel with snapshot_path; restores state directly
-            k2 = Kernel(snapshot_path=snap_path)
+            k2 = minimal_kernel(restore_path=snap_path)
             assert k2.L["counter"] == 10
         finally:
             os.unlink(snap_path)
 
     def test_ns_is_exposed(self):
         """kernel.L is fully exposed and directly readable/writable."""
-        k = Kernel()
+        k = minimal_kernel()
         assert isinstance(k.L, dict)
         # can write directly
         k.L["custom_var"] = "hello"
@@ -479,34 +479,34 @@ class TestKernel:
     def test_exec_via_ping_returns_ping(self):
         """ping(pong, ns) returns Ping after executing code."""
         from vessal.ark.shell.hull.cell.protocol import Ping
-        k = Kernel()
+        k = minimal_kernel()
         result = _exec(k, "x = 1")
         assert isinstance(result, Ping)
 
     def test_ping_none_returns_ping(self):
         """ping(None, ns) returns Ping (boot call)."""
         from vessal.ark.shell.hull.cell.protocol import Ping
-        k = Kernel()
+        k = minimal_kernel()
         result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
 
     def test_ping_none_does_not_increment_frame(self):
         """ping(None, ns) does not increment the frame number."""
-        k = Kernel()
+        k = minimal_kernel()
         frame_before = k.L["_frame"]
         k.ping(None, _ns(k))
         assert k.L["_frame"] == frame_before
 
     def test_ping_none_does_not_append_frame_stream(self):
         """ping(None, ns) does not commit to the frame stream."""
-        k = Kernel()
+        k = minimal_kernel()
         k.ping(None, _ns(k))
         k.ping(None, _ns(k))
         assert k.L["_frame_stream"].hot_frame_count() == 0
 
     def test_kernel_ping_returns_ping(self, tmp_path):
         from vessal.ark.shell.hull.cell.protocol import Ping
-        kernel = Kernel()
+        kernel = minimal_kernel()
         kernel.L["_system_prompt"] = "You are an agent."
         ping = kernel.ping(None, _ns(kernel))
         assert isinstance(ping, Ping)
@@ -514,45 +514,45 @@ class TestKernel:
 
     def test_exec_via_ping_does_not_set_frame_before_pong(self):
         """ping(pong, ns) increments _frame exactly once (via _commit)."""
-        k = Kernel()
+        k = minimal_kernel()
         initial = k.L["_frame"]
         _exec(k, "pass")
         assert k.L["_frame"] == initial + 1
 
     def test_exec_via_ping_commits_to_frame_stream(self):
         """ping(pong, ns) commits one frame to _frame_stream."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "x = 1")
         _exec(k, "y = 2")
         assert k.L["_frame_stream"].hot_frame_count() == 2
 
     def test_variable_persists_across_pings(self):
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "x = 42")
         _exec(k, "y = x + 1")
         assert k.L["y"] == 43
 
     def test_stdout_in_observation_after_exec(self):
         """observation.stdout is populated after execution via ping."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "print('hello from kernel')")
         assert "hello from kernel" in k.L["observation"].stdout
 
     def test_error_in_observation_after_exec(self):
         """Exception is captured into observation.error."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "1 / 0")
         assert k.L["observation"].error is not None
         assert "ZeroDivisionError" in k.L["observation"].error
 
     def test_diff_in_observation_after_exec(self):
         """New variables appear in observation.diff."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "alpha = 999")
         assert "alpha" in k.L["observation"].diff
 
     def test_snapshot_restore(self):
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "counter = 10")
 
         with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
@@ -572,12 +572,12 @@ class TestKernel:
 
     def test_snapshot_restore_no_skills(self, tmp_path):
         """snapshot/restore works normally without Skills present in the namespace."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "x = 42")
         snap = str(tmp_path / "test.pkl")
         k.snapshot(snap)
 
-        k2 = Kernel()
+        k2 = minimal_kernel()
         k2.restore(snap)
         assert k2.L["x"] == 42
         assert k2.L.get("_loaded_skills", {}) == {}
@@ -588,7 +588,7 @@ class TestKernel:
         snap = str(tmp_path / "test.pkl")
         k.snapshot(snap)
 
-        k2 = Kernel()
+        k2 = minimal_kernel()
         k2.restore(snap)
         assert isinstance(k2.L["_builtin_names"], list)
 
@@ -612,7 +612,7 @@ class TestKernel:
         from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
-            k = Kernel()
+            k = minimal_kernel()
             sm = SkillLoader(skill_paths=[skills_root])
             k.L["_builtin_names"] = []
 
@@ -624,7 +624,7 @@ class TestKernel:
             snap = str(tmp_path / "test.pkl")
             k.snapshot(snap)
 
-            k2 = Kernel()
+            k2 = minimal_kernel()
             k2.restore(snap)
 
             assert issubclass(k2.L["tasks_cls"], BaseSkill)
@@ -634,7 +634,7 @@ class TestKernel:
         from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
-            k = Kernel()
+            k = minimal_kernel()
             sm = SkillLoader(skill_paths=[skills_root])
             k.L["_builtin_names"] = []
 
@@ -647,50 +647,18 @@ class TestKernel:
             snap = str(tmp_path / "test.pkl")
             k.snapshot(snap)
 
-            k2 = Kernel()
+            k2 = minimal_kernel()
             k2.restore(snap)
 
             assert k2.L["task_id"] == "1"
             assert issubclass(k2.L["TasksCls"], BaseSkill)
-
-    def test_snapshot_partial_on_unpicklable(self, tmp_path):
-        """When namespace contains unpicklable objects, snapshot does partial save without raising.
-
-        Uses mock to control cloudpickle.dumps behavior: triggers fallback when
-        full serialization fails; filters per-key and saves only serializable keys.
-        """
-        import cloudpickle as cp
-        from unittest.mock import patch
-
-        k = Kernel()
-        k.L["good"] = {"data": 42}
-        k.L["bad"] = object()  # placeholder; will be marked unpicklable by mock
-        bad_obj = k.L["bad"]
-        original_dumps = cp.dumps
-
-        # Full ns dump fails; individual dump of bad_obj also fails; others succeed.
-        def selective_dumps(obj, *args, **kwargs):
-            if obj is k.L:
-                raise TypeError("simulate: cannot pickle namespace")
-            if obj is bad_obj:
-                raise TypeError("simulate: cannot pickle bad_obj")
-            return original_dumps(obj, *args, **kwargs)
-
-        snap = str(tmp_path / "partial.pkl")
-        with patch("vessal.ark.shell.hull.cell.kernel.kernel.cloudpickle.dumps", selective_dumps):
-            k.snapshot(snap)  # should not raise
-
-        k2 = Kernel()
-        k2.restore(snap)
-        assert k2.L["good"] == {"data": 42}
-        assert "bad" not in k2.L  # unpicklable key was skipped
 
     def test_restore_cleans_sys_modules(self, tmp_path):
         """restore clears sys.modules cache; does not use stale in-process modules."""
         from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
-            k = Kernel()
+            k = minimal_kernel()
             sm = SkillLoader(skill_paths=[skills_root])
             k.L["_builtin_names"] = []
 
@@ -700,7 +668,7 @@ class TestKernel:
             snap = str(tmp_path / "test.pkl")
             k.snapshot(snap)
 
-            k2 = Kernel()
+            k2 = minimal_kernel()
             k2.restore(snap)
 
             # Skill class should be usable after restore
@@ -708,21 +676,21 @@ class TestKernel:
 
     def test_ns_direct_write_affects_exec(self):
         """Writing directly to kernel.L is visible to subsequent ping() calls."""
-        k = Kernel()
+        k = minimal_kernel()
         k.L["injected"] = 42
         _exec(k, "answer = injected + 1")
         assert k.L["answer"] == 43
 
     def test_sleeping_lifecycle_var(self):
         """_sleeping is a lifecycle variable in namespace; Agent can set it via sleep()."""
-        k = Kernel()
+        k = minimal_kernel()
         assert k.L["_sleeping"] is False
         _exec(k, "sleep()")
         assert k.L["_sleeping"] is True
 
     def test_wake_driven_exec(self):
         """Simulate event-driven execution: write _wake, execute, then call sleep()."""
-        k = Kernel()
+        k = minimal_kernel()
         k.L["_wake"] = "user_message: compute 1+2+3"
         _exec(k, "total = 1 + 2 + 3")
         _exec(k, "sleep()")
@@ -732,14 +700,14 @@ class TestKernel:
     def test_eval_expect_returns_verdict(self):
         """ping with expect returns Verdict in L['verdict']."""
         from vessal.ark.shell.hull.cell.protocol import Verdict
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "x = 1")
         _exec(k, "pass", expect="assert x == 1")
         assert isinstance(k.L["verdict"], Verdict)
 
     def test_eval_expect_passes(self):
         """ping with passing expect: verdict.passed == verdict.total."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "x = 42")
         _exec(k, "pass", expect="assert x == 42")
         verdict = k.L["verdict"]
@@ -749,7 +717,7 @@ class TestKernel:
 
     def test_eval_expect_fails(self):
         """ping with failing expect: verdict.failures is non-empty."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "x = 1")
         _exec(k, "pass", expect="assert x == 99")
         verdict = k.L["verdict"]
@@ -759,7 +727,7 @@ class TestKernel:
 
     def test_eval_expect_does_not_leak_arbitrary_keys(self):
         """ping with expect evaluates on a copy; post-ping key delta is exactly the allowed set."""
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "x = 1")
         ns_keys_before = set(k.L.keys())
         _exec(k, "pass", expect="assert x == 1")
@@ -773,7 +741,7 @@ class TestKernel:
         """ping(pong, ns) commits one frame; _frame increments by 1."""
         from vessal.ark.shell.hull.cell.protocol import Action, Pong
 
-        k = Kernel()
+        k = minimal_kernel()
         frame_before = k.L["_frame"]
         count_before = k.L["_frame_stream"].hot_frame_count()
 
@@ -899,148 +867,14 @@ class TestPingReturnsPing:
         from vessal.ark.shell.hull.cell.kernel import Kernel
         from vessal.ark.shell.hull.cell.protocol import Action, Ping, Pong
 
-        k = Kernel()
+        k = minimal_kernel()
         k.L["_system_prompt"] = "test"
         pong = Pong(think="t", action=Action(operation="x = 1", expect=""))
         result = k.ping(pong, _ns(k))
         assert isinstance(result, Ping), f"Expected Ping, got {type(result)}"
 
 
-def test_restore_clears_incompatible_frame_stream(tmp_path):
-    """restore() re-initializes _frame_stream when snapshot has incompatible type; no exception raised."""
-    import cloudpickle
-    from vessal.ark.shell.hull.cell.kernel import Kernel
-    from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
-    # Create a snapshot with old-format _frame_log list (pre-FrameStream) instead of FrameStream
-    snap_path = tmp_path / "test.snap"
-    ns = {"_frame_log": [{"schema_version": 0}], "_system_prompt": "test"}
-    with open(snap_path, "wb") as f:
-        cloudpickle.dump({}, f)   # header: empty _loaded_skills
-        cloudpickle.dump(ns, f)   # body: namespace
-
-    # Restore and verify _frame_stream is a fresh FrameStream (incompatible format re-initialized)
-    k = Kernel()
-    k.restore(str(snap_path))
-
-    assert isinstance(k.L["_frame_stream"], FrameStream)
-    assert k.L["_frame_stream"].hot_frame_count() == 0
-
-
-def test_restore_keeps_current_schema_frame_stream(tmp_path):
-    """restore() preserves _frame_stream that is already a valid FrameStream."""
-    import cloudpickle
-    from vessal.ark.shell.hull.cell.kernel import Kernel
-    from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
-    from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
-
-    # Build a FrameStream with one committed frame
-    fs = FrameStream(k=16, n=8)
-    fs.commit_frame({
-        "schema_version": FRAME_SCHEMA_VERSION,
-        "number": 1,
-        "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
-        "pong": {"think": "", "action": {"operation": "x = 1", "expect": ""}},
-        "observation": {"stdout": "", "diff": "+x = 1", "error": None, "verdict": None},
-    })
-
-    snap_path = tmp_path / "test.snap"
-    ns = {"_frame_stream": fs, "_system_prompt": "test"}
-    with open(snap_path, "wb") as f:
-        cloudpickle.dump({}, f)
-        cloudpickle.dump(ns, f)
-
-    k = Kernel()
-    k.restore(str(snap_path))
-
-    assert isinstance(k.L["_frame_stream"], FrameStream)
-    assert k.L["_frame_stream"].hot_frame_count() == 1
-    assert k.L["_frame_stream"]._hot[0][0]["schema_version"] == FRAME_SCHEMA_VERSION
-
-
-def test_restore_migrates_legacy_two_blob_format(tmp_path):
-    """Legacy snapshot format: [skills_header_blob][ns_blob] is migrated to single-blob on restore.
-
-    The legacy format wrote a header dict (first blob) followed by the real namespace dict
-    (second blob). restore() detects remaining bytes after reading the first blob, discards
-    the header, loads the namespace from the second blob, and rewrites the file in the
-    current single-blob format so subsequent restores use the fast path.
-    """
-    import cloudpickle
-
-    header_bytes = cloudpickle.dumps({"chat": {"parent_path": "/skills"}})
-    ns_bytes = cloudpickle.dumps({"x": 99, "_sleeping": False})
-    legacy_path = tmp_path / "legacy.pkl"
-    legacy_path.write_bytes(header_bytes + ns_bytes)
-
-    k = Kernel()
-    k.restore(str(legacy_path))
-
-    assert k.L["x"] == 99
-
-    # File must be rewritten in new single-blob format (fast path on subsequent restore)
-    raw = legacy_path.read_bytes()
-    import io
-    buf = io.BytesIO(raw)
-    restored_ns = cloudpickle.load(buf)
-    assert buf.tell() == len(raw), "expected exactly one blob in migrated file"
-    assert restored_ns["x"] == 99
-
-
-def test_snapshot_tracks_dropped_keys(tmp_path):
-    """snapshot() records dropped unpicklable keys in _dropped_keys.
-
-    socket.socket cannot be pickled by cloudpickle; used to simulate connection objects.
-    """
-    import socket as _socket
-    kernel = Kernel()
-    kernel.L["normal_var"] = 42
-    sock = _socket.socket()
-    kernel.L["sock_handle"] = sock
-
-    path = str(tmp_path / "snap.pkl")
-    try:
-        kernel.snapshot(path)
-    finally:
-        sock.close()
-
-    kernel2 = Kernel()
-    kernel2.restore(path)
-
-    dropped = kernel2.L.get("_dropped_keys", [])
-    assert "normal_var" not in dropped
-    assert kernel2.L["normal_var"] == 42
-    assert "sock_handle" in dropped
-
-
-def test_restore_emits_reconstruction_signal(tmp_path):
-    """After restore(), if _dropped_keys exist, SystemSkill surfaces reconstruction hints."""
-    kernel = Kernel()
-    kernel.L["x"] = 42
-    kernel.L["_dropped_keys"] = ["db_conn", "file_handle"]
-    kernel.L["_dropped_keys_context"] = {
-        "db_conn": "db_conn = connect('postgres://...')",
-        "file_handle": "file_handle = open('data.csv')",
-    }
-
-    path = str(tmp_path / "snap.pkl")
-    kernel.snapshot(path)
-
-    kernel2 = Kernel()
-    kernel2.restore(path)
-    kernel2.ping(None, {"globals": kernel2.G, "locals": kernel2.L})
-
-    # PR 3: signals is now a dict keyed by (class_name, var_name, scope)
-    signals = kernel2.L.get("signals", {})
-    system_payload = signals.get(("SystemSkill", "_system", "G"), {})
-    assert "db_conn" in system_payload.get("dropped", "")
-
-
-def test_init_namespace_has_compaction_defaults():
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-    k = Kernel()
-    assert k.L["_compaction_k"] == 16
-    assert k.L["_compaction_n"] == 8
 
 
 # ─────────────────────────────────────────────
@@ -1060,7 +894,7 @@ class TestInspectGetSource:
 
     def test_inspect_getsource_function_after_execute(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "def add(a, b):\n    return a + b")
         src = inspect.getsource(k.L["add"])
         assert "def add(a, b):" in src
@@ -1068,7 +902,7 @@ class TestInspectGetSource:
 
     def test_inspect_getsource_class_after_execute(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "class Bar:\n    def m(self):\n        return 1")
         src = inspect.getsource(k.L["Bar"])
         assert "class Bar:" in src
@@ -1076,14 +910,14 @@ class TestInspectGetSource:
 
     def test_inspect_getsource_async_function(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "async def waiter():\n    return 42")
         src = inspect.getsource(k.L["waiter"])
         assert "async def waiter" in src
 
     def test_inspect_getsource_decorated_function_includes_decorator(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         code = (
             "def my_decorator(fn):\n"
             "    return fn\n"
@@ -1102,7 +936,7 @@ class TestInspectGetSource:
         single shared <frame-N> source; inspect.getsource returns the
         function's own definition span via the function's lineno."""
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        k = Kernel()
+        k = minimal_kernel()
         code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
         _exec(k, code)
         foo_src = inspect.getsource(k.L["foo"])

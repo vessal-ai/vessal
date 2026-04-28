@@ -240,16 +240,16 @@ def test_no_persistence_without_ns():
     assert h._data_dir is None
 
 
-def test_persistence_derives_data_dir(tmp_path):
-    ns = {"_data_dir": str(tmp_path)}
-    h = Chat(ns=ns)
+def test_persistence_derives_data_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("VESSAL_DATA_DIR", str(tmp_path))
+    h = Chat()
     assert h._data_dir == tmp_path / "chat"
     assert h._data_dir.exists()
 
 
-def test_persistence_saves_on_receive(tmp_path):
-    ns = {"_data_dir": str(tmp_path)}
-    h = Chat(ns=ns)
+def test_persistence_saves_on_receive(tmp_path, monkeypatch):
+    monkeypatch.setenv("VESSAL_DATA_DIR", str(tmp_path))
+    h = Chat()
     h.receive("hello")
     chat_file = tmp_path / "chat" / "chat.jsonl"
     lines = [l for l in chat_file.read_text().splitlines() if l.strip()]
@@ -257,9 +257,9 @@ def test_persistence_saves_on_receive(tmp_path):
     assert json.loads(lines[0])["content"] == "hello"
 
 
-def test_persistence_saves_on_reply(tmp_path):
-    ns = {"_data_dir": str(tmp_path)}
-    h = Chat(ns=ns)
+def test_persistence_saves_on_reply(tmp_path, monkeypatch):
+    monkeypatch.setenv("VESSAL_DATA_DIR", str(tmp_path))
+    h = Chat()
     h.reply("answer")
     chat_file = tmp_path / "chat" / "chat.jsonl"
     lines = [l for l in chat_file.read_text().splitlines() if l.strip()]
@@ -267,25 +267,25 @@ def test_persistence_saves_on_reply(tmp_path):
     assert json.loads(lines[0])["role"] == "agent"
 
 
-def test_persistence_loads_history_on_init(tmp_path):
-    ns = {"_data_dir": str(tmp_path)}
-    h1 = Chat(ns=ns)
+def test_persistence_loads_history_on_init(tmp_path, monkeypatch):
+    monkeypatch.setenv("VESSAL_DATA_DIR", str(tmp_path))
+    h1 = Chat()
     h1.receive("msg1")
     h1.reply("reply1")
-    h2 = Chat(ns=ns)
+    h2 = Chat()
     assert len(h2._chat_log) == 2
     assert h2._inbox == []  # inbox is not restored
     assert h2._unread_count == 0
 
 
-def test_persistence_corrupted_file(tmp_path):
+def test_persistence_corrupted_file(tmp_path, monkeypatch):
     data_dir = tmp_path / "chat"
     data_dir.mkdir(parents=True)
     chat_file = data_dir / "chat.jsonl"
     good = {"ts": 1000.0, "role": "user", "content": "ok", "sender": "user"}
     chat_file.write_text(json.dumps(good) + "\nNOT JSON{{{\n", encoding="utf-8")
-    ns = {"_data_dir": str(tmp_path)}
-    h = Chat(ns=ns)
+    monkeypatch.setenv("VESSAL_DATA_DIR", str(tmp_path))
+    h = Chat()
     assert len(h._chat_log) == 1
 
 

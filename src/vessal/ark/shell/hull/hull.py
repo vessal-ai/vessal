@@ -36,7 +36,8 @@ class Hull(HullInitMixin, HullSkillsMixin, HullCompactionMixin, HullRuntimeMixin
 
         cells_cfg = config.get("cells", {})
 
-        self._init_cell(core_cfg, cell_cfg, agent_cfg, cells_cfg)
+        boot_entries = self._init_skills_pre(hull_cfg)
+        self._init_cell(core_cfg, cell_cfg, agent_cfg, cells_cfg, boot_entries)
         self._init_compression(hull_cfg)
         self._init_skills(hull_cfg)
         self._init_prompts(renderer_cfg)

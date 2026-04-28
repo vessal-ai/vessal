@@ -27,10 +27,15 @@ class SystemSkill(BaseSkill):
     name = "_system"
     description = "kernel signals"
 
-    def __init__(self, kernel: "Kernel") -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._kernel = kernel
+        self._kernel: "Kernel | None" = None
         self._wake: str = ""
+        print("_system: SystemSkill — kernel signals (frame, context, wake, errors)")
+
+    def _bind_kernel(self, kernel: "Kernel") -> None:
+        """Kernel calls this once after exec(boot_script) returns. Spec §7.4 / D6."""
+        self._kernel = kernel
 
     # ---- Public API used by Hull ---------------------------------------
     def set_wake(self, reason: str) -> None:
@@ -39,6 +44,8 @@ class SystemSkill(BaseSkill):
 
     # ---- Kernel-driven scan --------------------------------------------
     def signal_update(self) -> None:
+        if self._kernel is None:
+            return  # not yet bound; signal stays {}
         L = self._kernel.L
         sig: dict[str, Any] = {}
 
@@ -79,18 +86,6 @@ class SystemSkill(BaseSkill):
         ns_text = self._render_namespace(L)
         if ns_text:
             sig["namespace"] = ns_text
-
-        dropped = L.get("_dropped_keys", [])
-        if dropped:
-            ctx = L.get("_dropped_keys_context", {})
-            lines = []
-            for key in dropped:
-                op = ctx.get(key, "")
-                if op:
-                    lines.append(f"  {key}: original creation code: {op[:100]}")
-                else:
-                    lines.append(f"  {key}: no creation record")
-            sig["dropped"] = "\n".join(lines)
 
         self.signal = sig
 

@@ -1,5 +1,6 @@
 """skill — Memory Skill implementation."""
 import json
+import os
 from pathlib import Path
 
 from vessal.skills._base import BaseSkill
@@ -17,22 +18,19 @@ class Memory(BaseSkill):
     name = "memory"
     description = "cross-session memory"
 
-    def __init__(self, ns: dict | None = None) -> None:
-        """Initialize the Memory skill.
-
-        Args:
-            ns: Hull namespace containing the _data_dir path. No persistence without ns.
-        """
+    def __init__(self) -> None:
         super().__init__()
         self._store: dict = {}
-        self._ns: dict | None = ns
+        self._ns: dict | None = None
         self._data_dir: Path | None = None
-        if ns is not None:
-            base = ns.get("_data_dir")
-            if base:
-                self._data_dir = Path(base) / "memory"
-                self._data_dir.mkdir(parents=True, exist_ok=True)
-                self._load()
+
+        base = os.environ.get("VESSAL_DATA_DIR")
+        if base:
+            self._data_dir = Path(base) / "memory"
+            self._data_dir.mkdir(parents=True, exist_ok=True)
+            self._load()
+
+        print("memory: save(k,v)/get(k)/delete(k) — cross-session key-value store")
 
     def save(self, key: str, value: object) -> None:
         """Save a memory entry and write to disk immediately.

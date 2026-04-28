@@ -11,8 +11,9 @@ import pytest
 def creator(tmp_path):
     """Create a skill_creator instance with skill_paths pointing to a temp directory."""
     from vessal.skills.skill_creator.skill import SkillCreator
-    ns = {"skill_paths": [str(tmp_path)]}
-    return SkillCreator(ns=ns)
+    c = SkillCreator()
+    c._skill_paths = [str(tmp_path)]
+    return c
 
 
 def test_create_generates_directory(creator, tmp_path):
@@ -54,7 +55,7 @@ def test_create_duplicate_fails(creator, tmp_path):
 
 def test_create_no_skill_paths():
     from vessal.skills.skill_creator.skill import SkillCreator
-    c = SkillCreator(ns={})
+    c = SkillCreator()
     result = c.create("test")
     assert "failed" in result.lower() or "skill_paths" in result
 
@@ -67,7 +68,9 @@ def test_matches_cli_scaffolder_output(tmp_path):
     skill_dir = tmp_path / "demo"
     cli_dir = tmp_path / "cli" / "demo"
 
-    SkillCreator(ns={"skill_paths": [str(tmp_path)]}).create("demo")
+    sc = SkillCreator()
+    sc._skill_paths = [str(tmp_path)]
+    sc.create("demo")
     write_skill_scaffold(cli_dir, "demo")
 
     rel = lambda root: sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
