@@ -9,8 +9,11 @@
 #   L                              Agent state dict, fully exposed, readable/writable directly
 #   G                              preset assets dict (Skills, boot globals); read-only by convention
 #
-# Initialization: decides where to start (fresh L or snapshot restore),
-# and initializes all system variables.
+# Initialization: four-step boot (spec §7.2):
+#   ① self.L = {}
+#   ② exec(boot_script, G, G) — capture stdout/stderr
+#   ③ (restart only) LenientUnpickler.load(restore_path) → self.L
+#   ④ write boot frame at n = n_prev + 1
 # Kernel has no state outside of G and L — no Gate, no counters, no config attributes.
 
 from __future__ import annotations
@@ -37,22 +40,6 @@ from vessal.ark.shell.hull.cell.kernel.render import render as _render
 logger = logging.getLogger(__name__)
 
 
-def _picklable(obj) -> bool:
-    """Check whether an object can be serialized by cloudpickle.
-
-    Args:
-        obj: Any Python object.
-
-    Returns:
-        True if serializable, False if not.
-    """
-    try:
-        cloudpickle.dumps(obj)
-        return True
-    except Exception:
-        return False
-
-
 class Kernel:
     """Agent execution kernel.
 
@@ -66,31 +53,109 @@ class Kernel:
     Construction and appending of _frame_log is Cell's responsibility (Phase 3 implementation).
     """
 
-    def __init__(self, snapshot_path: str | None = None, *, db_path: str | None = None) -> None:
-        """Initialize Kernel.
+    def __init__(
+        self,
+        boot_script: str,
+        *,
+        db_path: str | None = None,
+        restore_path: str | None = None,
+    ) -> None:
+        """Spec §7.2 four-step boot:
+
+          ① self.L = {}
+          ② exec(boot_script, G, G) — capture stdout/stderr
+          ③ (restart only) LenientUnpickler.load(restore_path) → self.L
+          ④ write boot frame at n = n_prev + 1
 
         Args:
-            snapshot_path: If provided, restore L from this file (continuing a
-                           previous session). G is rebuilt fresh by __init__
-                           (boot script comes in PR 4).
-            db_path: Optional path to a SQLite database for the frame_log.
+            boot_script: complete Python source synthesized by Hull via
+                         compose_boot_script().
+            db_path: SQLite frame_log location. None disables frame_log entirely
+                     (test-only path; production always sets it).
+            restore_path: pathname of a cloudpickle-dumps(L) blob. None = cold start.
         """
         self.G: dict = {}
+        # ① empty L
         self.L: dict = {}
-        if snapshot_path:
-            self.restore(snapshot_path)
-        else:
-            self._init_L()
-        # SystemSkill is always present in G; restored sessions also get a fresh instance.
-        from vessal.skills.system import SystemSkill
-        self.G["_system"] = SystemSkill(self)
+
+        # ② boot script — captures Skill __init__ prints into stdout/stderr
+        import contextlib, io
+        boot_stdout = io.StringIO()
+        boot_stderr = io.StringIO()
+        with contextlib.redirect_stdout(boot_stdout), contextlib.redirect_stderr(boot_stderr):
+            exec(compile(boot_script, "<boot>", "exec"), self.G, self.G)
+
+        # post-hook: bind any object that wants the kernel back-reference (D6)
+        # Skip classes themselves — only bind instances (bound-method check).
+        for obj in self.G.values():
+            if isinstance(obj, type):
+                continue
+            bind = getattr(obj, "_bind_kernel", None)
+            if callable(bind):
+                bind(self)
+
         self._signal_errors_this_frame: list[tuple[str, str, Exception]] = []
         self.frame_log: FrameLog | None = None
         if db_path is not None:
             conn = open_db(db_path)
             source_cache.reload_from_db(conn)
             self.frame_log = FrameLog(conn)
+
+        # ③ restart only
+        if restore_path is not None:
+            self.restore(restore_path)
+
         self._last_ping: Ping | None = None
+
+        # ④ boot frame
+        self._write_boot_frame(
+            boot_script=boot_script,
+            boot_stdout=boot_stdout.getvalue(),
+            boot_stderr=boot_stderr.getvalue(),
+        )
+
+    def _write_boot_frame(
+        self,
+        *,
+        boot_script: str,
+        boot_stdout: str,
+        boot_stderr: str,
+    ) -> None:
+        """Spec §7.6: write a layer=0 entry at n = n_prev + 1 capturing the boot."""
+        if self.frame_log is None:
+            return
+
+        last = self.frame_log.last_committed_frame() or 0
+        n = last + 1
+        diff_json = self._compute_boot_diff_json()
+
+        from vessal.ark.shell.hull.cell.kernel.frame_log.types import FrameWriteSpec
+        spec = FrameWriteSpec(
+            n=n,
+            pong_think="",
+            pong_operation=boot_script,
+            pong_expect="True",
+            obs_stdout=boot_stdout,
+            obs_stderr=boot_stderr,
+            obs_diff_json=diff_json,
+            operation_error=None,
+            verdict_value="true",
+            verdict_error=None,
+            signals=[],
+        )
+        self.frame_log.write_frame(spec)
+        self.L["_frame"] = n
+
+    def _compute_boot_diff_json(self) -> str:
+        """Spec §7.6: diff(empty, L_restored) — each value repr()'d."""
+        import json
+        diff: dict[str, str] = {}
+        for k, v in self.L.items():
+            try:
+                diff[k] = repr(v)
+            except Exception as e:
+                diff[k] = f"<unrepr: {type(v).__name__}: {type(e).__name__}>"
+        return json.dumps(diff, ensure_ascii=False)
 
     def ping(self, pong: "Pong | None", namespace: dict) -> Ping:
         """Single Kernel primitive (spec §1.2). Runs five steps internally:
@@ -153,81 +218,11 @@ class Kernel:
         self._last_ping = _render(self.L, self.L.get("_render_config"))
         return self._last_ping
 
-    def _init_L(self) -> None:
-        """Inject Agent-state factory defaults into an empty L."""
-        L = self.L
-        # v3 system prompt and pinned observations
-        L["_system_prompt"] = ""
-        L["_frame_type"] = "work"
-        L["_render_config"] = None
-
-        # Hierarchical compaction config (must precede _frame_stream init)
-        L["_compaction_k"] = 16
-        L["_compaction_n"] = 8
-
-        # Execution state
-        L["_frame"] = 0
-        L["_ns_meta"] = {}
-        L["_frame_stream"] = FrameStream(
-            k=L["_compaction_k"],
-            n=L["_compaction_n"],
-        )
-        L["signals"] = {}
-
-        # Context utilization (written by renderer on each frame render)
-        L["_context_pct"] = 0
-        L["_budget_total"] = 0
-
-        # Context budget (used by renderer to calculate utilization)
-        L["_context_budget"] = 128000
-        L["_token_budget"] = 4096
-
-        # Errors ring buffer
-        L["_errors"] = []
-        L["_error_buffer_cap"] = 50
-
-        # Frame drop count
-        L["_dropped_frame_count"] = 0
-
-        # Lifecycle variables
-        L["_sleeping"] = False
-        L["sleep"] = self.sleep
-        L["_next_wake"] = None
-
     def snapshot(self, path: str) -> None:
-        """Serialize L to file. Pure bytes — no Skill awareness. G is NOT serialized.
-
-        Atomic write: first writes to a temp file; replaces the target only on full
-        success; the original file is unaffected on failure.
-
-        Fallback strategy: if full serialization of L fails (e.g., C-extension
-        objects), unpicklable keys are filtered out and the rest is saved.
-
-        Args:
-            path: Serialization file path.
-        """
-        import os
-        import tempfile
+        """Serialize L to file. Pure cloudpickle.dumps(L) — no per-key filtering."""
+        import os, tempfile
         path = str(path)
-
-        try:
-            body_bytes = cloudpickle.dumps(self.L)
-        except Exception as e:
-            picklable = {k: v for k, v in self.L.items() if _picklable(v)}
-            dropped = [k for k in self.L if k not in picklable]
-            logger.debug(
-                "L serialization failed (%s); dropping %d unpicklable keys: %s",
-                e, len(dropped), dropped[:10],
-            )
-            partial = picklable
-            # Record dropped keys and their creation context for reconstruction
-            partial["_dropped_keys"] = dropped
-            partial["_dropped_keys_context"] = {
-                k: self._find_creation_operation(k)
-                for k in dropped
-            }
-            body_bytes = cloudpickle.dumps(partial)
-
+        body_bytes = cloudpickle.dumps(self.L)
         dir_name = os.path.dirname(path) or "."
         fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
         try:
@@ -242,74 +237,11 @@ class Kernel:
             raise
 
     def restore(self, path: str) -> None:
-        """Restore L from file. Caller MUST have prepared sys.path / sys.modules.
-
-        Args:
-            path: File path written by snapshot().
-
-        Side effects:
-            Completely replaces self.L.
-        """
-        import io as _io
+        """Restore L from file. sys.modules populated by boot script before this runs."""
         with open(path, "rb") as f:
             raw = f.read()
-        from .lenient import LenientUnpickler
-        buf = _io.BytesIO(raw)
-        first = LenientUnpickler(buf).load()
-        remaining = len(raw) - buf.tell()
-        if remaining > 0:
-            # Legacy layout: [cloudpickle(header_dict)][cloudpickle(L)]
-            # Discard header; load the actual L from remaining bytes.
-            self.L = LenientUnpickler(buf).load()
-            # Write back in new format so subsequent restores use fast path.
-            with open(path, "wb") as f:
-                f.write(cloudpickle.dumps(self.L))
-        else:
-            self.L = first
-        self._migrate_snapshot()
-
-    def _find_creation_operation(self, key: str) -> str:
-        """Search hot-zone frames in reverse for the most recent operation that created a variable.
-
-        Args:
-            key: Variable name.
-
-        Returns:
-            The operation string that created the variable, or empty string if not found.
-        """
-        fs = self.L.get("_frame_stream")
-        if fs is None:
-            return ""
-        return fs.find_creation(key) or ""
-
-    def _migrate_snapshot(self) -> None:
-        """Clear per-run state whose schema version doesn't match.
-
-        For v6→v7, the flat _frame_log is dropped and _frame_stream is reinitialized.
-        No backfill is attempted.
-        """
-        # Drop stale _frame_log if present (v6 and earlier)
-        self.L.pop("_frame_log", None)
-
-        fs = self.L.get("_frame_stream")
-        if fs is None:
-            self.L["_frame_stream"] = FrameStream(
-                k=self.L.get("_compaction_k", 16),
-                n=self.L.get("_compaction_n", 8),
-            )
-        else:
-            try:
-                d = fs.to_dict()
-                if d.get("schema_version") != FRAME_SCHEMA_VERSION:
-                    raise ValueError("schema mismatch")
-            except Exception:
-                self.L["_frame_stream"] = FrameStream(
-                    k=self.L.get("_compaction_k", 16),
-                    n=self.L.get("_compaction_n", 8),
-                )
-                logger.info("Cleared incompatible frame_stream (schema mismatch)")
-        self.L["sleep"] = self.sleep
-        self.L.setdefault("signals", {})
+        import io as _io
+        self.L = LenientUnpickler(_io.BytesIO(raw)).load()
 
     def sleep(self) -> None:
         """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
