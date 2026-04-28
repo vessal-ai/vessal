@@ -28,7 +28,7 @@ from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
 from vessal.ark.shell.hull.cell.protocol import (
     FRAME_SCHEMA_VERSION,
     FrameRecord,
-    FrameStream as ProtocolFrameStream,
+    FrameStream,
     Observation,
     Ping,
     Pong,
@@ -36,9 +36,7 @@ from vessal.ark.shell.hull.cell.protocol import (
 )
 from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
 from vessal.ark.shell.hull.cell.kernel import source_cache
-from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.lenient import LenientUnpickler
-from vessal.ark.shell.hull.cell.kernel.render import render as _render
 
 logger = logging.getLogger(__name__)
 
@@ -81,18 +79,10 @@ class Kernel:
         # ① empty L — seed system defaults that every agent needs from frame 0
         self.L: dict = {
             "_system_prompt": "",
-            "_frame_type": "work",
-            "_render_config": None,
             "_frame": 0,
-            "_ns_meta": {},
-            "_frame_stream": FrameStream(k=16, n=8),
             "signals": {},
-            "_context_pct": 0,
-            "_budget_total": 0,
-            "_context_budget": 128000,
             "_errors": [],
             "_error_buffer_cap": 50,
-            "_dropped_frame_count": 0,
             "_sleeping": False,
             "_next_wake": None,
         }
@@ -246,8 +236,16 @@ class Kernel:
             # First call after boot: signal_scan only (no exec/eval, no commit)
             self._signal_scan()
 
-        # ⑤ render
-        self._last_ping = _render(self.L, self.L.get("_render_config"))
+        # ⑤ render frame_stream from SQLite + assemble Ping dataclass
+        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        if self.frame_log is not None:
+            fs = render_frame_stream(self.frame_log._conn)
+        else:
+            fs = FrameStream(entries=[])
+        self._last_ping = Ping(
+            system_prompt=self.L.get("_system_prompt", ""),
+            state=State(frame_stream=fs, signals=dict(self.L.get("signals", {}))),
+        )
         return self._last_ping
 
     def snapshot(self, path: str) -> None:
@@ -363,7 +361,7 @@ class Kernel:
         """
         L = self.L
         effective_ping = ping_for_record if ping_for_record is not None else Ping(
-            system_prompt="", state=State(frame_stream=ProtocolFrameStream(entries=[]), signals={})
+            system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})
         )
         record = FrameRecord(
             number=frame_number,
@@ -371,11 +369,6 @@ class Kernel:
             pong=pong,
             observation=observation,
         )
-        fs = L.get("_frame_stream")
-        if fs is None:
-            fs = FrameStream(k=L.get("_compaction_k", 16), n=L.get("_compaction_n", 8))
-            L["_frame_stream"] = fs
-        fs.commit_frame(record.to_dict())
         L["_frame"] = frame_number
         if self.frame_log is not None:
             self.frame_log.write_frame(self._build_write_spec(record))
@@ -402,7 +395,7 @@ class Kernel:
         verdict_value: str | None = None
         if obs.verdict is not None:
             verdict_value = _json.dumps(obs.verdict.to_dict())
-        diff_json = obs.diff
+        diff_json = _json.dumps(obs.diff) if obs.diff else "{}"
         sig_rows: list[SignalRow] = []
         for (cls_name, var_name, scope), payload in self.L.get("signals", {}).items():
             err_id = payload.get("_error_id") if isinstance(payload, dict) else None

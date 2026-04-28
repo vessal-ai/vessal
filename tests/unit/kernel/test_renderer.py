@@ -585,14 +585,13 @@ class TestKernelRenderV3:
         _exec(k, "x = 1")
         assert k.L["observation"].diff != "" or k.L.get("x") == 1
 
-    def test_frame_stream_not_populated_by_exec(self):
+    def test_frame_stream_not_in_l(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = minimal_kernel()
-        # ping(pong, ns) DOES commit to _frame_stream (Cell's job moved to Kernel.ping in PR 2)
-        before = k.L["_frame_stream"].hot_frame_count()
+        # PR 5: _frame_stream removed from L; reads from SQLite each ping
+        assert "_frame_stream" not in k.L
         _exec(k, "x = 1")
-        # One frame was committed by ping
-        assert k.L["_frame_stream"].hot_frame_count() == before + 1
+        assert "_frame_stream" not in k.L
 
     def test_system_prompt_key_used(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
@@ -607,12 +606,12 @@ class TestKernelRenderV3:
         result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
 
-    def test_kernel_render_updates_context_pct(self):
+    def test_kernel_render_removes_context_pct(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = minimal_kernel()
         k.ping(None, _ns(k))
-        assert "_context_pct" in k.L
-        assert isinstance(k.L["_context_pct"], int)
+        # PR 5: _context_pct removed from L (rendering budget is not Kernel's concern)
+        assert "_context_pct" not in k.L
 
 
 # ──────────────────────────────────────────────────────────────────────────────
