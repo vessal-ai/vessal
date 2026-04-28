@@ -1,7 +1,7 @@
 """cell.py — Stateful execution engine: Kernel + Core + single-frame step(); does not auto-loop."""
 #
 # Single-frame execution order:
-#   prepare (each frame) → state_gate → core.step → action_gate → kernel.step → return StepResult
+#   (first call only) kernel.ping(None, ns) → state_gate → core.step → action_gate → kernel.ping(pong, ns) → return StepResult
 #
 # Public interface:
 #   G               preset assets dict (property, proxied from Kernel)
@@ -158,23 +158,28 @@ class Cell:
         """Execute one frame.
 
         Flow:
-            1. prepare (each frame)  — generate a fresh Ping (with latest signals)
-            2. state_gate            — state gating (using the cached Ping)
-            3. core.step             — call LLM (Core handles parsing internally)
-            4. action_gate           — action gating
-            5. kernel.step           — exec → expect → frame → commit
+            1. (first call only) kernel.ping(None, ns) — bootstrap initial Ping
+            2. state_gate     — state gating against current Ping
+            3. core.step      — call LLM, parse Pong
+            4. action_gate    — action gating
+            5. kernel.ping(pong, ns) — commits previous frame, returns next Ping
             6. return StepResult
 
-        Returns StepResult(protocol_error=...) on network error, parse failure, or action_gate block.
-        state_gate block does not terminate the frame: _error is injected and execution continues so the LLM sees it.
+        Frame N is committed inside the kernel.ping(pong_N, ns) call. The very
+        first step() does not commit any frame (no prior pong to execute) — it
+        only generates the initial Ping for the LLM.
 
         Args:
-            tracer: Optional TracerLike instance passed in by Hull.
+            tracer: Optional TracerLike instance.
 
         Returns:
             StepResult containing protocol_error (frame was not committed if non-None).
         """
-        self._ping = self._kernel.prepare()
+        ns = {"globals": self._kernel.G, "locals": self._kernel.L}
+
+        # Bootstrap: first call generates the initial Ping (pong=None).
+        if self._ping is None:
+            self._ping = self._kernel.ping(None, ns)
 
         self._check_state_gate(self._ping)
 
@@ -185,40 +190,26 @@ class Cell:
                 self._ping, tracer, frame_number,
             )
         except Exception as e:
-            self._kernel.L["_error"] = f"Core error: {type(e).__name__}: {e}"
             append_error(self._kernel.L, ErrorRecord(
                 "protocol", str(e),
                 self._kernel.L.get("_frame", 0), _time.time(),
             ))
             return StepResult(protocol_error=str(e))
 
-        # Overwrite renderer's estimated _context_pct with real token data from the API response
+        # Real-token bookkeeping (deferred to PR 5; kept for now)
         if prompt_tokens is not None:
             budget_total = self._kernel.L.get("_budget_total", 0)
-            self._kernel.L["_actual_tokens_in"] = prompt_tokens
-            self._kernel.L["_actual_tokens_out"] = completion_tokens or 0
             if budget_total > 0:
                 self._kernel.L["_context_pct"] = round(
                     prompt_tokens / budget_total * 100
                 )
 
         if self._check_action_gate(self._pong.action.operation) is None:
+            self._pong = None  # do not execute next call
             return StepResult(protocol_error="Action gate blocked")
 
-        self._kernel.step(self._pong, tracer, ping=self._ping, frame_number=frame_number)
-
-        fs = self._kernel.L.get("_frame_stream")
-        latest = fs.latest_hot_frame() if fs is not None else None
-        if latest is not None:
-            # Derive ping/pong from committed frame record (canonical post-step state).
-            ping_dict = latest.get("ping")
-            if ping_dict is not None:
-                self._ping = Ping.from_dict(ping_dict)
-            pong_dict = latest.get("pong")
-            if pong_dict is not None:
-                self._pong = Pong.from_dict(pong_dict)
-        # If frame_stream is empty (e.g., first frame or post-restore), _ping/_pong
-        # retain the pre-commit in-memory values, which remain the best available approximation.
+        # Single Kernel primitive: commits frame N, returns Ping for frame N+1
+        self._ping = self._kernel.ping(self._pong, ns)
 
         return StepResult()
 
@@ -250,15 +241,21 @@ class Cell:
     # ------------------------------------------------------------------ Gates
 
     def _check_state_gate(self, ping: Ping) -> None:
-        """Gate applied before Ping is sent to LLM. On block, injects _error (does not abort the current frame)."""
+        """State gating before the LLM sees Ping. Blocks logged to _errors ring."""
         result = self._state_gate.check(ping.state.frame_stream)
         if not result.allowed:
-            self._kernel.L["_error"] = f"State gate blocked: {result.reason}"
+            append_error(self._kernel.L, ErrorRecord(
+                "protocol", f"State gate blocked: {result.reason}",
+                self._kernel.L.get("_frame", 0), _time.time(),
+            ))
 
     def _check_action_gate(self, action: str) -> str | None:
-        """Gate applied before action is sent to Kernel. On block, injects _error and returns None."""
+        """Action gating before exec. Returns None when blocked."""
         result = self._action_gate.check(action)
         if not result.allowed:
-            self._kernel.L["_error"] = f"Action gate blocked: {result.reason}"
+            append_error(self._kernel.L, ErrorRecord(
+                "protocol", f"Action gate blocked: {result.reason}",
+                self._kernel.L.get("_frame", 0), _time.time(),
+            ))
             return None
         return action
