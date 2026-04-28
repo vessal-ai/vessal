@@ -9,7 +9,7 @@
 #       Does NOT write _frame_log or construct FrameRecord — that is Cell's responsibility.
 #       Exception tracebacks are intelligently compressed — user code frames and exception
 #       info are retained while library-internal frames are folded.
-#       Bare expressions (e.g. x, data.head()) have their value appended to _stdout
+#       Bare expressions (e.g. x, data.head()) have their value appended to captured stdout
 #       (Jupyter-style).
 #   is_user_var(name) -> bool
 #       Determines whether a variable name is a user variable (does not start with _).
@@ -327,7 +327,7 @@ def _update_ns_meta(L: dict[str, Any], before_keys: set, before_ids: dict, frame
 def _compute_diff(
     L: dict, before_keys: set, before_ids: dict, before_values: dict
 ) -> str:
-    """Return git-style diff string. (PR 2: returns instead of writing L["_diff"].)
+    """Return git-style diff string of namespace changes since before_keys/before_ids snapshot.
 
     Format (git-style, only + and - symbols):
     - New variable:      +name = preview
