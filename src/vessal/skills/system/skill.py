@@ -87,18 +87,6 @@ class SystemSkill(BaseSkill):
         if ns_text:
             sig["namespace"] = ns_text
 
-        dropped = L.get("_dropped_keys", [])
-        if dropped:
-            ctx = L.get("_dropped_keys_context", {})
-            lines = []
-            for key in dropped:
-                op = ctx.get(key, "")
-                if op:
-                    lines.append(f"  {key}: original creation code: {op[:100]}")
-                else:
-                    lines.append(f"  {key}: no creation record")
-            sig["dropped"] = "\n".join(lines)
-
         self.signal = sig
 
     # ---- Helpers --------------------------------------------------------
