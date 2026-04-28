@@ -95,15 +95,20 @@ def _fetch_summary_content(
 ) -> dict[tuple[int, int], dict]:
     if not keys:
         return {}
-    out: dict[tuple[int, int], dict] = {}
+    layer_to_nstarts: dict[int, list[int]] = {}
     for layer, n_start in keys:
-        row = conn.execute(
-            "SELECT schema_version, body FROM summary_content "
-            "WHERE layer=? AND n_start=?",
-            (layer, n_start),
-        ).fetchone()
-        if row is not None:
-            out[(layer, n_start)] = {"schema_version": row[0], "body": row[1]}
+        layer_to_nstarts.setdefault(layer, []).append(n_start)
+
+    out: dict[tuple[int, int], dict] = {}
+    for layer, n_starts in layer_to_nstarts.items():
+        placeholders = ",".join("?" for _ in n_starts)
+        rows = conn.execute(
+            f"SELECT n_start, schema_version, body FROM summary_content "
+            f"WHERE layer=? AND n_start IN ({placeholders})",
+            [layer] + n_starts,
+        ).fetchall()
+        for n_start, schema_version, body in rows:
+            out[(layer, n_start)] = {"schema_version": schema_version, "body": body}
     return out
 
 

@@ -34,10 +34,9 @@ def test_state_to_dict_includes_entries_count():
     assert d["frame_stream"]["entries"] and len(d["frame_stream"]["entries"]) == 1
 
 
-def test_string_state_construction_rejected():
-    """Old call sites passing strings must fail loudly."""
-    import pytest
-    fs = FrameStream(entries=[])
-    state = State(frame_stream=fs, signals={})
-    assert not isinstance(state.frame_stream, str)
-    assert not isinstance(state.signals, str)
+def test_state_frame_stream_field_accepts_framestream_not_str():
+    """State.frame_stream field type is FrameStream, not str."""
+    import dataclasses
+    fields = {f.name: f.type for f in dataclasses.fields(State)}
+    assert "FrameStream" in str(fields["frame_stream"])
+    assert "signals" in fields

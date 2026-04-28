@@ -8,13 +8,6 @@ from vessal.ark.shell.hull.cell.protocol import (
 )
 
 
-def test_core_has_build_messages_staticmethod():
-    """Core._build_messages is the single place messages are constructed."""
-    from vessal.ark.shell.hull.cell.core.core import Core
-    assert hasattr(Core, "_build_messages")
-    assert callable(Core._build_messages)
-
-
 def test_build_messages_returns_list():
     from vessal.ark.shell.hull.cell.core.core import Core
     ping = Ping(

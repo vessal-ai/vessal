@@ -5,6 +5,7 @@ Methods here may assume the attributes set by Hull.__init__ are available via se
 """
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -92,7 +93,7 @@ class HullRuntimeMixin:
         frame_log = self._cell._kernel.frame_log
         if frame_log is None:
             return []
-        fs = render_frame_stream(frame_log._conn)
+        fs = render_frame_stream(frame_log.conn)
         flat: list[dict] = []
         for entry in fs.entries:
             if entry.layer != 0:
@@ -108,7 +109,7 @@ class HullRuntimeMixin:
                 "pong_expect": c.expect,
                 "obs_stdout": c.observation.get("stdout", ""),
                 "obs_stderr": c.observation.get("stderr", ""),
-                "obs_diff_json": c.observation.get("diff", ""),
+                "obs_diff_json": json.dumps(c.observation.get("diff") or {}),
                 "obs_error": c.observation.get("error"),
                 "verdict_value": c.verdict.get("value") if c.verdict else None,
                 "verdict_error": c.verdict.get("error") if c.verdict else None,
@@ -256,3 +257,4 @@ class HullRuntimeMixin:
 
     def _after_frame(self) -> None:
         """Called after each successful frame."""
+        pass

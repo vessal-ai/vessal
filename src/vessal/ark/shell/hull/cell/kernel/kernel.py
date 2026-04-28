@@ -239,7 +239,7 @@ class Kernel:
         # ⑤ render frame_stream from SQLite + assemble Ping dataclass
         from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
         if self.frame_log is not None:
-            fs = render_frame_stream(self.frame_log._conn)
+            fs = render_frame_stream(self.frame_log.conn)
         else:
             fs = FrameStream(entries=[])
         self._last_ping = Ping(

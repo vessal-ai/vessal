@@ -50,10 +50,8 @@ def _compose_frame_stream(fs: FrameStream) -> str:
 
 
 def _compose_entry(e: Entry) -> str:
-    if e.layer == 0:
-        assert isinstance(e.content, FrameContent)
+    if isinstance(e.content, FrameContent):
         return _compose_layer0(e.n_start, e.content)
-    assert isinstance(e.content, SummaryContent)
     return _compose_layerk(e.n_start, e.n_end, e.content)
 
 
