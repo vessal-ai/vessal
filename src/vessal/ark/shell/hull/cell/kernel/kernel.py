@@ -213,7 +213,7 @@ class Kernel:
                 stdout=exec_result.stdout,
                 stderr="",
                 diff=exec_result.diff,
-                error=None,
+                error=exec_result.error,
             )
             # ③ eval
             if exec_result.error is None and pong.action.expect.strip():

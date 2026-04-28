@@ -148,19 +148,17 @@ class TestExecute:
     def test_runtime_error_captured(self):
         ns = bare_ns()
         result = execute("1 / 0", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "ZeroDivisionError" in result.error
+        assert isinstance(result.error, ZeroDivisionError)
 
     def test_syntax_error_captured(self):
         ns = bare_ns()
         result = execute("def foo(:\n    pass", {}, ns, frame_number=1)
-        assert result.error is not None
+        assert isinstance(result.error, SyntaxError)
 
     def test_name_error_captured(self):
         ns = bare_ns()
         result = execute("y = undefined_var", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "NameError" in result.error
+        assert isinstance(result.error, NameError)
 
     def test_error_none_on_success(self):
         ns = bare_ns()
@@ -264,15 +262,13 @@ class TestExecute:
         """LLM calling sys.exit() should not terminate the process; it should be captured in ExecResult.error."""
         ns = bare_ns()
         result = execute("import sys; sys.exit(0)", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "SystemExit" in result.error
+        assert isinstance(result.error, SystemExit)
 
     def test_exit_builtin_captured_as_error(self):
         """LLM calling builtin exit() should not terminate the process; it should be captured in ExecResult.error."""
         ns = bare_ns()
         result = execute("exit(0)", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "SystemExit" in result.error
+        assert isinstance(result.error, SystemExit)
 
     def test_redefine_to_builtin_no_crash(self):
         """When a function is reassigned to a builtin object, execute does not crash."""
@@ -338,32 +334,23 @@ class TestCompressTraceback:
         assert "ValueError: something went wrong" in result
         assert "lines omitted" in result
 
-    def test_execute_compresses_deep_traceback(self):
-        """execute() compresses exceptions from deep call stacks."""
+    def test_execute_deep_call_stack_returns_exception(self):
+        """execute() returns the raw exception for deep call stacks."""
         ns = bare_ns()
-        # Python 3.12 exec traceback has 1 line per frame (no code line); need > _TRACEBACK_COMPRESS_THRESHOLD
-        # frames to trigger compression. range(20) produces f0-f19, plus f20 (raises) = 21 function frames
-        # + 2 module frames + first line + exception = 25 lines.
         funcs = "\n".join(
             f"def f{i}(): return f{i+1}()" for i in range(20)
         )
         code = f"{funcs}\ndef f20(): return 1/0\nf0()"
-        # Pass ns as both G and L so cross-function calls resolve via ns
         result = execute(code, ns, ns, frame_number=1)
-        error = result.error
-        assert error is not None
-        assert "ZeroDivisionError" in error
-        # After compression there should be an omission notice (call chain is deep enough, > 20 lines)
-        assert "lines omitted" in error
+        assert isinstance(result.error, ZeroDivisionError)
+        assert result.error.__traceback__ is None
 
-    def test_execute_short_error_not_compressed(self):
-        """Simple exceptions in execute() are not compressed; full traceback is retained."""
+    def test_execute_short_error_returns_exception(self):
+        """Simple exceptions in execute() are returned as raw exception objects."""
         ns = bare_ns()
         result = execute("1 / 0", {}, ns, frame_number=1)
-        error = result.error
-        assert error is not None
-        # Short traceback does not contain omission notice
-        assert "lines omitted" not in error
+        assert isinstance(result.error, ZeroDivisionError)
+        assert result.error.__traceback__ is None
 
 
 # ─────────────────────────────────────────────
@@ -536,10 +523,10 @@ class TestKernel:
         assert "hello from kernel" in k.L["observation"].stdout
 
     def test_error_in_observation_after_exec(self):
-        """observation.error is None; errors are tracked via exec_result (Task 3 wires exception)."""
+        """observation.error is the raw exception when execution raises."""
         k = minimal_kernel()
         _exec(k, "1 / 0")
-        assert k.L["observation"].error is None
+        assert isinstance(k.L["observation"].error, ZeroDivisionError)
 
     def test_diff_in_observation_after_exec(self):
         """New variables appear in observation.diff."""

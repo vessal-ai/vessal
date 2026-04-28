@@ -47,7 +47,7 @@ class TestExecuteSideEffects:
         ns = _ns()
         result = execute("raise ValueError('boom')", {}, ns, frame_number=1)
         assert result.error is not None
-        assert "ValueError" in result.error
+        assert isinstance(result.error, ValueError)
 
     def test_operation_not_written_to_ns(self):
         """execute() does not write _operation to ns (side-effect keys moved to ExecResult)."""
@@ -74,9 +74,8 @@ class TestExecuteSideEffects:
     def test_error_set_on_exception(self):
         ns = _ns()
         result = execute("raise ValueError('boom')", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "ValueError" in result.error
-        assert "boom" in result.error
+        assert isinstance(result.error, ValueError)
+        assert str(result.error) == "boom"
 
     def test_empty_action_returns_empty_result(self):
         """Empty operation returns ExecResult with empty fields."""
@@ -217,17 +216,16 @@ class TestNsMetaUpdate:
 
 
 class TestErrorRecording:
-    """executor writes runtime errors to _errors."""
+    """executor returns errors as raw exceptions; does not write to _errors ring buffer."""
 
-    def test_runtime_error_recorded(self):
-        from vessal.ark.shell.hull.cell.protocol import ErrorRecord
+    def test_runtime_error_returned_as_exception(self):
         ns = _ns()
         ns["_errors"] = []
-        execute("raise ValueError('boom')", {}, ns, frame_number=1)
-        errors = ns["_errors"]
-        assert len(errors) == 1
-        assert errors[0].type == "runtime"
-        assert "ValueError" in errors[0].message
+        result = execute("raise ValueError('boom')", {}, ns, frame_number=1)
+        assert isinstance(result.error, ValueError)
+        assert str(result.error) == "boom"
+        # executor no longer writes to _errors; ring buffer is untouched
+        assert ns["_errors"] == []
 
 
 class TestLinecacheRegistration:
@@ -266,13 +264,14 @@ class TestLinecacheRegistration:
         execute("def helper():\n    return 99\n", {}, ns, frame_number=42)
         assert ns["helper"].__code__.co_filename == "<frame-42>"
 
-    def test_traceback_text_references_frame_n(self):
-        """Tracebacks now point at <frame-N>, not <string>."""
+    def test_error_references_frame_n_via_traceback(self):
+        """Exception is captured with traceback cleared; the exception type is preserved."""
         ns = _ns()
         self._clear(42)
         result = execute("raise ValueError('boom')\n", {}, ns, frame_number=42)
-        assert result.error is not None
-        assert '"<frame-42>"' in result.error
+        assert isinstance(result.error, ValueError)
+        assert str(result.error) == "boom"
+        assert result.error.__traceback__ is None
 
     def test_empty_operation_does_not_register(self):
         """No-op operation does not pollute linecache."""
