@@ -110,27 +110,39 @@ class TestRestoreLoadsOnlyIntoL:
 
 class TestLenientRestoreStillWorks:
     def test_unresolved_ref_lands_in_L_not_G(self, tmp_path):
-        # Construct a snapshot whose by-reference target is unresolvable.
-        # Use a class defined here, then delete its module from sys.modules.
-        import sys
+        import io
 
-        class Marker:
-            pass
-
-        Marker.__module__ = "nonexistent.module"
-        Marker.__qualname__ = "Marker"
-
-        # Force pickle to use by-reference: fabricate the bytestream directly
-        import pickle
-        blob = pickle.dumps(Marker())  # by-reference: stores ("nonexistent.module", "Marker")
+        # Construct a pickle bytestream by hand so the GLOBAL opcode references
+        # 'nonexistent.module.Marker' without requiring the module to exist at
+        # serialization time.  CPython's pickle validates importability on dumps,
+        # so we bypass that by building the opcodes directly (protocol 2).
+        #
+        # Byte layout: PROTO 2, EMPTY_DICT, BINPUT 0,
+        #   BINUNICODE 'vanished', BINPUT 1,
+        #   GLOBAL 'nonexistent.module\nMarker\n', BINPUT 2,
+        #   EMPTY_TUPLE, NEWOBJ, BINPUT 3,
+        #   SETITEM, STOP
+        buf = io.BytesIO()
+        buf.write(bytes([0x80, 2]))  # PROTO 2
+        buf.write(b"}")              # EMPTY_DICT
+        buf.write(b"q\x00")         # BINPUT 0
+        buf.write(b"X")             # BINUNICODE (4-byte LE length + UTF-8)
+        key = b"vanished"
+        buf.write(len(key).to_bytes(4, "little"))
+        buf.write(key)
+        buf.write(b"q\x01")         # BINPUT 1
+        buf.write(b"c")             # GLOBAL opcode
+        buf.write(b"nonexistent.module\nMarker\n")
+        buf.write(b"q\x02")         # BINPUT 2
+        buf.write(b")")             # EMPTY_TUPLE
+        buf.write(b"\x81")          # NEWOBJ
+        buf.write(b"q\x03")         # BINPUT 3
+        buf.write(b"s")             # SETITEM
+        buf.write(b".")             # STOP
+        blob = buf.getvalue()
 
         path = tmp_path / "snap.cp"
-        # Wrap blob as if it were the L dict
-        with open(path, "wb") as f:
-            f.write(cloudpickle.dumps({"vanished": Marker()}))
-
-        # Ensure the module is genuinely gone before restore
-        sys.modules.pop("nonexistent.module", None)
+        path.write_bytes(blob)
 
         k = Kernel(snapshot_path=str(path))
         assert isinstance(k.L["vanished"], UnresolvedRef)
