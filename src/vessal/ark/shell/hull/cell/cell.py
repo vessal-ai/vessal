@@ -34,8 +34,9 @@ class Cell:
     Encapsulates Kernel (execution) and Core (reasoning), providing a single-frame step() interface.
     Does not auto-loop, does not hold logs, and does not manage the Tracer lifecycle — these are Hull's responsibility.
 
-    Hull injects system variables (_system_prompt, _memories, etc.) via cell.L;
-    the L dict itself is the injection interface, no dedicated channel is needed.
+    Hull writes `_system_prompt` into G after boot via `cell.G["_system_prompt"]`.
+    Other per-frame state (_memories, etc.) lives in L; the L dict is the injection
+    interface for mutable agent state, no dedicated channel is needed.
 
     gate attributes take values "auto" | "safe" | "human"; reads and writes go through ActionGate/StateGate instances.
     Hull can switch modes via cell.action_gate = "safe" without knowing about internal Gate objects.
