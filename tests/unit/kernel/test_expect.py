@@ -177,8 +177,8 @@ class TestEvaluateExpect:
 
     def test_all_pass(self):
         """When all assertions pass, passed == total and failures is empty."""
-        ns = {"x": 1, "y": 2}
-        result = evaluate_expect("assert x == 1\nassert y == 2", ns, frame_number=1)
+        L = {"x": 1, "y": 2}
+        result = evaluate_expect("assert x == 1\nassert y == 2", {}, L, frame_number=1)
         assert isinstance(result, Verdict)
         assert result.total == 2
         assert result.passed == 2
@@ -186,8 +186,8 @@ class TestEvaluateExpect:
 
     def test_single_pass(self):
         """Single passing assertion."""
-        ns = {"value": 42}
-        result = evaluate_expect("assert value == 42", ns, frame_number=1)
+        L = {"value": 42}
+        result = evaluate_expect("assert value == 42", {}, L, frame_number=1)
         assert result.total == 1
         assert result.passed == 1
 
@@ -195,8 +195,8 @@ class TestEvaluateExpect:
 
     def test_single_failure(self):
         """Single assertion failure: failures contains one record with kind == assertion_failed."""
-        ns = {"x": 0}
-        result = evaluate_expect("assert x == 1", ns, frame_number=1)
+        L = {"x": 0}
+        result = evaluate_expect("assert x == 1", {}, L, frame_number=1)
         assert result.total == 1
         assert result.passed == 0
         assert len(result.failures) == 1
@@ -204,26 +204,26 @@ class TestEvaluateExpect:
 
     def test_assertion_failure_with_message(self):
         """assert expr, msg failure: message contains the custom error string."""
-        ns = {"x": 0}
-        result = evaluate_expect("assert x > 0, 'x must be positive'", ns, frame_number=1)
+        L = {"x": 0}
+        result = evaluate_expect("assert x > 0, 'x must be positive'", {}, L, frame_number=1)
         assert result.failures[0].message == "x must be positive"
 
     # ── no short-circuit: collect all failures ──
 
     def test_multiple_failures_no_short_circuit(self):
         """Multiple assertion failures are all collected without short-circuiting."""
-        ns = {"a": 0, "b": 0}
+        L = {"a": 0, "b": 0}
         code = "assert a == 1\nassert b == 2\nassert a + b == 3"
-        result = evaluate_expect(code, ns, frame_number=1)
+        result = evaluate_expect(code, {}, L, frame_number=1)
         assert result.total == 3
         assert result.passed == 0
         assert len(result.failures) == 3
 
     def test_partial_failures(self):
         """With partial failures, passed and failures counts are correct."""
-        ns = {"x": 1, "y": 0}
+        L = {"x": 1, "y": 0}
         code = "assert x == 1\nassert y == 1"
-        result = evaluate_expect(code, ns, frame_number=1)
+        result = evaluate_expect(code, {}, L, frame_number=1)
         assert result.total == 2
         assert result.passed == 1
         assert len(result.failures) == 1
@@ -233,7 +233,7 @@ class TestEvaluateExpect:
 
     def test_syntax_error_produces_syntax_failure(self):
         """Syntax error returns Verdict with kind == expect_syntax_error."""
-        result = evaluate_expect("assert x ==", {"x": 1}, frame_number=1)
+        result = evaluate_expect("assert x ==", {}, {"x": 1}, frame_number=1)
         assert isinstance(result, Verdict)
         assert result.total == 0
         assert result.passed == 0
@@ -243,13 +243,13 @@ class TestEvaluateExpect:
 
     def test_unsafe_import_produces_unsafe_failure(self):
         """import statement returns Verdict with kind == expect_unsafe_error."""
-        result = evaluate_expect("import os", {}, frame_number=1)
+        result = evaluate_expect("import os", {}, {}, frame_number=1)
         assert isinstance(result, Verdict)
         assert result.failures[0].kind == "expect_unsafe_error"
 
     def test_attribute_method_call_evaluates_correctly(self):
         """Attribute method call evaluates correctly, not an unsafe_error."""
-        result = evaluate_expect("assert x.strip() == 'hi'", {"x": "hi "}, frame_number=1)
+        result = evaluate_expect("assert x.strip() == 'hi'", {}, {"x": "hi "}, frame_number=1)
         assert result.total == 1
         assert result.passed == 1
         assert not result.failures
@@ -259,15 +259,14 @@ class TestEvaluateExpect:
     def test_runtime_error_produces_runtime_failure(self):
         """Non-AssertionError runtime exception has kind == expect_runtime_error."""
         # assert 1 / 0 raises ZeroDivisionError during eval, not AssertionError
-        result = evaluate_expect("assert 1 / 0", {}, frame_number=1)
+        result = evaluate_expect("assert 1 / 0", {}, {}, frame_number=1)
         assert result.failures[0].kind == "expect_runtime_error"
         assert result.total == 1
         assert result.passed == 0
 
     def test_name_error_is_runtime_failure(self):
         """Accessing a missing variable has kind == expect_runtime_error."""
-        ns = {}
-        result = evaluate_expect("assert missing_var == 1", ns, frame_number=1)
+        result = evaluate_expect("assert missing_var == 1", {}, {}, frame_number=1)
         assert result.total == 1
         assert result.passed == 0
         assert result.failures[0].kind == "expect_runtime_error"
@@ -275,9 +274,9 @@ class TestEvaluateExpect:
 
     def test_type_error_in_comparison_is_runtime_failure(self):
         """TypeError (e.g. comparing incomparable types) has kind == expect_runtime_error."""
-        ns = {"x": object()}
+        L = {"x": object()}
         # sorted() needs comparable items
-        result = evaluate_expect("assert sorted([x, 1]) == [1, x]", ns, frame_number=1)
+        result = evaluate_expect("assert sorted([x, 1]) == [1, x]", {}, L, frame_number=1)
         # This raises TypeError: '<' not supported
         assert result.failures[0].kind == "expect_runtime_error"
 
@@ -285,40 +284,39 @@ class TestEvaluateExpect:
 
     def test_never_raises_on_syntax_error(self):
         """Syntax error never raises; returns Verdict."""
-        result = evaluate_expect("assert (", {}, frame_number=1)
+        result = evaluate_expect("assert (", {}, {}, frame_number=1)
         assert isinstance(result, Verdict)
 
     def test_never_raises_on_unsafe_code(self):
         """Illegal code never raises; returns Verdict."""
-        result = evaluate_expect("import sys\nassert sys.version", {}, frame_number=1)
+        result = evaluate_expect("import sys\nassert sys.version", {}, {}, frame_number=1)
         assert isinstance(result, Verdict)
 
     def test_never_raises_on_runtime_error(self):
         """Runtime error never raises; returns Verdict."""
-        result = evaluate_expect("assert 1/0 == 0", {}, frame_number=1)
+        result = evaluate_expect("assert 1/0 == 0", {}, {}, frame_number=1)
         assert isinstance(result, Verdict)
 
     def test_never_raises_on_exception_in_exec(self):
         """Any exception inside exec is caught as expect_runtime_error and not propagated."""
-        ns = {}
-        result = evaluate_expect("assert nonexistent_func()", ns, frame_number=1)
+        result = evaluate_expect("assert nonexistent_func()", {}, {}, frame_number=1)
         assert isinstance(result, Verdict)
         assert result.passed == 0
 
     # ── namespace isolation ──
 
     def test_does_not_modify_ns(self):
-        """evaluate_expect does not modify the passed-in ns (uses a shallow copy)."""
-        ns = {"x": 1}
-        ns_before = dict(ns)
-        evaluate_expect("assert x == 1", ns, frame_number=1)
-        assert ns == ns_before
+        """evaluate_expect does not modify the passed-in L (uses a shallow copy)."""
+        L = {"x": 1}
+        L_before = dict(L)
+        evaluate_expect("assert x == 1", {}, L, frame_number=1)
+        assert L == L_before
 
     # ── edge case: empty string ──
 
     def test_empty_expect_not_called_via_evaluate(self):
         """Empty expect returns Verdict(total=0, passed=0, failures=())."""
-        result = evaluate_expect("", {}, frame_number=1)
+        result = evaluate_expect("", {}, {}, frame_number=1)
         assert result.total == 0
         assert result.passed == 0
         assert result.failures == ()
@@ -327,8 +325,8 @@ class TestEvaluateExpect:
 
     def test_assertion_field_contains_code(self):
         """failure.assertion contains the original assertion code string."""
-        ns = {"x": 0}
-        result = evaluate_expect("assert x == 1", ns, frame_number=1)
+        L = {"x": 0}
+        result = evaluate_expect("assert x == 1", {}, L, frame_number=1)
         assert "assert" in result.failures[0].assertion
 
 
@@ -346,24 +344,42 @@ class TestExpectLinecacheRegistration:
 
     def test_expect_lines_in_linecache(self):
         self._clear(7)
-        evaluate_expect("assert x == 1\n", {"x": 1}, frame_number=7)
+        evaluate_expect("assert x == 1\n", {}, {"x": 1}, frame_number=7)
         assert linecache.getlines("<frame-7-expect>") == ["assert x == 1\n"]
 
     def test_filename_uses_single_bracket_pair(self):
         """Filename is <frame-7-expect>, NOT <frame-7>-expect> (single pair, dash-joined)."""
         self._clear(7)
-        evaluate_expect("assert x == 1\n", {"x": 1}, frame_number=7)
+        evaluate_expect("assert x == 1\n", {}, {"x": 1}, frame_number=7)
         assert "<frame-7-expect>" in linecache.cache
         assert "<frame-7>-expect>" not in linecache.cache
 
     def test_assertion_failure_traceback_references_frame_n_expect(self):
         """Failed assert produces a Verdict.failure; linecache key must exist."""
         self._clear(7)
-        verdict = evaluate_expect("assert x == 999\n", {"x": 1}, frame_number=7)
+        verdict = evaluate_expect("assert x == 999\n", {}, {"x": 1}, frame_number=7)
         assert len(verdict.failures) == 1
         assert "<frame-7-expect>" in linecache.cache
 
     def test_empty_expect_does_not_register(self):
         self._clear(7)
-        evaluate_expect("", {"x": 1}, frame_number=7)
+        evaluate_expect("", {}, {"x": 1}, frame_number=7)
         assert "<frame-7-expect>" not in linecache.cache
+
+
+class TestEvaluateExpectThreeArg:
+    def test_g_name_readable_in_expect(self):
+        from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
+        G = {"threshold": 10}
+        L = {"value": 5}
+        verdict = evaluate_expect("assert value < threshold", G, L, frame_number=99)
+        assert verdict.total == 1
+        assert verdict.passed == 1
+
+    def test_l_not_mutated_by_expect(self):
+        from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
+        G = {}
+        L = {"x": 1}
+        evaluate_expect("assert x == 1", G, L, frame_number=100)
+        assert L == {"x": 1}
+        assert "tmp" not in L

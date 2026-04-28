@@ -207,7 +207,7 @@ class Kernel:
         frame = frame_number if frame_number is not None else self.L.get("_frame", 0) + 1
         if tracer:
             tracer.start(frame, "kernel.eval_expect")
-        result = evaluate_expect(expect, self.L, frame)
+        result = evaluate_expect(expect, self.G, self.L, frame)
         if tracer:
             tracer.end(frame, "kernel.eval_expect")
         return result
