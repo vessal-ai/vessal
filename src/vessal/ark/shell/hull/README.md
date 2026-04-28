@@ -21,7 +21,7 @@ Hull runs in an independent subprocess (started by the Shell main process via `s
 
 Hull exists to centralize the configuration work of turning a "generic Cell" into a "specific Agent". Cell is a pure engine that knows nothing about hull.toml, Skill paths, system prompts, or log directories. Without Hull, Shell would have to take on all initialization work, but Shell's responsibility is only the HTTP gateway and guardian; mixing the two would scatter startup logic everywhere.
 
-Hull's shape is "configuration layer + lifecycle manager", not a God Object. It holds references to Cell, EventLoop, and SkillLoader, and operates through their public interfaces without crossing into their internals. This design rejected the alternative of "Hull directly manipulating Cell.ns for routing" — routes are maintained dynamically in a `_routes` dict, Skill servers register via HullApi, Hull.handle() dispatches by table lookup, and the routing table and routing logic are independent of each other.
+Hull's shape is "configuration layer + lifecycle manager", not a God Object. It holds references to Cell, EventLoop, and SkillLoader, and operates through their public interfaces without crossing into their internals. This design rejected the alternative of "Hull directly manipulating Cell.L for routing" — routes are maintained dynamically in a `_routes` dict, Skill servers register via HullApi, Hull.handle() dispatches by table lookup, and the routing table and routing logic are independent of each other.
 
 ```mermaid
 graph LR
@@ -53,7 +53,7 @@ sequenceDiagram
     Skills->>Hull: _load_and_instantiate_skill(name)
     Hull->>SM: load(name) → SkillClass
     Hull->>Hull: SkillClass() → instance
-    Hull->>NS: cell.set(name, instance)
+    Hull->>NS: cell.L[name] = instance
 
     Hull->>SM: has_server(name)?
     alt has server.py
@@ -61,7 +61,7 @@ sequenceDiagram
         alt start succeeds
             Server-->>Hull: routes registered
         else start fails
-            Hull->>NS: cell.set(name, None)  ← rollback
+            Hull->>NS: cell.L[name] = None  ← rollback
             Hull->>SM: unload(name)          ← rollback
         end
     end
@@ -80,7 +80,7 @@ Invariants: Each `wake()` call ultimately produces a complete frame cycle — in
 
 **Snapshot management.** Hull owns `<snap>.skills.json`. Written atomically alongside `cell.snapshot()` to record active Skill paths and names; read before `cell.restore()` to prime `sys.path`/`sys.modules` before cloudpickle resolves Skill classes. Cell is unaware of this file — Cell serializes namespace bytes only. This is the only place `sys.path`/`sys.modules` are mutated for Skill restoration.
 
-Hull and Cell relationship: Hull creates Cell and operates through public interfaces (`cell.step()`, `cell.get()`, `cell.set()`, `cell.ns`, etc.). Hull does not import Kernel or Core — these are internal to Cell. Hull and EventLoop relationship: Hull creates EventLoop and injects callbacks via FrameHooks (before_frame, snapshot, run_compression); EventLoop does not know Hull exists.
+Hull and Cell relationship: Hull creates Cell and operates through public interfaces (`cell.step()`, `cell.G`, `cell.L`, `cell.snapshot()`, `cell.restore()`). Hull does not import Kernel or Core — these are internal to Cell. Hull and EventLoop relationship: Hull creates EventLoop and injects callbacks via FrameHooks (before_frame, snapshot, run_compression); EventLoop does not know Hull exists.
 
 ### Three-Layer Information Distribution for Skills
 

@@ -92,7 +92,7 @@ flowchart TB
         Cell --> Kernel
         Cell --> Gate
         SM -->|"load/unload"| SkillSrv
-        SM -->|"cell.set(name, instance)"| Kernel
+        SM -->|"cell.L[name] = instance"| Kernel
     end
 
     Kernel <-->|"Ping / Pong"| LLM["LLM API"]

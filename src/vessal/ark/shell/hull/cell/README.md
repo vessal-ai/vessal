@@ -60,7 +60,7 @@ Two key internal decisions. First, step() unconditionally calls kernel.prepare()
 
 Invariants: each successful step() call (protocol_error is None) produces exactly one FrameRecord committed by Kernel (schema version defined by `FRAME_SCHEMA_VERSION` in `protocol.py`); _ping is the output of the current frame's prepare(), its semantics expire at frame end (regenerated next frame); _pong always points to the previous frame's LLM output; _actual_tokens_in/_actual_tokens_out are overwritten with real values when the API returns usage, otherwise remain None; on protocol exceptions _errors appends ErrorRecord("protocol", ...).
 
-Cell and Hull relationship: Hull creates Cell, operates it via public interfaces step(), get(), set(), ns, snapshot(), restore(), and does not access Cell internals. Cell and Kernel relationship: Cell calls kernel.prepare() and kernel.step(), reads kernel.ns, but does not directly operate on Kernel's internal Executor or Renderer. Cell and Core relationship: Cell calls core.step(ping), passes the resulting Pong directly to Kernel; Core is stateless.
+Cell and Hull relationship: Hull creates Cell, operates it via public interfaces step(), G, L, snapshot(), restore(), and does not access Cell internals. Cell and Kernel relationship: Cell calls kernel.prepare() and kernel.step(), reads kernel.G and kernel.L, but does not directly operate on Kernel's internal Executor or Renderer. Cell and Core relationship: Cell calls core.step(ping), passes the resulting Pong directly to Kernel; Core is stateless.
 
 ## Public Interface
 
@@ -75,11 +75,11 @@ Key properties and methods:
 | Member | Description |
 |--------|-------------|
 | `step(tracer=None) → StepResult` | Run one frame (Ping → LLM → Pong → exec → commit) |
-| `snapshot(path)` / `restore(path)` | Persist / reload namespace bytes via cloudpickle |
+| `snapshot(path)` / `restore(path)` | Persist / reload L bytes via cloudpickle (G is rebuilt by __init__) |
 | `ping` / `pong` | Read-only projections of the latest committed FrameRecord |
 | `max_tokens` | Read-only int; proxies to Core |
-| `get(key)` / `set(key, value)` / `keys()` | Controlled namespace access (use these; do not bypass via `cell.ns[]` from Hull) |
-| `ns` | Raw namespace dict; available for Hull's pre-frame writes via `cell.set()` |
+| `G` | Preset assets dict (read-only from Agent; boot script populates in PR 4) |
+| `L` | Agent state dict; direct read/write by Hull |
 | `action_gate` / `state_gate` | String mode property — "auto" \| "safe" \| "human" |
 | `set_gate(gate_type, fn)` | Supply a custom gate rule function |
 
