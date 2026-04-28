@@ -530,9 +530,12 @@ class TestVenvActivation:
 
 class TestWake:
     def test_wake_default_empty(self, tmp_path):
-        """_wake is empty string after Hull initialization."""
+        """SystemSkill wake is empty string after Hull initialization."""
+        from vessal.skills.system import SystemSkill
         hull = _make_hull(tmp_path)
-        assert hull._cell.L["_wake"] == ""
+        system = hull._cell.G.get("_system")
+        assert isinstance(system, SystemSkill)
+        assert system._wake == ""
 
     def test_wake_set_before_frame_loop(self, tmp_path):
         """_wake retains its injected value during _frame_loop() execution."""

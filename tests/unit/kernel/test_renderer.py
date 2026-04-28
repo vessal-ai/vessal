@@ -6,7 +6,7 @@
 #   TestSystemPrompt      _render_system_prompt
 #   TestRenderSingleFrame project_frame() tested via _render_frame_stream
 #   TestRenderFrameStream _render_frame_stream
-#   TestRenderAuxiliary   _render_auxiliary (reads from ns["_signal_outputs"])
+#   TestRenderAuxiliary   _render_auxiliary (reads from ns["signals"] spec §6 dict)
 #   TestRender            render() main function — returns Pong
 #   TestRenderPing        render() returning Ping focused tests
 #   TestKernelRenderV3    Kernel integration tests (v4 render path)
@@ -75,7 +75,7 @@ def bare_ns_v3() -> dict:
         "_error": None,
         "_action": "",
         "_diff": "",
-        "_signal_outputs": [],
+        "signals": {},
         "_dropped_frame_count": 0,
     }
 
@@ -96,7 +96,7 @@ def minimal_ns():
         "_error": None,
         "_action": "",
         "_diff": "",
-        "_signal_outputs": [],
+        "signals": {},
         "_dropped_frame_count": 0,
     }
 
@@ -136,7 +136,7 @@ class TestRenderConfig:
         assert DEFAULT_CONFIG.system_prompt_key == "_system_prompt"
 
     def test_no_auxiliary_modules_field(self):
-        # RenderConfig has no auxiliary_modules field; auxiliary signals are driven by ns["_signal_outputs"]
+        # RenderConfig has no auxiliary_modules field; auxiliary signals are driven by ns["signals"]
         assert not hasattr(DEFAULT_CONFIG, "auxiliary_modules")
 
     def test_default_frame_budget_ratio(self):
@@ -374,43 +374,51 @@ class TestRenderFrameStream:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Step 5: TestRenderAuxiliary — reads from ns["_signal_outputs"]
+# Step 5: TestRenderAuxiliary — reads from ns["signals"] (spec §6 dict)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class TestRenderAuxiliary:
-    def test_render_auxiliary_reads_signal_outputs(self):
-        """_render_auxiliary reads ns["_signal_outputs"] directly without scanning prefix keys."""
-        ns = {"_signal_outputs": [("tasks", "do something"), ("system", "frame: 1")]}
+    def test_render_auxiliary_reads_signals_dict(self):
+        """_render_auxiliary reads ns["signals"] (spec §6 dict keyed by triple)."""
+        ns = {
+            "signals": {
+                ("TaskSkill", "tasks", "L"): {"todo": "do something"},
+                ("SysSkill", "system", "G"): {"frame": "1"},
+            }
+        }
         result = _render_auxiliary(ns)
         assert "══════ tasks ══════" in result
         assert "do something" in result
         assert "══════ system ══════" in result
 
-    def test_render_auxiliary_empty_outputs_returns_empty(self):
-        """_render_auxiliary returns empty string when _signal_outputs is empty."""
-        ns = {"_signal_outputs": []}
+    def test_render_auxiliary_empty_signals_returns_empty(self):
+        """_render_auxiliary returns empty string when signals is empty."""
+        ns = {"signals": {}}
         result = _render_auxiliary(ns)
         assert result == ""
 
-    def test_render_auxiliary_missing_outputs_returns_empty(self):
-        """_render_auxiliary returns empty string when _signal_outputs is absent from ns."""
+    def test_render_auxiliary_missing_signals_returns_empty(self):
+        """_render_auxiliary returns empty string when signals is absent from ns."""
         result = _render_auxiliary({})
         assert result == ""
 
-    def test_render_auxiliary_does_not_scan_signal_prefix_keys(self):
-        """_render_auxiliary no longer scans _signal_* prefix keys."""
+    def test_render_auxiliary_skips_error_payloads(self):
+        """_render_auxiliary skips signal entries with _error_id (failed signal_update)."""
         ns = {
-            "_signal_outputs": [],
-            "_signal_something": "should not appear",
+            "signals": {
+                ("BadSkill", "bad", "L"): {"_error_id": 0},
+                ("OkSkill", "ok", "L"): {"status": "fine"},
+            }
         }
         result = _render_auxiliary(ns)
-        assert result == ""
+        assert "bad" not in result
+        assert "══════ ok ══════" in result
 
     def test_render_auxiliary_header_present_when_has_content(self):
         """Auxiliary section includes a header when there is content."""
-        ns = {"_signal_outputs": [("signal", "signal content")]}
+        ns = {"signals": {("FooSkill", "foo", "L"): {"key": "signal content"}}}
         result = _render_auxiliary(ns)
-        assert "══════ signal ══════" in result
+        assert "══════ foo ══════" in result
         assert "signal content" in result
 
 
@@ -483,7 +491,7 @@ class TestRender:
         fs = FrameStream(k=16, n=8)
         fs.commit_frame(make_frame_record(number=1))
         ns["_frame_stream"] = fs
-        ns["_signal_outputs"] = [("auxiliary", "auxiliary content")]
+        ns["signals"] = {("AuxSkill", "auxiliary", "L"): {"content": "auxiliary content"}}
         ping = render(ns)
         # system_prompt, frame_stream, signals are independent fields — order is guaranteed by structure
         assert "System." in ping.system_prompt
@@ -512,10 +520,10 @@ class TestRender:
         render(ns)
         assert ns["_budget_total"] == 8000  # 10000 - 2000
 
-    def test_render_uses_signal_outputs_from_namespace(self):
-        """render() reads _signal_outputs from ns to populate ping.signals."""
+    def test_render_uses_signals_dict_from_namespace(self):
+        """render() reads signals dict from ns to populate ping.state.signals."""
         ns = bare_ns_v3()
-        ns["_signal_outputs"] = [("system", "frame: 5\ncontext: 0%")]
+        ns["signals"] = {("SystemSkill", "_system", "G"): {"frame": "5", "context": "0%"}}
         ping = render(ns)
         assert "frame: 5" in ping.state.signals
 

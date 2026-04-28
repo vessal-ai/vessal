@@ -28,17 +28,19 @@ class TestKernelHasGAndL:
         k = Kernel()
         assert k.G is not k.L
 
-    def test_g_starts_empty_in_pr1(self):
-        # PR 1 does not populate G yet; boot script (PR 4) will.
+    def test_g_starts_with_system_skill(self):
+        # PR 3 populates G["_system"] with SystemSkill; boot script (PR 4) adds more.
+        from vessal.skills.system import SystemSkill
         k = Kernel()
-        assert k.G == {}
+        assert "_system" in k.G
+        assert isinstance(k.G["_system"], SystemSkill)
 
     def test_l_has_init_namespace_keys(self):
         k = Kernel()
         # Spot-check a few keys that belong to _init_L
         assert "_frame" in k.L
         assert "_frame_stream" in k.L
-        assert "_signal_outputs" in k.L
+        assert "signals" in k.L
 
 
 class TestThreeArgExecWritesToLOnly:
@@ -105,8 +107,9 @@ class TestRestoreLoadsOnlyIntoL:
         # Step 2: restore in a fresh kernel
         k2 = Kernel(snapshot_path=str(path))
         assert k2.L["session_x"] == 7
-        # G is rebuilt by __init__, not from snapshot
-        assert k2.G == {}
+        # G is rebuilt by __init__, not from snapshot; PR 3 adds _system
+        assert "_system" in k2.G
+        assert "session_x" not in k2.G
 
 
 class TestLenientRestoreStillWorks:
@@ -147,4 +150,6 @@ class TestLenientRestoreStillWorks:
 
         k = Kernel(snapshot_path=str(path))
         assert isinstance(k.L["vanished"], UnresolvedRef)
-        assert k.G == {}  # G untouched by restore
+        # G is rebuilt by __init__ (PR 3 adds _system); restore does not touch G
+        assert "_system" in k.G
+        assert "vanished" not in k.G

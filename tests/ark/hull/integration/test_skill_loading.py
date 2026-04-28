@@ -71,14 +71,31 @@ def test_load_not_found():
         sm.load("nonexistent")
 
 
-def test_isinstance_scan_integration(skill_env):
-    """End-to-end: load class → instantiate → kernel scans → signal collected."""
+def test_isinstance_scan_integration(tmp_path):
+    """End-to-end: load BaseSkill subclass → instantiate → kernel scans → signal collected."""
     from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
 
-    sm = SkillLoader(skill_paths=[str(skill_env)])
-    cls = sm.load("test_skill")
+    # Create a skill using the new BaseSkill contract
+    skill_dir = tmp_path / "scan_skill"
+    skill_dir.mkdir()
+    (skill_dir / "__init__.py").write_text(
+        "from .skill import ScanSkill as Skill\n__all__ = ['Skill']\n"
+    )
+    (skill_dir / "skill.py").write_text(
+        "from vessal.skills._base import BaseSkill\n"
+        "class ScanSkill(BaseSkill):\n"
+        "    name = 'scan_skill'\n"
+        "    description = 'Scan skill.'\n"
+        "    def signal_update(self):\n"
+        "        self.signal = {'status': 'test_signal'}\n"
+    )
+    (skill_dir / "SKILL.md").write_text("---\nname: scan_skill\ndescription: Scan.\n---\nGuide.\n")
+
+    sm = SkillLoader(skill_paths=[str(tmp_path)])
+    cls = sm.load("scan_skill")
     k = Kernel()
     k.L["ts"] = cls()
     k.ping(None, {"globals": k.G, "locals": k.L})
-    outputs = k.L["_signal_outputs"]
-    assert any("test_signal" in body for _, body in outputs)
+    signals = k.L["signals"]
+    assert ("ScanSkill", "ts", "L") in signals
+    assert signals[("ScanSkill", "ts", "L")].get("status") == "test_signal"

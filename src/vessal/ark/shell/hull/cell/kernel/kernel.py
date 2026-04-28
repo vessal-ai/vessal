@@ -33,7 +33,6 @@ from vessal.ark.shell.hull.cell.kernel import source_cache
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.lenient import LenientUnpickler
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
-from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +81,10 @@ class Kernel:
             self.restore(snapshot_path)
         else:
             self._init_L()
+        # SystemSkill is always present in G; restored sessions also get a fresh instance.
+        from vessal.skills.system import SystemSkill
+        self.G["_system"] = SystemSkill(self)
+        self._signal_errors_this_frame: list[tuple[str, str, Exception]] = []
         self.frame_log: FrameLog | None = None
         if db_path is not None:
             conn = open_db(db_path)
@@ -157,7 +160,6 @@ class Kernel:
         L["_system_prompt"] = ""
         L["_frame_type"] = "work"
         L["_render_config"] = None
-        L["_wake"] = ""
 
         # Hierarchical compaction config (must precede _frame_stream init)
         L["_compaction_k"] = 16
@@ -170,7 +172,7 @@ class Kernel:
             k=L["_compaction_k"],
             n=L["_compaction_n"],
         )
-        L["_signal_outputs"] = []
+        L["signals"] = {}
 
         # Context utilization (written by renderer on each frame render)
         L["_context_pct"] = 0
@@ -307,6 +309,7 @@ class Kernel:
                 )
                 logger.info("Cleared incompatible frame_stream (schema mismatch)")
         self.L["sleep"] = self.sleep
+        self.L.setdefault("signals", {})
 
     def sleep(self) -> None:
         """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
@@ -315,33 +318,66 @@ class Kernel:
     # ------------------------------------------------------------------ Private helpers
 
     def _signal_scan(self) -> None:
-        """Collect base signals + duck-typed _signal() Skill outputs.
+        """Spec §6: scan G ∪ L for BaseSkill instances; aggregate to L["signals"].
 
-        Writes self.L["_signal_outputs"] (list[(title, body)]).
-        PR 3 will swap to spec's dict[(class_name, var_name, scope), payload]
-        and rename the key to L["signals"].
+        Iteration order: G first, L second. When the same var_name exists in both,
+        L wins (LEGB shadowing) — the G entry is dropped.
+
+        Aggregation key: (class_name, var_name, scope).
+        On signal_update exception, the entry's payload is {"_error_id": <id>} and
+        the error is logged. Other Skills' scans are unaffected.
         """
-        outputs: list[tuple[str, str]] = []
-        for signal_name, fn in BASE_SIGNALS:
-            try:
-                result = fn(self.L)
-                if isinstance(result, str) and result.strip():
-                    outputs.append((signal_name, result))
-            except Exception as e:
-                fn_name = getattr(fn, "__name__", repr(fn))
-                logger.warning("Base signal '%s' failed: %s", fn_name, e)
-        for obj in list(self.L.values()):
-            if hasattr(obj, "_signal") and callable(getattr(obj, "_signal")):
-                try:
-                    result = obj._signal()
-                    if isinstance(result, tuple) and len(result) == 2:
-                        title, body = result
-                        if isinstance(body, str) and body.strip():
-                            outputs.append((str(title), body))
-                except Exception as e:
-                    obj_name = getattr(obj, "name", repr(obj))
-                    logger.warning("Signal source '%s' failed: %s", obj_name, e)
-        self.L["_signal_outputs"] = outputs
+        from vessal.skills._base import BaseSkill
+        self._signal_errors_this_frame = []
+        signals: dict[tuple[str, str, str], dict] = {}
+        l_var_names = {k for k, v in self.L.items() if isinstance(v, BaseSkill)}
+
+        for var_name, value in self.G.items():
+            if not isinstance(value, BaseSkill):
+                continue
+            if var_name in l_var_names:
+                continue  # shadowed by L
+            self._scan_one(signals, value, var_name, "G")
+
+        for var_name, value in self.L.items():
+            if not isinstance(value, BaseSkill):
+                continue
+            self._scan_one(signals, value, var_name, "L")
+
+        self.L["signals"] = signals
+
+    def _scan_one(
+        self,
+        signals: dict,
+        skill: "BaseSkill",
+        var_name: str,
+        scope: str,
+    ) -> None:
+        cls_name = type(skill).__name__
+        try:
+            skill.signal_update()
+        except Exception as exc:
+            logger.warning(
+                "signal_update raised on %s (%s@%s): %s",
+                cls_name, var_name, scope, exc,
+            )
+            error_id = self._record_signal_error(cls_name, var_name, exc)
+            signals[(cls_name, var_name, scope)] = {"_error_id": error_id}
+            return
+
+        payload = skill.signal
+        if not isinstance(payload, dict):
+            logger.warning(
+                "%s.signal is %s, expected dict — coercing to empty",
+                cls_name, type(payload).__name__,
+            )
+            payload = {}
+        signals[(cls_name, var_name, scope)] = dict(payload)  # shallow copy
+
+    def _record_signal_error(self, cls_name: str, var_name: str, exc: Exception) -> int:
+        bucket = self._signal_errors_this_frame
+        bucket.append((cls_name, var_name, exc))
+        return len(bucket) - 1
 
     def _commit(
         self,
@@ -388,7 +424,8 @@ class Kernel:
             FrameWriteSpec ready to pass to FrameLog.write_frame().
         """
         import json as _json
-        from vessal.ark.shell.hull.cell.kernel.frame_log.types import ErrorOnSource, FrameWriteSpec
+        import traceback as _tb
+        from vessal.ark.shell.hull.cell.kernel.frame_log.types import ErrorOnSource, FrameWriteSpec, SignalRow
 
         obs = record.observation
         operation_error = (
@@ -400,6 +437,27 @@ class Kernel:
         if obs.verdict is not None:
             verdict_value = _json.dumps(obs.verdict.to_dict())
         diff_json = obs.diff
+        sig_rows: list[SignalRow] = []
+        for (cls_name, var_name, scope), payload in self.L.get("signals", {}).items():
+            err_id = payload.get("_error_id") if isinstance(payload, dict) else None
+            if err_id is not None and 0 <= err_id < len(self._signal_errors_this_frame):
+                _cls, _var, exc = self._signal_errors_this_frame[err_id]
+                tb_text = "".join(_tb.TracebackException.from_exception(exc).format())
+                sig_rows.append(SignalRow(
+                    class_name=cls_name,
+                    var_name=var_name,
+                    scope=scope,
+                    payload_json=None,
+                    error=ErrorOnSource("signal_update", var_name, tb_text),
+                ))
+            else:
+                sig_rows.append(SignalRow(
+                    class_name=cls_name,
+                    var_name=var_name,
+                    scope=scope,
+                    payload_json=_json.dumps(payload, default=str),
+                    error=None,
+                ))
         return FrameWriteSpec(
             n=record.number,
             pong_think=record.pong.think,
@@ -411,5 +469,5 @@ class Kernel:
             operation_error=operation_error,
             verdict_value=verdict_value,
             verdict_error=None,
-            signals=[],
+            signals=sig_rows,
         )

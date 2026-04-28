@@ -596,11 +596,12 @@ class TestFreshPingPerFrame:
     """Every step() must produce a fresh Ping via prepare(), not reuse a cached one."""
 
     def test_signal_injected_between_frames_is_visible(self):
-        """A signal source added to namespace between step() calls appears in the next Ping.
+        """A BaseSkill added to namespace between step() calls appears in the next Ping.
 
         This verifies that step() calls prepare() every frame, not just the first.
         If Ping were cached from the previous frame, this new signal would be invisible.
         """
+        from vessal.skills._base import BaseSkill
         cell = _make_cell()
 
         # First step — establish baseline
@@ -608,12 +609,15 @@ class TestFreshPingPerFrame:
         result1 = cell.step()
         assert result1.protocol_error is None
 
-        # Inject a signal source into namespace BETWEEN frames
-        class _TestSignal:
-            def _signal(self):
-                return ("test_signal", "signal_was_seen")
+        # Inject a BaseSkill into namespace BETWEEN frames
+        class _TestSkill(BaseSkill):
+            name = "test_skill"
+            description = "test"
 
-        cell.L["_test_signal_source"] = _TestSignal()
+            def signal_update(self) -> None:
+                self.signal = {"status": "signal_was_seen"}
+
+        cell.L["_test_signal_source"] = _TestSkill()
 
         # Second step — the fresh prepare() must pick up the new signal
         result2 = cell.step()

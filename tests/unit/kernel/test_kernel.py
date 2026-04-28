@@ -445,11 +445,12 @@ class TestKernel:
         assert "_history_depth" not in k.L
 
     def test_init_creates_lifecycle_vars(self):
-        """After init, ns contains _sleeping/_wake/_next_wake lifecycle variables."""
+        """After init, ns contains _sleeping/_next_wake lifecycle variables."""
         k = Kernel()
         assert k.L["_sleeping"] is False
-        assert k.L["_wake"] == ""
         assert k.L["_next_wake"] is None
+        # _wake moved to G["_system"].set_wake() in PR 3
+        assert "_wake" not in k.L
 
     def test_init_from_snapshot(self):
         """snapshot_path parameter: restore namespace from file to continue a previous session."""
@@ -1013,7 +1014,7 @@ def test_snapshot_tracks_dropped_keys(tmp_path):
 
 
 def test_restore_emits_reconstruction_signal(tmp_path):
-    """After restore(), if _dropped_keys exist, the signal should include reconstruction hints."""
+    """After restore(), if _dropped_keys exist, SystemSkill surfaces reconstruction hints."""
     kernel = Kernel()
     kernel.L["x"] = 42
     kernel.L["_dropped_keys"] = ["db_conn", "file_handle"]
@@ -1029,9 +1030,10 @@ def test_restore_emits_reconstruction_signal(tmp_path):
     kernel2.restore(path)
     kernel2.ping(None, {"globals": kernel2.G, "locals": kernel2.L})
 
-    signals = kernel2.L.get("_signal_outputs", [])
-    signal_text = "\n".join(body for _, body in signals)
-    assert "db_conn" in signal_text
+    # PR 3: signals is now a dict keyed by (class_name, var_name, scope)
+    signals = kernel2.L.get("signals", {})
+    system_payload = signals.get(("SystemSkill", "_system", "G"), {})
+    assert "db_conn" in system_payload.get("dropped", "")
 
 
 def test_init_namespace_has_compaction_defaults():
