@@ -26,6 +26,7 @@ import logging
 from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
 from vessal.ark.shell.hull.cell.kernel.executor import execute
 from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
+from vessal.ark.shell.hull.cell.kernel.transient import is_transient_value
 from vessal.ark.shell.hull.cell.protocol import (
     FRAME_SCHEMA_VERSION,
     FrameRecord,
@@ -103,6 +104,7 @@ class Kernel:
             if callable(bind):
                 bind(self)
 
+        self._transient_names: set[str] = set()
         self._signal_errors_this_frame: list[tuple[str, str, Exception]] = []
         self.frame_log: FrameLog | None = None
         if db_path is not None:
@@ -241,6 +243,10 @@ class Kernel:
         )
         return self._last_ping
 
+    def mark_transient(self, name: str) -> None:
+        """Register a specific L key to be skipped at snapshot time."""
+        self._transient_names.add(name)
+
     def snapshot(self, path: str) -> None:
         """Serialise L to disk; per-key fallback to DeadHandle on cloudpickle failure."""
         import os
@@ -250,6 +256,10 @@ class Kernel:
         to_dump: dict = {}
         for key, value in self.L.items():
             if key == "sleep":
+                continue
+            if key in self._transient_names:
+                continue
+            if is_transient_value(value):
                 continue
             try:
                 cloudpickle.dumps(value)
