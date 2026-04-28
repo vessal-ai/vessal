@@ -264,6 +264,8 @@ To borrow CPU cache terminology: system_prompt is the hot data that permanently 
 
 §6.4.1 made `system_prompt` byte-stable for the lifetime of the session. What remains is the frame stream — a structure that has to keep growing. A ten-million-frame session will not fit in any context window, no matter how large. Compression is unavoidable. The real question is how to compress without wrecking the prefix cache, and how to compress in a way that itself scales as the session runs longer.
 
+> **Implementation note (as of PR 5).** Hull's internal compaction worker (`HullCompactionMixin`, thread pool, bucket-shifting logic) has been deleted. Neither mechanical stripping nor semantic summarization is currently active; the frame stream grows unbounded in SQLite and is read in full each ping via `render_frame_stream(conn)`. Layer≥1 cold-zone entries are not yet produced. The full hierarchical compaction model described in this section remains the architectural target and will be implemented as an independent compaction Cell (PR-Compaction-Cell). The rest of this section describes that target design.
+
 **Why a three-segment model is not enough.**
 
 An earlier Vessal design proposed `[oldest raw | middle summary | latest raw]`: preserve the prefix, preserve recent working memory, and compress the middle. This obeys P5 at small scale. Two flaws surface as soon as sessions run long:
