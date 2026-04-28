@@ -82,12 +82,15 @@ class EventLoop:
         return self._queue
 
     def inject_wake(self, event: dict) -> None:
-        """Inject an event into the Cell namespace, set _wake and clear _sleeping.
+        """Record wake reason on _system Skill and clear _sleeping.
 
         Args:
             event: Event dict; must contain a reason key; defaults to "heartbeat" if absent.
         """
-        self._cell.L["_wake"] = event.get("reason", "heartbeat")
+        reason = event.get("reason", "heartbeat")
+        system_skill = self._cell.G.get("_system")
+        if system_skill is not None:
+            system_skill.set_wake(reason)
         self._cell.L["_sleeping"] = False
 
     async def run_forever(self) -> None:

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 from vessal.skills.skills.skill import Skills
 
 
@@ -30,7 +30,7 @@ def skills(hull):
 # ── Class-level contract ──
 
 def test_inherits_skillbase():
-    assert issubclass(Skills, SkillBase)
+    assert issubclass(Skills, BaseSkill)
 
 
 def test_name_and_description_are_class_attrs():
@@ -93,10 +93,9 @@ def test_signal_lists_available_with_load_markers(hull):
 
     s = Skills()
     s._bind_hull(hull)
-    result = s._signal()
-    assert result is not None
-    title, body = result
-    assert "available skills" in title
+    s.signal_update()
+    assert s.signal != {}
+    body = s.signal["available"]
     assert "[loaded]" in body and "[available]" in body
     assert "chat" in body and "search" in body
 
@@ -106,7 +105,8 @@ def test_signal_contains_guide_reminder(hull):
     hull.loaded_skill_names.return_value = []
     s = Skills()
     s._bind_hull(hull)
-    _, body = s._signal()
+    s.signal_update()
+    body = s.signal["available"]
     assert "print(" in body and "guide)" in body
 
 
@@ -115,7 +115,8 @@ def test_signal_has_no_method_names(hull):
     hull.loaded_skill_names.return_value = []
     s = Skills()
     s._bind_hull(hull)
-    _, body = s._signal()
+    s.signal_update()
+    body = s.signal["available"]
     for forbidden in ("load(", "unload(", "load_skill", "unload_skill"):
         assert forbidden not in body
 
@@ -150,6 +151,7 @@ def test_list_hub_returns_paged(skills):
     assert "a" in result
 
 
-def test_signal_returns_none_when_hull_unbound():
+def test_signal_returns_empty_when_hull_unbound():
     s = Skills()
-    assert s._signal() is None
+    s.signal_update()
+    assert s.signal == {}

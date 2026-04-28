@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from vessal.ark.shell.hull.hub.registry import Registry
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 if TYPE_CHECKING:
     from vessal.ark.shell.hull.hull import Hull
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Skills(SkillBase):
+class Skills(BaseSkill):
     """Agent-facing Skill management + Console-facing inventory UI."""
 
     name = "skills"
@@ -37,9 +37,10 @@ class Skills(SkillBase):
             "Call methods with the exact names and parameters from the manual; do not guess the interface.",
         )
 
-    def _signal(self) -> tuple[str, str] | None:
+    def signal_update(self) -> None:
         if self._hull is None:
-            return None
+            self.signal = {}
+            return
         available = self._hull.available_skills()
         loaded = self._hull.loaded_skill_names()
         lines = []
@@ -50,7 +51,8 @@ class Skills(SkillBase):
             lines.append(f"  {marker} {name} — {desc}")
         lines.append("")
         lines.append("Before using a loaded skill for the first time, run print(name.guide) to view methods")
-        return ("available skills", "\n".join(lines))
+        text = "\n".join(lines)
+        self.signal = {"available": text} if text else {}
 
     def list(self) -> list[dict]:
         """List all available Skills."""

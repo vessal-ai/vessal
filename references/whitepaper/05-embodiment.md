@@ -111,7 +111,7 @@ These two design decisions, taken together, mean the hardware access model is al
 
 **Outer face (server).** The device driver, running continuously outside the frame loop, can be written in C or Rust.
 
-**Signal.** Hardware state changes enter the next frame's Ping via `_signal()`. `eye._signal()` returns detected objects; `ear._signal()` returns speech-to-text results.
+**Signal.** Hardware state changes enter the next frame's Ping via `signal_update()`. `eye.signal_update()` updates the signals dict with detected objects; `ear.signal_update()` updates with speech-to-text results.
 
 ```mermaid
 graph LR
@@ -131,10 +131,10 @@ graph LR
     K -->|"tool call"| Ear
     K -->|"tool call"| Chat
 
-    Eye -->|"_signal()"| K
-    Hand -->|"_signal()"| K
-    Ear -->|"_signal()"| K
-    Chat -->|"_signal()"| K
+    Eye -->|"signal_update()"| K
+    Hand -->|"signal_update()"| K
+    Ear -->|"signal_update()"| K
+    Chat -->|"signal_update()"| K
 ```
 
 Loading and unloading a Skill is installing and removing an organ. The meta-skill's `load_skill("camera")` is giving the Agent eyes. The Agent need not know whether `chat.send_message()` sits on top of HTTP or a motor controller — Kernel's duck-typing discovery mechanism is indifferent to implementation language or underlying hardware.

@@ -28,15 +28,15 @@ def test_description_max_15_chars(skill_name):
 
 @pytest.mark.parametrize("skill_name", BUILTIN_SKILLS)
 def test_signal_no_method_names(skill_name):
-    """_signal() output (if any) must not contain method names."""
+    """signal_update() output (if any) must not contain method names."""
     mod = importlib.import_module(f"vessal.skills.{skill_name}")
     cls = mod.Skill
     instance = cls()
-    result = instance._signal()
-    if result is None:
+    instance.signal_update()
+    if not instance.signal:
         return
-    _, body = result
+    body = " ".join(str(v) for v in instance.signal.values())
     for forbidden in FORBIDDEN_IN_SIGNAL:
         assert forbidden not in body, (
-            f"{skill_name}._signal() contains method name {forbidden!r}"
+            f"{skill_name}.signal contains method name {forbidden!r}"
         )

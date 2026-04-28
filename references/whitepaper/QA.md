@@ -124,7 +124,7 @@ No. Only the guide is a framework standard. Other documentation is defined by th
 
 ### Q: How are Skill files organized?
 
-A Skill directory contains `__init__.py` (re-exports the Skill class), `skill.py` (the SkillBase subclass), `SKILL.md` (guide for the LLM), `requirements.txt` (Skill-local deps), and `tests/`. `server.py` is added only when the Skill needs a long-running server. Distribution packaging = directory compression.
+A Skill directory contains `__init__.py` (re-exports the Skill class), `skill.py` (the BaseSkill subclass), `SKILL.md` (guide for the LLM), `requirements.txt` (Skill-local deps), and `tests/`. `server.py` is added only when the Skill needs a long-running server. Distribution packaging = directory compression.
 
 ### Q: Any changes to compressed frames in V5?
 

@@ -6,7 +6,7 @@ Responsible for:
 - hull.toml config parsing and Cell initialization
 - Skill discovery, loading, instantiation, and unloading (via SkillLoader)
 - Event loop driving (via EventLoop, wake/sleep lifecycle)
-- Meta-skill registration (the `skills` Skill is loaded through the normal skill-loader path; there is no dedicated manager class; each frame outputs the available Skill list via _signal(), and injects the guide usage protocol via _prompt())
+- Meta-skill registration (the `skills` Skill is loaded through the normal skill-loader path; there is no dedicated manager class; each frame outputs the available Skill list via signal_update(), and injects the guide usage protocol via _prompt())
 - HTTP request routing (handle() is Shell's sole entry point)
 
 Not responsible for:
@@ -36,7 +36,7 @@ graph LR
     Cell["Cell\n(single-frame execution)"]
     EL["EventLoop\n(frame scheduling)"]
     SM["SkillLoader\n(Skill discovery/loading)"]
-    Skills["Skills(SkillBase)\n(Agent's Skill management interface,\nloaded as 'skills' via normal skill-loader path)"]
+    Skills["Skills(BaseSkill)\n(Agent's Skill management interface,\nloaded as 'skills' via normal skill-loader path)"]
     HullApi["HullApi\n(Skill route registration)"]
 
     Hull -->|"create + drive"| Cell
@@ -92,10 +92,10 @@ Hull and Cell relationship: Hull creates Cell and operates through public interf
 Skills pass information to the Agent at different granularities through three channels:
 
 - **_prompt() (persistent layer)**: returns a (condition, methodology) tuple; renderer injects into system prompt. Present every frame, cannot be squeezed out of context. Suitable for core rules of behavioral Skills.
-- **guide (manual layer)**: a SkillBase attribute; Agent consults it on demand via `print(name.guide)`. Content includes method signatures, parameter descriptions, and usage examples. If lost, re-print; cost = 1 frame delay.
-- **_signal() (reminder layer)**: returns a (title, body) tuple; appears in the auxiliary signal section each frame. Displays current status information, ending with a reminder to "print(name.guide) to see methods". Does not include method names.
+- **guide (manual layer)**: a BaseSkill attribute; Agent consults it on demand via `print(name.guide)`. Content includes method signatures, parameter descriptions, and usage examples. If lost, re-print; cost = 1 frame delay.
+- **signal_update() (reminder layer)**: updates the L["signals"] dict with (class_name, var_name, scope) keys; appears in the auxiliary signal section each frame. Displays current status information, ending with a reminder to "print(name.guide) to see methods". Does not include method names.
 
-Creation guidelines: description ≤ 15 characters, write only the function; _signal() does not expose method signatures; SKILL.md is the only place containing method signatures; _prompt() only contains behavioral rules. Changes to _prompt() must go through the file (unload → modify → reload); runtime dynamic modification is not allowed.
+Creation guidelines: description ≤ 15 characters, write only the function; signal_update() does not expose method signatures; SKILL.md is the only place containing method signatures; _prompt() only contains behavioral rules. Changes to _prompt() must go through the file (unload → modify → reload); runtime dynamic modification is not allowed.
 
 Skill modification policy: Agents may modify any Skill (including built-in ones). Built-in Skill modifications are overwritten on vessal package upgrades; for persistent modifications, create a same-named user Skill in skill_paths to override.
 
@@ -106,16 +106,16 @@ None.
 
 ### Known Issues
 - 2026-04-09: hull.py is currently 623 lines, exceeding the 500-line convention; needs splitting — suggest extracting internal utility functions such as `_load_gate_files`, `_activate_venv`, `_restore_latest_snapshot` into `hull_init.py`
-- 2026-04-09: Skill protocol field `summary` has been renamed to `description` (SkillBase class attribute + SKILL.md frontmatter + SkillLoader.list() output); the old name is no longer valid
+- 2026-04-09: Skill protocol field `summary` has been renamed to `description` (BaseSkill class attribute + SKILL.md frontmatter + SkillLoader.list() output); the old name is no longer valid
 - 2026-04-12: SkillsManager rename complete — name changed from `_meta` to `skills`, methods `load_skill/unload_skill` changed to `load/unload`, `query_guide` deleted, namespace injection key changed from `_meta` to `skills`
 
 ### Active
-- 2026-04-10: Signal protocol migration from _signal_output side effect to _signal() -> (title, body) tuple return value; renderer handles delimiter wrapping uniformly
 - 2026-04-13: Output logger.warning when hull.toml does not configure [cell].context_budget (default 128000), prompting users to set it according to model window size
 - 2026-04-12: _prompt() cognitive protocol — Skills can inject (condition, methodology) into system prompt via _prompt()
-- 2026-04-12: Skill UX spec implementation — three-layer information distribution (_prompt/guide/_signal) written into SkillBase docstring and Hull CONTEXT.md
+- 2026-04-12: Skill UX spec implementation — three-layer information distribution (_prompt/guide/signal_update) written into BaseSkill docstring and Hull CONTEXT.md
 
 ### Completed
 - 2026-04-10: Hull process isolation — Hull runs in a subprocess (subprocess.Popen runtime/subprocess_mode.py), Shell main process acts as gateway and guardian
 - 2026-04-14: SOUL.md hot reload — mtime detection each frame; changes take effect in the next frame after Agent modifies the file at runtime (hull.py _init_prompts + _rewrite_runtime_owned)
 - 2026-04-14: Context lifecycle refactor — removed compression frame mechanism (event_loop/hull/prompts/tests), render trimming changed to physical frame deletion, Memory skill adds drop(n) + context pressure signal, hull.toml [cell].compress_threshold config (default 50)
+- 2026-04-28: BaseSkill + signal_update migration — replaced _signal() duck-typing and BASE_SIGNALS with BaseSkill.signal_update() protocol; Kernel scans G ∪ L for BaseSkill instances and aggregates to L["signals"] dict (spec §6)

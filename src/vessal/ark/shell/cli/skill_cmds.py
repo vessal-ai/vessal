@@ -30,7 +30,7 @@ def _cmd_skill_create(args: argparse.Namespace) -> None:
 def _cmd_skill_check(args: argparse.Namespace) -> None:
     """Check Skill directory compliance.
 
-    Checks __init__.py, skill.py, SKILL.md, and SkillBase inheritance.
+    Checks __init__.py, skill.py, SKILL.md, and BaseSkill inheritance.
     With --test, additionally runs tests/ directory.
     Exits with code 1 if any FAIL; exits with code 0 if only WARNs.
     """
@@ -109,7 +109,7 @@ def _cmd_skill_check(args: argparse.Namespace) -> None:
     else:
         warn("SKILL.md not found (recommended)")
 
-    # 5. Module import + SkillBase check
+    # 5. Module import + BaseSkill check
     if init_py.exists():
         parent_str = str(skill_dir.parent)
         added = parent_str not in sys.path
@@ -128,11 +128,11 @@ def _cmd_skill_check(args: argparse.Namespace) -> None:
                 fail("__init__.py does not export 'Skill' (should be: from .skill import XxxClass as Skill)")
             else:
                 ok("Exports 'Skill'")
-                from vessal.ark.shell.hull.skill import SkillBase
-                if issubclass(skill_cls, SkillBase):
-                    ok(f"Skill inherits SkillBase: {skill_cls.__name__}")
+                from vessal.skills._base import BaseSkill
+                if issubclass(skill_cls, BaseSkill):
+                    ok(f"Skill inherits BaseSkill: {skill_cls.__name__}")
                 else:
-                    fail(f"Skill {skill_cls.__name__!r} does not inherit SkillBase")
+                    fail(f"Skill {skill_cls.__name__!r} does not inherit BaseSkill")
 
                 if isinstance(getattr(skill_cls, "name", None), str):
                     ok(f"  name = {skill_cls.name!r}")

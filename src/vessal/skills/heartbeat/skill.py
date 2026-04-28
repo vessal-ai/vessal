@@ -1,10 +1,10 @@
 """heartbeat skill — periodic heartbeat wake-up."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
-class Heartbeat(SkillBase):
+class Heartbeat(BaseSkill):
     """Periodic heartbeat wake-up Skill. Works with server.py timer to prevent the Agent from sleeping indefinitely.
 
     Attributes:

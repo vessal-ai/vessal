@@ -6,7 +6,7 @@ Responsible for:
 - hull.toml config parsing and Cell initialization
 - Skill discovery, loading, instantiation, and unloading (via SkillLoader)
 - Event loop driving (via EventLoop, wake/sleep lifecycle)
-- Meta-skill registration (the `skills` Skill is loaded through the normal skill-loader path; there is no dedicated manager class; each frame outputs the available Skill list via _signal(), and injects the guide usage protocol via _prompt())
+- Meta-skill registration (the `skills` Skill is loaded through the normal skill-loader path; there is no dedicated manager class; each frame outputs the available Skill list via signal_update(), and injects the guide usage protocol via _prompt())
 - HTTP request routing (handle() is Shell's sole entry point)
 
 Not responsible for:
@@ -29,7 +29,7 @@ graph LR
     Cell["Cell\n(single-frame execution)"]
     EL["EventLoop\n(frame scheduling)"]
     SM["SkillLoader\n(Skill discovery/loading)"]
-    Skills["Skills(SkillBase)\n(Agent's Skill management interface,\nloaded as 'skills' via normal skill-loader path)"]
+    Skills["Skills(BaseSkill)\n(Agent's Skill management interface,\nloaded as 'skills' via normal skill-loader path)"]
     HullApi["HullApi\n(Skill route registration)"]
 
     Hull -->|"create + drive"| Cell
@@ -40,7 +40,7 @@ graph LR
     EL -->|"FrameHooks callbacks"| Hull
 ```
 
-There are three key internal decisions. First, runtime-owned variables (`_frame_type`, `_render_config`, `_system_prompt`, `_compression_prompt`) are backfilled by Hull before each frame via `_rewrite_runtime_owned()`, rather than being maintained by Cell or the LLM. This ensures the Agent cannot change its own perspective by writing to these variables, while also allowing Hull to switch configurations between compression frames and working frames. Second, Skills are loaded in two phases: first load the class, instantiate it, and inject into the namespace, then start the server; if the server fails to start, the first phase is rolled back to avoid leaving Skill instances without server support in the namespace. Third, heartbeat was moved out of Shell into the heartbeat Skill, making the ShellServer after Hull initialization a stateless HTTP proxy, simplifying testing and lifecycle management.
+There are three key internal decisions. First, runtime-owned variables (`_frame_type`, `_render_config`, `_system_prompt`, `_soul`) are backfilled by Hull before each frame via `_rewrite_runtime_owned()`, rather than being maintained by Cell or the LLM. This ensures the Agent cannot change its own perspective by writing to these variables. `_soul` is special: each frame checks SOUL.md's mtime, and if the file has changed, it is re-read, so changes the Agent makes to SOUL.md take effect in the next frame. Second, Skills are loaded in two phases: first load the class, instantiate it, and inject into the namespace, then start the server; if the server fails to start, the first phase is rolled back to avoid leaving Skill instances without server support in the namespace. Third, heartbeat was moved out of Shell into the heartbeat Skill, making the ShellServer after Hull initialization a stateless HTTP proxy, simplifying testing and lifecycle management.
 
 ```mermaid
 sequenceDiagram
@@ -73,7 +73,7 @@ graph LR
     Hull -->|"backfill each frame"| FT["_frame_type"]
     Hull -->|"backfill each frame"| RC["_render_config"]
     Hull -->|"backfill each frame"| SP["_system_prompt"]
-    Hull -->|"backfill each frame"| CP["_compression_prompt"]
+    Hull -->|"check mtime each frame\nre-read on change"| SOUL["_soul"]
 ```
 
 Invariants: Each `wake()` call ultimately produces a complete frame cycle — inject_wake, frame loop until `_sleeping` is set, snapshot save. EventLoop guarantees this process is not interrupted (unless max_frames_per_wake is exceeded). Hull.handle() returns 404 for all unknown routes without throwing exceptions, ensuring the Shell layer always receives a valid response.
@@ -87,8 +87,8 @@ Hull and Cell relationship: Hull creates Cell and operates through public interf
 Skills pass information to the Agent at different granularities through three channels:
 
 - **_prompt() (persistent layer)**: returns a (condition, methodology) tuple; renderer injects into system prompt. Present every frame, cannot be squeezed out of context. Suitable for core rules of behavioral Skills.
-- **guide (manual layer)**: a SkillBase attribute; Agent consults it on demand via `print(name.guide)`. Content includes method signatures, parameter descriptions, and usage examples. If lost, re-print; cost = 1 frame delay.
-- **_signal() (reminder layer)**: returns a (title, body) tuple; appears in the auxiliary signal section each frame. Displays current status information, ending with a reminder to "print(name.guide) to see methods". Does not include method names.
+- **guide (manual layer)**: a BaseSkill attribute; Agent consults it on demand via `print(name.guide)`. Content includes method signatures, parameter descriptions, and usage examples. If lost, re-print; cost = 1 frame delay.
+- **signal_update() (reminder layer)**: updates the L["signals"] dict with (class_name, var_name, scope) keys; appears in the auxiliary signal section each frame. Displays current status information, ending with a reminder to "print(name.guide) to see methods". Does not include method names.
 
 Creation guidelines: description ≤ 15 characters, write only the function; _signal() does not expose method signatures; SKILL.md is the only place containing method signatures; _prompt() only contains behavioral rules. Changes to _prompt() must go through the file (unload → modify → reload); runtime dynamic modification is not allowed.
 
@@ -114,7 +114,7 @@ Renders a Python object as text at the specified level of detail.
 - `test_hull_api.py` — Test HullApi interface for skill servers.
 - `test_hull_public_api.py` — test_hull_public_api — Hull public interface unit tests.
 - `test_subprocess_mode.py` — Unit tests for the Hull subprocess carrier.
-- `test_skill_base.py` — test_skill_base — SkillBase abstract interface contract.
+- `test_skill_base.py` — test_skill_base — BaseSkill abstract interface contract.
 - `test_skill_loader.py` — test_skill_loader — SkillLoader lifecycle tests.
 - `test_skill_ux_rules.py` — test_skill_ux_rules — Verifies that all built-in Skills follow UX guidelines.
 - `test_wake.py` — tests/hull/unit/test_wake.py — _wake variable injection tests.

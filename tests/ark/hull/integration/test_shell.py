@@ -294,11 +294,11 @@ class TestSkillCreate:
         assert "__guide__" not in content
         assert "from pathlib import Path" not in content
 
-    def test_skill_init_skill_py_has_skillbase(self, tmp_path):
-        """Generated skill.py inherits SkillBase and defines name/description class attributes."""
+    def test_skill_init_skill_py_has_baseskill(self, tmp_path):
+        """Generated skill.py inherits BaseSkill and defines name/description class attributes."""
         base = self._scaffold(tmp_path)
         content = (base / "skill.py").read_text(encoding="utf-8")
-        assert "SkillBase" in content
+        assert "BaseSkill" in content
         assert 'name = "my_skill"' in content
         assert "description =" in content
 
@@ -309,7 +309,7 @@ class TestSkillCreate:
         base.mkdir()
         write_skill_scaffold(base, "my_cool_skill")
         content = (base / "skill.py").read_text(encoding="utf-8")
-        assert "class MyCoolSkill(SkillBase)" in content
+        assert "class MyCoolSkill(BaseSkill)" in content
         init_content = (base / "__init__.py").read_text(encoding="utf-8")
         assert "from .skill import MyCoolSkill as Skill" in init_content
 
@@ -369,8 +369,8 @@ class TestSkillCheck:
             encoding="utf-8",
         )
         (skill_dir / "skill.py").write_text(
-            f'from vessal.ark.shell.hull.skill import SkillBase\n\n'
-            f'class {class_name}(SkillBase):\n'
+            f'from vessal.skills._base import BaseSkill\n\n'
+            f'class {class_name}(BaseSkill):\n'
             f'    name = "{name}"\n'
             f'    description = "test Skill"\n'
             f'    def __init__(self): super().__init__()\n',
@@ -453,8 +453,8 @@ class TestSkillCheck:
                 main()
         assert exc.value.code == 1
 
-    def test_check_not_skillbase_subclass_exits_one(self, tmp_path):
-        """Exits with code 1 when Skill does not inherit SkillBase."""
+    def test_check_not_baseskill_subclass_exits_one(self, tmp_path):
+        """Exits with code 1 when Skill does not inherit BaseSkill."""
         skill_dir = tmp_path / "bad_skill"
         skill_dir.mkdir()
         (skill_dir / "__init__.py").write_text(
@@ -474,14 +474,14 @@ class TestSkillCheck:
                 main()
         assert exc.value.code == 1
 
-    def test_check_skillbase_subclass_ok(self, tmp_path, capsys):
-        """Outputs OK with class name when Skill correctly inherits SkillBase."""
+    def test_check_baseskill_subclass_ok(self, tmp_path, capsys):
+        """Outputs OK with class name when Skill correctly inherits BaseSkill."""
         skill_dir = self._make_valid_skill(tmp_path, "good_skill")
         with patch("sys.argv", ["vessal", "skill", "check", str(skill_dir)]):
             main()
         out = capsys.readouterr().out
         assert "[FAIL]" not in out
-        assert "SkillBase" in out
+        assert "BaseSkill" in out
 
     def test_check_output_includes_skill_name(self, tmp_path, capsys):
         """Check output contains the Skill name."""

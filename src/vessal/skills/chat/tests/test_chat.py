@@ -4,7 +4,7 @@ import threading
 import time
 
 import pytest
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 from vessal.skills.chat.skill import Chat
 
 
@@ -12,7 +12,7 @@ from vessal.skills.chat.skill import Chat
 
 
 def test_chat_is_skillbase():
-    assert issubclass(Chat, SkillBase)
+    assert issubclass(Chat, BaseSkill)
 
 
 def test_chat_has_required_attrs():
@@ -178,17 +178,17 @@ def test_drain_outbox():
 
 def test_signal_empty_when_no_messages():
     h = Chat()
-    result = h._signal()
-    assert result is None
+    h.signal_update()
+    assert h.signal == {}
 
 
 def test_signal_shows_unread_count():
     h = Chat()
     h.receive("a")
     h.receive("b")
-    result = h._signal()
-    assert result is not None
-    title, body = result
+    h.signal_update()
+    assert h.signal != {}
+    body = h.signal["recent"]
     assert "2 unread" in body
     assert "Must process unread messages" in body
 
@@ -198,9 +198,9 @@ def test_signal_shows_recent_messages():
     h.receive("question", sender="alice")
     h.read()  # clear unread
     h.reply("answer")
-    result = h._signal()
-    assert result is not None
-    title, body = result
+    h.signal_update()
+    assert h.signal != {}
+    body = h.signal["recent"]
     assert "alice" in body
     assert "question" in body
     assert "answer" in body
@@ -210,9 +210,9 @@ def test_signal_after_read_no_unread():
     h = Chat()
     h.receive("msg")
     h.read()
-    result = h._signal()
-    assert result is not None
-    title, body = result
+    h.signal_update()
+    assert h.signal != {}
+    body = h.signal["recent"]
     assert "unread" not in body
     assert "msg" in body
 
@@ -224,9 +224,9 @@ def test_signal_always_shows_history_even_with_unread():
     h.read()
     h.reply("old reply")
     h.receive("new msg")
-    result = h._signal()
-    assert result is not None
-    title, body = result
+    h.signal_update()
+    assert h.signal != {}
+    body = h.signal["recent"]
     assert "1 unread" in body
     assert "old msg" in body
     assert "new msg" in body
@@ -346,8 +346,8 @@ def test_reply_clears_signal_pending():
     h = Chat()
     h.receive("msg")
     h.reply("answer")
-    result = h._signal()
-    assert result is not None
-    _, body = result
+    h.signal_update()
+    assert h.signal != {}
+    body = h.signal["recent"]
     assert "pending" not in body
     assert "answer" in body

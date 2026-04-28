@@ -5,8 +5,8 @@ from vessal.skills.memory.skill import Memory
 
 
 def test_memory_is_skillbase():
-    from vessal.ark.shell.hull.skill import SkillBase
-    assert issubclass(Memory, SkillBase)
+    from vessal.skills._base import BaseSkill
+    assert issubclass(Memory, BaseSkill)
 
 
 def test_memory_has_required_attrs():
@@ -55,17 +55,17 @@ def test_save_various_types():
 
 def test_signal_empty_when_no_memories():
     m = Memory()
-    result = m._signal()
-    assert result is None
+    m.signal_update()
+    assert m.signal == {}
 
 
 def test_signal_shows_all_memories():
     m = Memory()
     m.save("a", 1)
     m.save("b", "hello")
-    result = m._signal()
-    assert result is not None
-    title, body = result
+    m.signal_update()
+    assert m.signal != {}
+    body = m.signal["entries"]
     assert "a" in body
     assert "b" in body
 
@@ -154,43 +154,43 @@ class TestDrop:
 
 
 class TestContextPressureSignal:
-    """Memory._signal() shows context pressure warning when threshold exceeded."""
+    """Memory.signal_update() shows context pressure warning when threshold exceeded."""
 
     def test_no_warning_below_threshold(self):
         ns = {"_context_pct": 30}
         m = Memory(ns=ns)
-        result = m._signal()
-        # No memories and no warning → None
-        assert result is None
+        m.signal_update()
+        # No memories and no warning → empty signal
+        assert m.signal == {}
 
     def test_warning_at_threshold(self):
         ns = {"_context_pct": 50}
         m = Memory(ns=ns)
-        result = m._signal()
-        assert result is not None
-        title, body = result
+        m.signal_update()
+        assert m.signal != {}
+        body = m.signal["entries"]
         assert "50%" in body
 
     def test_warning_above_threshold(self):
         ns = {"_context_pct": 70}
         m = Memory(ns=ns)
-        result = m._signal()
-        assert result is not None
-        _, body = result
+        m.signal_update()
+        assert m.signal != {}
+        body = m.signal["entries"]
         assert "70%" in body
 
     def test_custom_threshold(self):
         ns = {"_context_pct": 40, "_compress_threshold": 30}
         m = Memory(ns=ns)
-        result = m._signal()
-        assert result is not None  # 40 >= 30, should warn
+        m.signal_update()
+        assert m.signal != {}  # 40 >= 30, should warn
 
     def test_memories_and_warning_combined(self):
         ns = {"_context_pct": 60}
         m = Memory(ns=ns)
         m.save("key1", "value1")
-        result = m._signal()
-        assert result is not None
-        _, body = result
+        m.signal_update()
+        assert m.signal != {}
+        body = m.signal["entries"]
         assert "key1" in body  # memories still shown
         assert "60%" in body   # warning also shown

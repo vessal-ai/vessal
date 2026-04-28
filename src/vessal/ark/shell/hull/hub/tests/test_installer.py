@@ -11,8 +11,8 @@ def _make_single_skill(repo_dir: Path, name: str = "my_skill") -> None:
     """Create a single-skill repo layout at repo_dir root."""
     (repo_dir / "__init__.py").write_text(f"from .skill import Sk as Skill\n")
     (repo_dir / "skill.py").write_text(
-        f"from vessal.ark.shell.hull.skill import SkillBase\n\n"
-        f"class Sk(SkillBase):\n"
+        f"from vessal.skills._base import BaseSkill\n\n"
+        f"class Sk(BaseSkill):\n"
         f"    name = '{name}'\n"
         f"    description = 'test'\n"
     )

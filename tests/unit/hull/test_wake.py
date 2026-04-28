@@ -1,6 +1,7 @@
 """tests/hull/unit/test_wake.py — _wake variable injection tests.
 
-Verifies that EventLoop.inject_wake() and _frame_loop() correctly set the _wake variable.
+Verifies that EventLoop.inject_wake() and _frame_loop() correctly set the wake reason
+on G["_system"]._wake (spec §6.2).
 """
 
 from __future__ import annotations
@@ -8,6 +9,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from vessal.ark.shell.hull.event_loop import EventLoop
+from vessal.skills.system import SystemSkill
 
 
 def _make_stub_cell(responses=None) -> MagicMock:
@@ -16,10 +18,15 @@ def _make_stub_cell(responses=None) -> MagicMock:
     ns: dict = {
         "_frame": 0,
         "_sleeping": False,
-        "_wake": "",
         "_next_wake": None,
         "_context_pct": 0,
     }
+
+    class _FakeKernel:
+        def __init__(self):
+            self.L = ns
+
+    system_skill = SystemSkill(_FakeKernel())
 
     call_count = [0]
     if responses is None:
@@ -36,29 +43,30 @@ def _make_stub_cell(responses=None) -> MagicMock:
         return result
 
     cell.L = ns
+    cell.G = {"_system": system_skill}
     cell.step = fake_step
     return cell
 
 
 class TestWakeInjection:
-    """inject_wake() correctly sets ns['_wake'] at the start of run."""
+    """inject_wake() correctly records wake reason on G['_system']._wake (spec §6.2)."""
 
     def test_inject_wake_sets_user_message(self):
-        """inject_wake() sets ns['_wake'] = 'user_message'."""
+        """inject_wake() records 'user_message' on _system._wake."""
         cell = _make_stub_cell()
         loop = EventLoop(cell=cell)
         loop.inject_wake({"reason": "user_message"})
-        assert cell.L["_wake"] == "user_message"
+        assert cell.G["_system"]._wake == "user_message"
 
     def test_wake_visible_during_frame_loop(self):
-        """_wake is readable by cell.step during _frame_loop() execution."""
+        """_wake is readable from G['_system'] during _frame_loop() execution."""
         cell = _make_stub_cell()
         wake_values: list[str] = []
 
         original_step = cell.step
 
         def capturing_step(tracer=None):
-            wake_values.append(cell.L.get("_wake", "NOT_SET"))
+            wake_values.append(cell.G["_system"]._wake)
             return original_step(tracer)
 
         cell.step = capturing_step
@@ -82,4 +90,4 @@ class TestWakeInjection:
         cell = _make_stub_cell()
         loop = EventLoop(cell=cell)
         loop.inject_wake({})
-        assert cell.L["_wake"] == "heartbeat"
+        assert cell.G["_system"]._wake == "heartbeat"

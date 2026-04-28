@@ -445,11 +445,12 @@ class TestKernel:
         assert "_history_depth" not in k.L
 
     def test_init_creates_lifecycle_vars(self):
-        """After init, ns contains _sleeping/_wake/_next_wake lifecycle variables."""
+        """After init, ns contains _sleeping/_next_wake lifecycle variables."""
         k = Kernel()
         assert k.L["_sleeping"] is False
-        assert k.L["_wake"] == ""
         assert k.L["_next_wake"] is None
+        # _wake moved to G["_system"].set_wake() in PR 3
+        assert "_wake" not in k.L
 
     def test_init_from_snapshot(self):
         """snapshot_path parameter: restore namespace from file to continue a previous session."""
@@ -608,7 +609,7 @@ class TestKernel:
 
     def test_snapshot_restore_with_skill(self, tmp_path):
         """After loading a Skill and doing snapshot/restore, the Skill class object is correctly restored."""
-        from vessal.ark.shell.hull.skill import SkillBase
+        from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
@@ -618,7 +619,7 @@ class TestKernel:
             skill_cls = sm.load("tasks")
             k.L["tasks_cls"] = skill_cls
 
-            assert issubclass(skill_cls, SkillBase)
+            assert issubclass(skill_cls, BaseSkill)
 
             snap = str(tmp_path / "test.pkl")
             k.snapshot(snap)
@@ -626,11 +627,11 @@ class TestKernel:
             k2 = Kernel()
             k2.restore(snap)
 
-            assert issubclass(k2.L["tasks_cls"], SkillBase)
+            assert issubclass(k2.L["tasks_cls"], BaseSkill)
 
     def test_snapshot_restore_skill_with_data(self, tmp_path):
         """Skill-produced data and instances are correctly restored together."""
-        from vessal.ark.shell.hull.skill import SkillBase
+        from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
@@ -650,7 +651,7 @@ class TestKernel:
             k2.restore(snap)
 
             assert k2.L["task_id"] == "1"
-            assert issubclass(k2.L["TasksCls"], SkillBase)
+            assert issubclass(k2.L["TasksCls"], BaseSkill)
 
     def test_snapshot_partial_on_unpicklable(self, tmp_path):
         """When namespace contains unpicklable objects, snapshot does partial save without raising.
@@ -686,7 +687,7 @@ class TestKernel:
 
     def test_restore_cleans_sys_modules(self, tmp_path):
         """restore clears sys.modules cache; does not use stale in-process modules."""
-        from vessal.ark.shell.hull.skill import SkillBase
+        from vessal.skills._base import BaseSkill
         skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
         with patch.dict(sys.modules):
             k = Kernel()
@@ -703,7 +704,7 @@ class TestKernel:
             k2.restore(snap)
 
             # Skill class should be usable after restore
-            assert issubclass(k2.L["TasksCls"], SkillBase)
+            assert issubclass(k2.L["TasksCls"], BaseSkill)
 
     def test_ns_direct_write_affects_exec(self):
         """Writing directly to kernel.L is visible to subsequent ping() calls."""
@@ -762,7 +763,7 @@ class TestKernel:
         _exec(k, "x = 1")
         ns_keys_before = set(k.L.keys())
         _exec(k, "pass", expect="assert x == 1")
-        allowed_new_keys = {"verdict", "observation", "_frame", "_signal_outputs",
+        allowed_new_keys = {"verdict", "observation", "_frame", "signals",
                             "_context_pct", "_budget_total", "_dropped_frame_count"}
         leaked_extra_keys = set(k.L.keys()) - ns_keys_before - allowed_new_keys
         assert leaked_extra_keys == set(), f"Unexpected new keys after expect: {leaked_extra_keys}"
@@ -1013,7 +1014,7 @@ def test_snapshot_tracks_dropped_keys(tmp_path):
 
 
 def test_restore_emits_reconstruction_signal(tmp_path):
-    """After restore(), if _dropped_keys exist, the signal should include reconstruction hints."""
+    """After restore(), if _dropped_keys exist, SystemSkill surfaces reconstruction hints."""
     kernel = Kernel()
     kernel.L["x"] = 42
     kernel.L["_dropped_keys"] = ["db_conn", "file_handle"]
@@ -1029,9 +1030,10 @@ def test_restore_emits_reconstruction_signal(tmp_path):
     kernel2.restore(path)
     kernel2.ping(None, {"globals": kernel2.G, "locals": kernel2.L})
 
-    signals = kernel2.L.get("_signal_outputs", [])
-    signal_text = "\n".join(body for _, body in signals)
-    assert "db_conn" in signal_text
+    # PR 3: signals is now a dict keyed by (class_name, var_name, scope)
+    signals = kernel2.L.get("signals", {})
+    system_payload = signals.get(("SystemSkill", "_system", "G"), {})
+    assert "db_conn" in system_payload.get("dropped", "")
 
 
 def test_init_namespace_has_compaction_defaults():

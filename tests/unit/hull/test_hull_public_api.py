@@ -95,7 +95,7 @@ class TestHullStatus:
         # Manually set namespace values to verify
         hull._cell.L["_sleeping"] = True
         hull._cell.L["_frame"] = 42
-        hull._cell.L["_wake"] = "heartbeat"
+        hull._cell.G["_system"].set_wake("heartbeat")
         result = hull.status()
         assert result["idle"] is True
         assert result["frame"] == 42

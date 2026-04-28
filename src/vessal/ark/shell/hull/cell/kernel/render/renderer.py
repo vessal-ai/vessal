@@ -5,7 +5,7 @@ render(ns, config) -> Ping
 Output structure (Ping three fields):
     system_prompt: ns["_system_prompt"] (stripped)
     frame_stream:  recent frame history text (══════ frame stream ══════ prefix + frame blocks, trimmed to token budget)
-    signals:       _signal_outputs concatenated text
+    signals:       signals concatenated text
 
 Side effects: writes ns["_context_pct"], ns["_budget_total"], ns["_dropped_frame_count"].
 """

@@ -5,13 +5,13 @@ import re
 import subprocess
 import sys
 
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 # Valid package name: alphanumeric, hyphens, underscores, dots, brackets (version constraints)
 _VALID_PKG = re.compile(r"^[A-Za-z0-9._\-\[\]>=<!, ]+$")
 
 
-class Pip(SkillBase):
+class Pip(BaseSkill):
     """Python package installer.
 
     Attributes:

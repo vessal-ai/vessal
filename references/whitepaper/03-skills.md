@@ -1,6 +1,6 @@
 # 3. Skill Model
 
-> **TL;DR.** A Skill is not "a capability" but an interface between the agent and the outside world, with two faces: tools and signals for the agent, a server for the world. Kernel-side duck-typed discovery, dual-track methodology, and meta-skills are what let Skills evolve independently of the runtime.
+> **TL;DR.** A Skill is not "a capability" but an interface between the agent and the outside world, with two faces: tools and signals for the agent, a server for the world. Kernel-side BaseSkill-typed discovery, dual-track methodology, and meta-skills are what let Skills evolve independently of the runtime.
 
 The previous chapter established the three-layer architecture: Cell for computation, Hull for orchestration, Shell for boundary. This chapter addresses a question that arises immediately from that layering: where does an Agent's capability extension — the Skill — belong?
 
@@ -32,7 +32,7 @@ The skill class is loaded into the Cell's namespace. It contains three kinds of 
 
 **Tools.** Python methods. The class attribute `tools: list[str]` declares which methods are LLM-callable tools, filtering out internal helpers from the describe/ system's automatic scan.  Tool methods execute inside the Cell's Kernel with full system privileges.
 
-**Signals.** Before rendering each Ping, the Kernel scans the namespace for any object with a callable `_signal` method and calls it, collecting the returned `(title, body)` tuples. `_signal()` takes no arguments, accesses instance state through `self`, and returns `tuple[str, str] | None` (title becomes the rendered section header; body is the signal content). External data reaches the signal via mutable references passed in at construction time.
+**Signals.** Before rendering each Ping, the Kernel scans the namespace for BaseSkill instances and calls their `signal_update()` method. The method updates a dict with keys `(class_name, var_name, scope)` and payload values. Kernel aggregates all signals into `L["signals"]`, which is then rendered into the Ping. The `signal_update()` method takes no arguments and accesses instance state through `self`; it returns nothing (side effect is dict update). External data reaches the signal via mutable references passed in at construction time.
 
 ### Server (Hull Side)
 
@@ -62,7 +62,7 @@ graph TB
         subgraph cell_side["Cell side — skill class"]
             Meta["SOP\nname · summary · guide"]
             Tool["Tool\nmethods"]
-            Sig["Signal\n_signal()"]
+            Sig["Signal\nsignal_update()"]
         end
         subgraph hull_side["Hull side — server"]
             SV["server.py\nHTTP · timers · UI"]
@@ -137,14 +137,12 @@ flowchart TB
     TD2 --> TD3["generate text description\nfor each tool method"]
     TD3 --> PING["embed in Ping"]
 
-    SD --> SD1["scan all values"]
-    SD1 --> SD2{"has _signal()\nand callable?"}
+    SD --> SD1["scan G ∪ L"]
+    SD1 --> SD2{"is BaseSkill\ninstance?"}
     SD2 -->|no| SD3["skip"]
-    SD2 -->|yes| SD4["call _signal()"]
-    SD4 --> SD5["collect (title, body)"]
-    SD5 --> SD6{"non-empty return?"}
-    SD6 -->|no| SD3
-    SD6 -->|yes| PING
+    SD2 -->|yes| SD4["call signal_update()"]
+    SD4 --> SD5["aggregate to L['signals']\ndict[(class_name, var_name, scope), payload]"]
+    SD5 --> PING
 ```
 
 
@@ -200,7 +198,7 @@ Distributing a Skill is as simple as archiving this directory.
 
 Section 3.1 noted that a Skill's outside world can be "a human, another Agent, an API service, or a hardware device." Section 3.2 noted that a server "can even be written in another language." These two design decisions combine naturally: the Skill model has built-in support for hardware integration.
 
-Each hardware device maps to one Skill: tool methods are the control interface (`eye.capture()`, `hand.move()`), the server is the device driver (can be written in C or Rust, running continuously outside the frame loop), and the signal is the perception channel (hardware state changes enter the next frame's Ping via `_signal()`).
+Each hardware device maps to one Skill: tool methods are the control interface (`eye.capture()`, `hand.move()`), the server is the device driver (can be written in C or Rust, running continuously outside the frame loop), and the signal is the perception channel (hardware state changes enter the next frame's Ping via `signal_update()`).
 
 Loading and unloading a Skill corresponds to attaching and detaching an organ. The Kernel's duck-typing discovery mechanism is indifferent to the Skill's implementation language or the underlying hardware. The Agent never needs to know whether a tool method is backed by an HTTP API or a motor controller.
 

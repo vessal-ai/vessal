@@ -55,7 +55,7 @@ class HullRuntimeMixin:
             "idle": sleeping,
             "sleeping": sleeping,
             "frame": self._cell.L.get("_frame", 0),
-            "wake": self._cell.L.get("_wake", ""),
+            "wake": self._cell.G["_system"]._wake if "_system" in self._cell.G else "",
         }
 
     def reload_soul(self) -> None:

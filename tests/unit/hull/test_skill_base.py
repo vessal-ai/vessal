@@ -1,24 +1,24 @@
-"""test_skill_base — SkillBase abstract interface contract."""
+"""test_skill_base — BaseSkill abstract interface contract."""
 import pytest
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
-def test_skillbase_cannot_be_instantiated_directly():
-    """SkillBase is abstract — direct instantiation raises TypeError."""
+def test_baseskill_cannot_be_instantiated_directly():
+    """BaseSkill is abstract — direct instantiation raises TypeError."""
     with pytest.raises(TypeError):
-        SkillBase()
+        BaseSkill()
 
 
 def test_concrete_skill_must_define_name_and_description():
     """A concrete skill without name/description raises on class definition."""
     with pytest.raises(TypeError):
-        class BadSkill(SkillBase):
+        class BadSkill(BaseSkill):
             pass
 
 
 def test_concrete_skill_with_required_attrs():
     """A well-formed concrete skill instantiates and has defaults."""
-    class GoodSkill(SkillBase):
+    class GoodSkill(BaseSkill):
         name = "test"
         description = "A test skill."
 
@@ -26,42 +26,41 @@ def test_concrete_skill_with_required_attrs():
     assert s.name == "test"
     assert s.description == "A test skill."
     assert s.guide == ""
-    assert not hasattr(s, "_signal_output")
+    assert s.signal == {}
 
 
-def test_signal_is_noop_by_default():
-    """Default _signal() returns None."""
-    class Minimal(SkillBase):
+def test_signal_update_is_noop_by_default():
+    """Default signal_update() does nothing (signal stays empty dict)."""
+    class Minimal(BaseSkill):
         name = "minimal"
         description = "Minimal."
 
     s = Minimal()
-    result = s._signal()
-    assert result is None
+    s.signal_update()
+    assert s.signal == {}
 
 
-def test_signal_can_be_overridden():
-    """Subclass overrides _signal() to return (title, body) tuple."""
-    class Custom(SkillBase):
+def test_signal_update_can_be_overridden():
+    """Subclass overrides signal_update() to mutate self.signal."""
+    class Custom(BaseSkill):
         name = "custom"
         description = "Custom."
         def __init__(self):
             super().__init__()
             self.data = "hello"
-        def _signal(self):
-            return ("custom", f"data={self.data}")
+        def signal_update(self):
+            self.signal = {"data": self.data}
 
     s = Custom()
-    result = s._signal()
-    assert isinstance(result, tuple)
-    assert result == ("custom", "data=hello")
+    s.signal_update()
+    assert s.signal == {"data": "hello"}
 
 
 def test_isinstance_check():
-    """SkillBase instances pass isinstance check."""
-    class MySkill(SkillBase):
+    """BaseSkill instances pass isinstance check."""
+    class MySkill(BaseSkill):
         name = "my"
         description = "My."
 
     s = MySkill()
-    assert isinstance(s, SkillBase)
+    assert isinstance(s, BaseSkill)

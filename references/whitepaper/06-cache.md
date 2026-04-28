@@ -174,7 +174,7 @@ Ping
 │   └── skill protocol (_prompt() return value) — depends on skill implementation
 └── state (dynamic)
     ├── frame_stream                     — one record appended per frame
-    └── signals (_signal() return value) — rewritten each frame
+    └── signals (signal_update() dict aggregate) — rewritten each frame
 ```
 
 Mapping each segment against the five principles:
@@ -234,9 +234,9 @@ Design decision: **system_prompt retains only absolutely invariant content**.
 
 Concrete measures:
 
-First, the `_prompt()` mechanism moves from system_prompt to the signals region. Skill behavioral guidance no longer injects into system_prompt; instead it travels through the `_signal()` channel, landing at the tail of the Ping. This eliminates every source of change from inside system_prompt.
+First, the `_prompt()` mechanism moves from system_prompt to the signals region. Skill behavioral guidance no longer injects into system_prompt; instead it travels through the `signal_update()` channel, landing at the tail of the Ping. This eliminates every source of change from inside system_prompt.
 
-Second, commonly used Skills are promoted to system builtins. Their protocol text no longer flows through `_prompt()` or `_signal()`; it is hardcoded directly into system_prompt as static content at the same level as kernel_protocol and SOUL.
+Second, commonly used Skills are promoted to system builtins. Their protocol text no longer flows through `_prompt()` or `signal_update()`; it is hardcoded directly into system_prompt as static content at the same level as kernel_protocol and SOUL.
 
 Third, loading non-builtin Skills does not affect system_prompt. Their guidance travels through signals; their runtime state is surfaced through signals. system_prompt is entirely unaffected by Skill loading and unloading.
 
@@ -251,8 +251,8 @@ Ping
 └── state
     ├── frame_stream (appended per frame)
     └── signals (rewritten per frame)
-        ├── _signal() output for each skill
-        └── behavioral guidance for non-builtin skills
+        ├── signal_update() output for each BaseSkill instance
+        └── behavioral guidance from _prompt() for non-builtin skills
 ```
 
 Under this structure, system_prompt does not change at any point during the session's lifetime. It is the absolute anchor of Prefix Cache — every frame's Ping prefix matches exactly from the very start of system_prompt. Combined with the append-based growth of frame_stream, the valid cache region extends from system_prompt all the way through the last frame record of the previous frame.

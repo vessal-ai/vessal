@@ -1,16 +1,16 @@
 """test_prompt_protocol.py — Unit tests for _prompt() cognitive protocol."""
 import logging
 
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
-class ToolSkill(SkillBase):
+class ToolSkill(BaseSkill):
     """Pure tool Skill that does not override _prompt()."""
     name = "tool"
     description = "A tool skill"
 
 
-class BehaviorSkill(SkillBase):
+class BehaviorSkill(BaseSkill):
     """Behavior Skill that overrides _prompt()."""
     name = "reviewer"
     description = "Code reviewer"
@@ -23,7 +23,7 @@ class BehaviorSkill(SkillBase):
 
 
 def test_default_prompt_returns_none():
-    """SkillBase default _prompt() returns None."""
+    """BaseSkill default _prompt() returns None."""
     skill = ToolSkill()
     assert skill._prompt() is None
 
@@ -40,7 +40,7 @@ def test_behavior_skill_returns_tuple():
 
 
 class FakePromptSource:
-    """Non-SkillBase subclass with a _prompt() method (duck-typing)."""
+    """Non-BaseSkill subclass with a _prompt() method (duck-typing)."""
     name = "duck"
 
     def _prompt(self):
@@ -70,7 +70,7 @@ def test_collect_skill_protocols_from_namespace():
 
 
 def test_collect_protocols_ducktype():
-    """Non-SkillBase objects with _prompt() are also collected."""
+    """Non-BaseSkill objects with _prompt() are also collected."""
     from vessal.ark.shell.hull.cell.kernel.render._prompt_render import (
         collect_skill_protocols,
     )

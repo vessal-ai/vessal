@@ -156,7 +156,7 @@ class SkillLoader:
             name: Skill package name — corresponds to a subdirectory under skill_paths or a vessal.skills subpackage.
 
         Returns:
-            SkillBase subclass.
+            BaseSkill subclass.
 
         Raises:
             RuntimeError: Skill not found or import failed.
