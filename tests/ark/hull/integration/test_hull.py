@@ -153,7 +153,7 @@ class TestRunLoop:
         """Agent calls sleep(); _frame_loop() stops after that frame."""
         hull = _make_hull(tmp_path)
         _set_responses(hull, ['sleep()'])
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)
         assert hull._cell.L["_sleeping"] is True
@@ -163,7 +163,7 @@ class TestRunLoop:
         hull = _make_hull(tmp_path)
         assert not hasattr(hull._cell, "run")
         _set_responses(hull, ['sleep()'])
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)  # should not raise
 
@@ -176,7 +176,7 @@ class TestRunLoop:
         hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)
         # Frame limit reached; _sleeping was not set by Agent
@@ -199,7 +199,7 @@ class TestRunLoop:
         hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)
 
@@ -211,14 +211,14 @@ class TestRunLoop:
         _set_responses(hull, [
             'x = 42\nsleep()',
         ])
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)
         assert hull._cell.L.get("x") == 42
 
         _set_responses(hull, ['result_val = x\nsleep()'])
         hull._cell.L["_sleeping"] = False
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         _run_frame_loop(hull)
         assert hull._cell.L.get("result_val") == 42
 
@@ -226,7 +226,7 @@ class TestRunLoop:
         """_frame_loop() does not automatically snapshot (snapshots triggered manually by Hull.snapshot())."""
         hull = _make_hull(tmp_path)
         _set_responses(hull, ['sleep()'])
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)
         snapshots = list((tmp_path / "snapshots").glob("*.pkl")) if (tmp_path / "snapshots").exists() else []
@@ -367,7 +367,7 @@ class TestNamespaceAccess:
         hull = _make_hull(tmp_path)
         hull._cell.L["custom_var"] = "test_value"
         _set_responses(hull, ['result_val = custom_var\nsleep()'])
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)
         assert hull._cell.L.get("result_val") == "test_value"
@@ -476,20 +476,20 @@ class TestVenvActivation:
 
 class TestWake:
     def test_wake_default_empty(self, tmp_path):
-        """SystemSkill wake is empty string after Hull initialization."""
+        """SystemSkill wake_reason is empty string after Hull initialization."""
         from vessal.skills.system import SystemSkill
         hull = _make_hull(tmp_path)
         system = hull._cell.G.get("_system")
         assert isinstance(system, SystemSkill)
-        assert system._wake == ""
+        assert system._wake_reason == ""
 
     def test_wake_set_before_frame_loop(self, tmp_path):
-        """_wake retains its injected value during _frame_loop() execution."""
+        """_wake_reason retains its injected value during _frame_loop() execution."""
         hull = _make_hull(tmp_path)
         wake_seen = []
         original_step = hull._cell.step
         def capturing_step(tracer=None):
-            wake_seen.append(hull._cell.G["_system"]._wake)
+            wake_seen.append(hull._cell.G["_system"]._wake_reason)
             return original_step(tracer)
         hull._cell.step = capturing_step
         from vessal.ark.shell.hull.cell.core.parser import parse_response
@@ -497,7 +497,7 @@ class TestWake:
         hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].set_wake("user_message")
+        hull._cell.G["_system"].wake("user_message")
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)
         assert all(w == "user_message" for w in wake_seen)

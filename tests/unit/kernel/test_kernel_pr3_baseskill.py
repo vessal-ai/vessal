@@ -113,25 +113,21 @@ def test_no_wake_ns_key_anymore():
     assert "_wake" not in k.L
 
 
-def test_systemskill_set_wake_propagates_to_signal():
+def test_systemskill_wake_propagates_to_signal():
     k = minimal_kernel()
-    k.G["_system"].set_wake("user_message")
+    k.G["_system"].wake("user_message")
     signals = _scan(k)
     payload = signals[("SystemSkill", "_system", "G")]
-    assert payload.get("wake") == "user_message"
+    assert payload.get("wake_reason") == "user_message"
 
 
-def test_systemskill_carries_frame_and_verdict():
-    from vessal.ark.shell.hull.cell.protocol import Verdict
-
+def test_systemskill_carries_frame():
     k = minimal_kernel()
     k.L["_frame"] = 7
-    k.L["verdict"] = Verdict(total=2, passed=2, failures=())
 
     signals = _scan(k)
     payload = signals[("SystemSkill", "_system", "G")]
     assert payload["frame"] == 7
-    assert "verdict" in payload  # exact text format checked in render tests
 
 
 def test_old_skillbase_module_removed():

@@ -1,7 +1,7 @@
-"""tests/hull/unit/test_wake.py — _wake variable injection tests.
+"""tests/hull/unit/test_wake.py — wake variable injection tests.
 
 Verifies that EventLoop.inject_wake() and _frame_loop() correctly set the wake reason
-on G["_system"]._wake (spec §6.2).
+on G["_system"]._wake_reason (spec §6.2).
 """
 
 from __future__ import annotations
@@ -49,24 +49,24 @@ def _make_stub_cell(responses=None) -> MagicMock:
 
 
 class TestWakeInjection:
-    """inject_wake() correctly records wake reason on G['_system']._wake (spec §6.2)."""
+    """inject_wake() correctly records wake reason on G['_system']._wake_reason (spec §6.2)."""
 
     def test_inject_wake_sets_user_message(self):
-        """inject_wake() records 'user_message' on _system._wake."""
+        """inject_wake() records 'user_message' on _system._wake_reason."""
         cell = _make_stub_cell()
         loop = EventLoop(cell=cell)
         loop.inject_wake({"reason": "user_message"})
-        assert cell.G["_system"]._wake == "user_message"
+        assert cell.G["_system"]._wake_reason == "user_message"
 
     def test_wake_visible_during_frame_loop(self):
-        """_wake is readable from G['_system'] during _frame_loop() execution."""
+        """_wake_reason is readable from G['_system'] during _frame_loop() execution."""
         cell = _make_stub_cell()
         wake_values: list[str] = []
 
         original_step = cell.step
 
         def capturing_step(tracer=None):
-            wake_values.append(cell.G["_system"]._wake)
+            wake_values.append(cell.G["_system"]._wake_reason)
             return original_step(tracer)
 
         cell.step = capturing_step
@@ -90,4 +90,4 @@ class TestWakeInjection:
         cell = _make_stub_cell()
         loop = EventLoop(cell=cell)
         loop.inject_wake({})
-        assert cell.G["_system"]._wake == "heartbeat"
+        assert cell.G["_system"]._wake_reason == "heartbeat"

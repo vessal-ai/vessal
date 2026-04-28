@@ -90,7 +90,7 @@ class EventLoop:
         reason = event.get("reason", "heartbeat")
         system_skill = self._cell.G.get("_system")
         if system_skill is not None:
-            system_skill.set_wake(reason)
+            system_skill.wake(reason)
         self._cell.L["_sleeping"] = False
 
     async def run_forever(self) -> None:

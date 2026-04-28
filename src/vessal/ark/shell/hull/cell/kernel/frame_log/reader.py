@@ -134,6 +134,24 @@ def _fetch_signals(
     return out
 
 
+def recent_errors(conn: sqlite3.Connection, limit: int = 3) -> list[dict]:
+    """Most-recent rows from the errors table, newest first."""
+    rows = conn.execute(
+        "SELECT n_start, source, source_detail, format_text "
+        "FROM errors ORDER BY id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [
+        {
+            "n_start": r[0],
+            "source": r[1],
+            "source_detail": r[2],
+            "format_text": r[3],
+        }
+        for r in rows
+    ]
+
+
 def _fetch_errors_for_visible(
     conn: sqlite3.Connection,
     visible: list[tuple[int, int, int]],
