@@ -102,6 +102,68 @@ class Kernel:
             conn = open_db(db_path)
             source_cache.reload_from_db(conn)
             self.frame_log = FrameLog(conn)
+        self._last_ping: Ping | None = None
+
+    def ping(self, pong: "Pong | None", namespace: dict) -> Ping:
+        """Single Kernel primitive (spec §1.2). Runs five steps internally:
+
+          ① archive pong (deferred to _commit_frame inside this call)
+          ② exec(pong.operation, G, L) → L["observation"]
+          ③ eval(pong.expect, G, copy(L)) → L["verdict"]
+          ④ signal_scan → L["_signal_outputs"]   (PR 3 will rename to L["signals"])
+          ⑤ render Ping structure
+
+        pong=None (first call after boot/restart) skips ②③ — observation/verdict
+        are not written. ④⑤ always run.
+
+        Args:
+            pong: LLM's previous frame Pong, or None on the very first call.
+            namespace: {"globals": G, "locals": L}. Both dicts mutated in-place.
+
+        Returns:
+            Ping rendered from current L state. Caller passes this to LLM
+            to obtain the next pong.
+        """
+        G = namespace["globals"]
+        L = namespace["locals"]
+        # Sanity check: G/L must be the Kernel's own dicts (in-place mutation contract).
+        assert G is self.G and L is self.L, \
+            "ping() namespace must reference Kernel.G and Kernel.L (in-place)"
+
+        if pong is not None:
+            frame_n = L["_frame"] + 1
+            # ② exec
+            exec_result = execute(pong.action.operation, G, L, frame_n)
+            L["observation"] = Observation(
+                stdout=exec_result.stdout,
+                diff=exec_result.diff,
+                error=exec_result.error,
+                verdict=None,
+            )
+            # ③ eval
+            if exec_result.error is None and pong.action.expect.strip():
+                L["verdict"] = evaluate_expect(
+                    pong.action.expect, G, L, frame_n,
+                )
+            else:
+                L["verdict"] = None
+            # ④ signal_scan
+            self.update_signals()
+            # commit frame N (uses self._last_ping as the FrameRecord.ping field)
+            observation_for_record = Observation(
+                stdout=L["observation"].stdout,
+                diff=L["observation"].diff,
+                error=L["observation"].error,
+                verdict=L["verdict"],   # FrameRecord still nests verdict inside observation in v7
+            )
+            self._commit_frame(pong, observation_for_record, frame_n, ping=self._last_ping)
+        else:
+            # First call after boot: signal_scan only (no exec/eval, no commit)
+            self.update_signals()
+
+        # ⑤ render
+        self._last_ping = self.render()
+        return self._last_ping
 
     def _init_L(self) -> None:
         """Inject Agent-state factory defaults into an empty L."""
