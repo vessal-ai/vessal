@@ -383,7 +383,7 @@ class Kernel:
         operation_error_text: str | None
         if obs.error is not None:
             operation_error_text = "".join(
-                _tb.TracebackException.from_exception(obs.error, capture_locals=True).format()
+                _tb.TracebackException.from_exception(obs.error).format()
             )
             operation_error = ErrorOnSource("operation", None, operation_error_text)
         else:
