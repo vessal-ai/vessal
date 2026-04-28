@@ -35,7 +35,6 @@ def test_every_skill_has_signal_attr_after_init():
         try:
             instance = cls()
         except TypeError:
-            # Skill requires constructor args (e.g., Skills(ns) / SystemSkill(kernel))
             continue
         assert hasattr(instance, "signal")
         assert isinstance(instance.signal, dict)

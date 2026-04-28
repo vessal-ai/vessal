@@ -10,7 +10,9 @@ def make_tasks():
 def make_tasks_with_ns():
     """Create Tasks with a namespace dict for testing ns interactions."""
     ns = {}
-    return Tasks(ns=ns), ns
+    t = Tasks()
+    t._ns = ns
+    return t, ns
 
 
 class TestAdd:

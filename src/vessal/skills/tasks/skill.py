@@ -13,10 +13,11 @@ class Tasks(BaseSkill):
     name = "tasks"
     description = "hierarchical tasks"
 
-    def __init__(self, ns: dict | None = None):
+    def __init__(self) -> None:
         super().__init__()
-        self._ns = ns
+        self._ns: dict | None = None
         self._tree: dict[str, dict] = {}
+        print("tasks: add(title)/done(id)/list() — task management")
 
     # ── Internal utilities ──
 

@@ -22,13 +22,14 @@ def test_pin_unpin():
 
 
 def test_signal_no_pins_empty():
-    p = Pin(ns={"x": 1})
+    p = Pin()
+    p._ns = {"x": 1}
     p.signal_update()
     assert p.signal == {}
 
 
 def test_signal_no_ns_empty():
-    p = Pin(ns=None)
+    p = Pin()
     p.pin("x")
     p.signal_update()
     assert p.signal == {}
@@ -36,7 +37,8 @@ def test_signal_no_ns_empty():
 
 def test_signal_with_existing_var():
     ns = {"x": 42}
-    p = Pin(ns=ns)
+    p = Pin()
+    p._ns = ns
     p.pin("x")
     p.signal_update()
     assert p.signal != {}
@@ -46,7 +48,8 @@ def test_signal_with_existing_var():
 
 def test_signal_missing_var():
     ns = {}
-    p = Pin(ns=ns)
+    p = Pin()
+    p._ns = ns
     p.pin("missing_var")
     p.signal_update()
     assert p.signal != {}
@@ -56,7 +59,8 @@ def test_signal_missing_var():
 
 def test_signal_multiple_pins():
     ns = {"a": 1, "b": 2}
-    p = Pin(ns=ns)
+    p = Pin()
+    p._ns = ns
     p.pin("a")
     p.pin("b")
     p.signal_update()
@@ -68,7 +72,8 @@ def test_signal_multiple_pins():
 
 def test_signal_sorted():
     ns = {"z": 1, "a": 2}
-    p = Pin(ns=ns)
+    p = Pin()
+    p._ns = ns
     p.pin("z")
     p.pin("a")
     p.signal_update()

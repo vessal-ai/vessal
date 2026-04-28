@@ -7,6 +7,7 @@ Persistence: all messages are written append-only to data/chat.jsonl.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from datetime import datetime
@@ -21,21 +22,22 @@ class Chat(BaseSkill):
     name = "chat"
     description = "send/receive messages"
 
-    def __init__(self, ns=None):
+    def __init__(self) -> None:
         super().__init__()
         self._inbox: list[dict] = []
         self._outbox: list[dict] = []
         self._unread_count: int = 0
         self._chat_log: list[dict] = []
-        self._data_dir: Path | None = None
         self._inbox_event = threading.Event()
+        self._data_dir: Path | None = None
 
-        if ns is not None:
-            base = ns.get("_data_dir")
-            if base:
-                self._data_dir = Path(base) / "chat"
-                self._data_dir.mkdir(parents=True, exist_ok=True)
-                self._load_chat()
+        base = os.environ.get("VESSAL_DATA_DIR")
+        if base:
+            self._data_dir = Path(base) / "chat"
+            self._data_dir.mkdir(parents=True, exist_ok=True)
+            self._load_chat()
+
+        print("chat: read(n)/reply(content) — bidirectional human messaging")
 
     # ── Agent interface ──
 

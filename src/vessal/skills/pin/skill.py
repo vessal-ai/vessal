@@ -15,10 +15,11 @@ class Pin(BaseSkill):
     name = "pin"
     description = "watch pinned variables"
 
-    def __init__(self, ns: dict | None = None):
+    def __init__(self) -> None:
         super().__init__()
-        self._ns = ns
+        self._ns: dict | None = None
         self._pins: set[str] = set()
+        print("pin: save(key,val)/get(key)/list() — pinned persistent values")
 
     def pin(self, name: str) -> None:
         """Add a variable to pinned observation."""

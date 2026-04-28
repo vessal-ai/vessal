@@ -18,11 +18,10 @@ class SkillCreator(BaseSkill):
     name = "skill_creator"
     description = "create new skill scaffold"
 
-    def __init__(self, ns: dict | None = None):
+    def __init__(self) -> None:
         super().__init__()
         self._skill_paths: list[str] = []
-        if ns is not None:
-            self._skill_paths = ns.get("skill_paths", [])
+        print("skill_creator: create(name) — scaffold a new Skill")
 
     def create(self, name: str) -> str:
         """Create a Skill scaffold under `skill_paths[0]`.

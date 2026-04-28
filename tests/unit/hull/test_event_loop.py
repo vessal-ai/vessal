@@ -22,9 +22,11 @@ def mock_cell():
             }
 
     fk = _FakeKernel()
+    sys_skill = SystemSkill()
+    sys_skill._bind_kernel(fk)
     cell = MagicMock()
     cell.L = fk.L
-    cell.G = {"_system": SystemSkill(fk)}
+    cell.G = {"_system": sys_skill}
     return cell
 
 
