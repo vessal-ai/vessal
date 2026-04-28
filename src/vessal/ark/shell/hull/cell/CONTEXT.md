@@ -3,7 +3,7 @@
 Single-frame SORA execution engine. Encapsulates Kernel (execution) and Core (inference), driving one Ping → Core → Pong → Kernel → FrameRecord cycle via step().
 
 Responsible for:
-- Single-frame execution orchestration (step()): kernel.ping(pong, namespace) → state_gate → core.step → action_gate → kernel.ping(pong, namespace) (exec+commit+render)
+- Single-frame execution orchestration (step()): kernel.ping(None, ns) [bootstrap, first call only] → state_gate → core.step → action_gate → kernel.ping(pong, ns) [exec+commit+render]
 - Lifecycle and mode switching for ActionGate and StateGate
 - Read/write proxy for namespace (get / set / keys / ns pass-through to Kernel)
 - Snapshot serialization and restore (pass-through to Kernel; Skill manifest is Hull's concern)
@@ -42,7 +42,7 @@ Cell is a leaf: execution engine only. These constraints are executable — see 
 
 ## Invariants
 
-- `ns["_frame"]` increments exactly once per frame, inside `_commit_frame`. The in-progress frame number is an explicit parameter passed through the call chain.
+- `ns["_frame"]` increments exactly once per frame, inside `_commit` (the private helper). The in-progress frame number is an explicit parameter passed through the call chain.
 - `ns["sleep"]` is `Kernel.sleep` bound method. Re-bound by `_migrate_snapshot()` after restore so closures do not capture stale state.
 - `ns["_errors"]` capped by `ns["_error_buffer_cap"]` (default 200) via `append_error()` in `_errors_helper.py`.
 - `cell.ping` / `cell.pong` are projections from `FrameStream.latest_hot_frame()`, updated at the end of each `step()`.
@@ -107,4 +107,4 @@ None.
 ### Active
 - 2026-04-09: FrameRecord schema v6 landed, added ping field (Ping.to_dict/from_dict), from_dict is compatible with v5.
 - 2026-04-13: Core.step() returns (Pong, prompt_tokens, completion_tokens) tuple; Cell.step() overwrites _context_pct with real API token data (_actual_tokens_in/_actual_tokens_out); protocol exceptions written to _errors (ErrorRecord).
-- 2026-04-28: Cell.step() collapses to two kernel.ping() calls (render-only + exec+commit); kernel.prepare() and kernel.step() are deleted. Frame outputs land in L["observation"] (Observation dataclass) and L["verdict"] (Verdict | None).
+- 2026-04-28: Cell.step() uses kernel.ping(None, ns) for bootstrap (render-only, first call once) and kernel.ping(pong, ns) for every subsequent frame (exec+commit+render); kernel.prepare() and kernel.step() are deleted. Frame outputs land in L["observation"] (Observation dataclass) and L["verdict"] (Verdict | None).
