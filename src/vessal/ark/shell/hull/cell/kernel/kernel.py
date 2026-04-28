@@ -247,12 +247,25 @@ class Kernel:
         import tempfile
 
         path = str(path)
+        from vessal.ark.shell.hull.cell.kernel.hibernate import call_hibernate, has_hibernate
+
         to_dump: dict = {}
         for key, value in self.L.items():
             if key in self._transient_names:
                 continue
             if is_transient_value(value):
                 continue
+            if has_hibernate(value):
+                try:
+                    to_dump[key] = call_hibernate(value)
+                    continue
+                except Exception as exc:
+                    to_dump[key] = DeadHandle(
+                        kind=type(value).__name__,
+                        origin=key,
+                        reason=f"hibernate raised: {exc}",
+                    )
+                    continue
             try:
                 cloudpickle.dumps(value)
             except Exception as exc:
@@ -280,9 +293,24 @@ class Kernel:
 
     def restore(self, path: str) -> None:
         """Restore L from file. sys.modules populated by boot script before this runs."""
+        from vessal.ark.shell.hull.cell.kernel.hibernate import call_wake, is_hibernated_tuple
+        from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
+
         with open(path, "rb") as f:
             raw = f.read()
-        self.L = LenientUnpickler(io.BytesIO(raw)).load()
+        loaded = LenientUnpickler(io.BytesIO(raw)).load()
+
+        for key, value in list(loaded.items()):
+            if is_hibernated_tuple(value):
+                try:
+                    loaded[key] = call_wake(value)
+                except Exception as exc:
+                    cls = value[1]
+                    loaded[key] = UnresolvedRef(
+                        cls.__module__, cls.__qualname__,
+                        f"wake raised: {exc}",
+                    )
+        self.L = loaded
 
     # ------------------------------------------------------------------ Private helpers
 
