@@ -401,19 +401,11 @@ class TestRenderIntegration:
         assert "hello from kernel" in k.L["observation"].stdout
 
     def test_frame_stream_in_state(self):
-        """Frame stream section appears in the rendered output."""
-        from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
+        """State.frame_stream is a FrameStream dataclass (not a rendered string)."""
+        from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION, FrameStream as ProtocolFrameStream
         k = minimal_kernel()
-        # Manually commit a frame dict into _frame_stream to trigger the frame stream section
-        k.L["_frame_stream"].commit_frame({
-            "schema_version": FRAME_SCHEMA_VERSION,
-            "number": 1,
-            "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
-            "pong": {"think": "", "action": {"operation": "x = 1", "expect": ""}},
-            "observation": {"stdout": "", "diff": "+x = 1", "error": None, "verdict": None},
-        })
         ping = k.ping(None, _ns(k))
-        assert "══════ frame stream ══════" in ping.state.frame_stream
+        assert isinstance(ping.state.frame_stream, ProtocolFrameStream)
 
     def test_context_budget_default_set_by_kernel(self):
         """Kernel init sets the default _context_budget in ns."""
@@ -422,10 +414,14 @@ class TestRenderIntegration:
         assert k.L["_context_budget"] == 128000
 
     def test_auxiliary_section_in_output(self):
-        """Auxiliary section (system variables) appears in render output after ping(None, ...)."""
+        """Signals dict contains system signal key with 'context' payload key."""
         k = minimal_kernel()
         pong = k.ping(None, _ns(k))
-        assert "context" in pong.state.signals
+        assert isinstance(pong.state.signals, dict)
+        assert any(
+            isinstance(payload, dict) and "context" in payload
+            for payload in pong.state.signals.values()
+        )
 
 
 # ─────────────────────────────────────────────

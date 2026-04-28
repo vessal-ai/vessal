@@ -8,6 +8,7 @@ from __future__ import annotations
 from vessal.ark.shell.hull.cell.protocol import (
     Action,
     FrameRecord,
+    FrameStream,
     Observation,
     Ping,
     Pong,
@@ -30,7 +31,7 @@ def _make_record_dict(
 ) -> dict:
     record = FrameRecord(
         number=number,
-        ping=Ping(system_prompt="", state=State(frame_stream="", signals="")),
+        ping=Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})),
         pong=Pong(think=think, action=Action(operation=operation, expect=expect)),
         observation=Observation(stdout=stdout, diff=diff, error=error, verdict=verdict),
     )

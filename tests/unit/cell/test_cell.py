@@ -626,7 +626,11 @@ class TestFreshPingPerFrame:
         # Verify the Ping used for the second step contained the new signal
         # cell.ping is set at the start of step() by prepare()
         assert cell.ping is not None
-        assert "signal_was_seen" in cell.ping.state.signals
+        signals = cell.ping.state.signals
+        assert any(
+            isinstance(payload, dict) and payload.get("status") == "signal_was_seen"
+            for payload in signals.values()
+        )
 
 
 # ============================================================

@@ -3,7 +3,10 @@ from vessal.ark.shell.hull.cell.protocol import (
     Action, State, Pong, Ping, Observation, StepResult, FrameRecord,
     Verdict, VerdictFailure,
     FRAME_SCHEMA_VERSION,
+    FrameStream, Entry, FrameContent,
 )
+
+_EMPTY_FS = FrameStream(entries=[])
 
 
 class TestAction:
@@ -24,56 +27,57 @@ class TestAction:
 
 class TestState:
     def test_fields(self):
-        s = State(frame_stream="frames", signals="sigs")
-        assert s.frame_stream == "frames"
-        assert s.signals == "sigs"
+        s = State(frame_stream=_EMPTY_FS, signals={("A", "b", "L"): {"x": 1}})
+        assert s.frame_stream is _EMPTY_FS
+        assert s.signals == {("A", "b", "L"): {"x": 1}}
 
     def test_immutable(self):
-        s = State(frame_stream="a", signals="b")
+        s = State(frame_stream=_EMPTY_FS, signals={})
         with pytest.raises(Exception):
-            s.frame_stream = "x"  # frozen
+            s.frame_stream = FrameStream(entries=[])  # frozen
 
     def test_to_dict(self):
-        s = State(frame_stream="fs", signals="sig")
-        assert s.to_dict() == {"frame_stream": "fs", "signals": "sig"}
+        s = State(frame_stream=_EMPTY_FS, signals={})
+        d = s.to_dict()
+        assert d == {"frame_stream": {"entries": []}, "signals": {}}
 
     def test_from_dict_roundtrip(self):
-        s = State(frame_stream="fs", signals="sig")
+        s = State(frame_stream=_EMPTY_FS, signals={})
         s2 = State.from_dict(s.to_dict())
         assert s2 == s
 
     def test_from_dict_missing_keys_defaults(self):
         s = State.from_dict({})
-        assert s.frame_stream == ""
-        assert s.signals == ""
+        assert s.frame_stream == FrameStream(entries=[])
+        assert s.signals == {}
 
 
 class TestPing:
     def test_two_fields(self):
-        p = Ping(system_prompt="sys", state=State(frame_stream="frames", signals="sigs"))
+        p = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         assert p.system_prompt == "sys"
-        assert p.state.frame_stream == "frames"
-        assert p.state.signals == "sigs"
+        assert p.state.frame_stream == _EMPTY_FS
+        assert p.state.signals == {}
 
     def test_immutable(self):
-        p = Ping(system_prompt="a", state=State(frame_stream="b", signals="c"))
+        p = Ping(system_prompt="a", state=State(frame_stream=_EMPTY_FS, signals={}))
         with pytest.raises(Exception):
             p.system_prompt = "x"  # frozen
 
     def test_to_dict(self):
-        p = Ping(system_prompt="sys", state=State(frame_stream="fs", signals="sig"))
+        p = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         d = p.to_dict()
-        assert d == {"system_prompt": "sys", "state": {"frame_stream": "fs", "signals": "sig"}}
+        assert d == {"system_prompt": "sys", "state": {"frame_stream": {"entries": []}, "signals": {}}}
 
     def test_from_dict_roundtrip(self):
-        p = Ping(system_prompt="sys", state=State(frame_stream="fs", signals="sig"))
+        p = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         p2 = Ping.from_dict(p.to_dict())
         assert p2 == p
 
     def test_from_dict_missing_keys_defaults(self):
         p = Ping.from_dict({})
         assert p.system_prompt == ""
-        assert p.state.frame_stream == ""
+        assert p.state.frame_stream == FrameStream(entries=[])
 
 
 class TestPong:
@@ -131,7 +135,7 @@ class TestFrameRecord:
         assert FRAME_SCHEMA_VERSION == 7
 
     def _make_record(self, number: int = 1) -> FrameRecord:
-        ping = Ping(system_prompt="sys", state=State(frame_stream="fs", signals="sig"))
+        ping = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         pong = Pong(think="", action=Action(operation="pass", expect=""))
         obs = Observation(stdout="", diff="", error=None, verdict=None)
         return FrameRecord(number=number, ping=ping, pong=pong, observation=obs)
@@ -150,13 +154,13 @@ class TestFrameRecord:
     def test_to_dict(self):
         pong = Pong(think="t", action=Action(operation="x=1", expect=""))
         obs = Observation(stdout="out", diff="+x = 1", error=None, verdict=None)
-        ping = Ping(system_prompt="sys", state=State(frame_stream="fs", signals="sig"))
+        ping = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         fr = FrameRecord(number=3, ping=ping, pong=pong, observation=obs)
         d = fr.to_dict()
         assert d["schema_version"] == 7
         assert d["number"] == 3
         assert d["ping"]["system_prompt"] == "sys"
-        assert d["ping"]["state"]["signals"] == "sig"
+        assert d["ping"]["state"]["signals"] == {}
         assert d["pong"]["action"]["operation"] == "x=1"
         assert d["observation"]["stdout"] == "out"
         assert "frame_type" not in d
@@ -185,7 +189,7 @@ class TestFrameRecord:
         fr = FrameRecord.from_dict(v5)
         assert fr.number == 1
         assert fr.ping.system_prompt == ""
-        assert fr.ping.state.frame_stream == ""
+        assert fr.ping.state.frame_stream == FrameStream(entries=[])
 
     def test_from_dict_no_version_check(self):
         # from_dict should NOT raise on version mismatch — migration is handled elsewhere
@@ -203,14 +207,14 @@ class TestFrameRecord:
         assert fr2.number == 1
 
     def test_frame_record_v6_includes_ping(self):
-        ping = Ping(system_prompt="sys", state=State(frame_stream="fs", signals="sig"))
+        ping = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         pong = Pong(think="t", action=Action(operation="x=1", expect=""))
         obs = Observation(stdout="", diff="+ x: 1", error=None, verdict=None)
         record = FrameRecord(number=1, ping=ping, pong=pong, observation=obs)
         d = record.to_dict()
         assert d["schema_version"] == 7
         assert d["ping"]["system_prompt"] == "sys"
-        assert d["ping"]["state"]["signals"] == "sig"
+        assert d["ping"]["state"]["signals"] == {}
 
 
 def test_compaction_record_roundtrip():

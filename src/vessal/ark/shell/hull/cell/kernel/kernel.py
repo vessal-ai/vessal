@@ -28,6 +28,7 @@ from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
 from vessal.ark.shell.hull.cell.protocol import (
     FRAME_SCHEMA_VERSION,
     FrameRecord,
+    FrameStream as ProtocolFrameStream,
     Observation,
     Ping,
     Pong,
@@ -362,7 +363,7 @@ class Kernel:
         """
         L = self.L
         effective_ping = ping_for_record if ping_for_record is not None else Ping(
-            system_prompt="", state=State(frame_stream="", signals="")
+            system_prompt="", state=State(frame_stream=ProtocolFrameStream(entries=[]), signals={})
         )
         record = FrameRecord(
             number=frame_number,

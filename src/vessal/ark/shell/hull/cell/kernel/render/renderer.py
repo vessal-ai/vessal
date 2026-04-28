@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from vessal.ark.shell.hull.cell.protocol import Ping, State
+from vessal.ark.shell.hull.cell.protocol import FrameStream as ProtocolFrameStream, Ping, State
 from vessal.ark.shell.hull.cell.kernel.render._frame_render import render_frame_stream
 from vessal.ark.shell.hull.cell.kernel.render._signal_render import render_signals
 from vessal.ark.shell.hull.cell.kernel.render._prompt_render import render_skill_protocols
@@ -96,22 +96,25 @@ def render(ns: dict, config: RenderConfig | None = None) -> Ping:
     frame_stream_text, dropped = render_frame_stream(ns, frame_budget)
     ns["_dropped_frame_count"] = dropped
 
-    # concatenate frame stream header
+    # concatenate frame stream header (used only for token counting)
     if frame_stream_text:
-        frame_stream = "══════ frame stream ══════\n" + frame_stream_text
+        frame_stream_text_header = "══════ frame stream ══════\n" + frame_stream_text
     else:
-        frame_stream = ""
+        frame_stream_text_header = ""
 
-    signals = render_signals(ns)
+    signals_text = render_signals(ns)
 
     # write context utilization
-    total_text = system_prompt + frame_stream + signals
+    total_text = system_prompt + frame_stream_text_header + signals_text
     total_tokens = estimate_tokens(total_text)
     ns["_context_pct"] = round(total_tokens / budget_total * 100) if budget_total > 0 else 0
 
     return Ping(
         system_prompt=system_prompt,
-        state=State(frame_stream=frame_stream, signals=signals),
+        state=State(
+            frame_stream=ProtocolFrameStream(entries=[]),
+            signals=ns.get("signals") or {},
+        ),
     )
 
 

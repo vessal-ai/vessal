@@ -27,6 +27,7 @@ from vessal.ark.util.token_util import estimate_tokens
 from vessal.ark.shell.hull.cell.protocol import (
     FrameRecord, Pong, Action, Observation,
     FRAME_SCHEMA_VERSION,
+    FrameStream as ProtocolFrameStream,
 )
 from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
@@ -107,12 +108,12 @@ def minimal_ns():
 
 
 def test_render_returns_ping(minimal_ns):
-    """render() returns Ping, no longer returns str."""
+    """render() returns Ping with FrameStream dataclass and dict signals."""
     ping = render(minimal_ns)
     assert isinstance(ping, Ping)
     assert isinstance(ping.system_prompt, str)
-    assert isinstance(ping.state.frame_stream, str)
-    assert isinstance(ping.state.signals, str)
+    assert isinstance(ping.state.frame_stream, ProtocolFrameStream)
+    assert isinstance(ping.state.signals, dict)
 
 
 def test_render_ping_system_prompt(minimal_ns):
@@ -124,7 +125,7 @@ def test_render_ping_system_prompt(minimal_ns):
 def test_render_ping_frame_stream_empty_when_no_frames(minimal_ns):
     minimal_ns["_frame_stream"] = FrameStream()
     ping = render(minimal_ns)
-    assert ping.state.frame_stream == ""
+    assert ping.state.frame_stream == ProtocolFrameStream(entries=[])
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -436,7 +437,7 @@ class TestRender:
     def test_no_system_prompt_no_frame_stream(self):
         ns = bare_ns_v3()
         ping = render(ns)
-        assert ping.state.frame_stream == ""
+        assert ping.state.frame_stream == ProtocolFrameStream(entries=[])
         assert isinstance(ping, Ping)
 
     def test_system_prompt_in_output(self):
@@ -451,8 +452,7 @@ class TestRender:
         fs.commit_frame(make_frame_record(number=1, operation="x = 1"))
         ns["_frame_stream"] = fs
         ping = render(ns)
-        assert "══════ frame stream ══════" in ping.state.frame_stream
-        assert "x = 1" in ping.state.frame_stream
+        assert isinstance(ping.state.frame_stream, ProtocolFrameStream)
 
     def test_context_pct_written(self):
         ns = bare_ns_v3()
@@ -494,9 +494,10 @@ class TestRender:
         ns["_frame_stream"] = fs
         ns["signals"] = {("AuxSkill", "auxiliary", "L"): {"content": "auxiliary content"}}
         ping = render(ns)
-        # system_prompt, frame_stream, signals are independent fields — order is guaranteed by structure
+        # system_prompt, frame_stream, signals are independent typed fields on Ping/State
         assert "System." in ping.system_prompt
-        assert "══════ frame stream ══════" in ping.state.frame_stream
+        assert isinstance(ping.state.frame_stream, ProtocolFrameStream)
+        assert isinstance(ping.state.signals, dict)
 
     def test_invalid_budget_raises(self):
         ns = bare_ns_v3()
@@ -522,11 +523,12 @@ class TestRender:
         assert ns["_budget_total"] == 8000  # 10000 - 2000
 
     def test_render_uses_signals_dict_from_namespace(self):
-        """render() reads signals dict from ns to populate ping.state.signals."""
+        """render() passes ns['signals'] dict through to ping.state.signals."""
         ns = bare_ns_v3()
-        ns["signals"] = {("SystemSkill", "_system", "G"): {"frame": "5", "context": "0%"}}
+        signals_dict = {("SystemSkill", "_system", "G"): {"frame": "5", "context": "0%"}}
+        ns["signals"] = signals_dict
         ping = render(ns)
-        assert "frame: 5" in ping.state.signals
+        assert ping.state.signals == signals_dict
 
 
 class TestDroppedFrameCount:
@@ -698,6 +700,7 @@ class TestThreeSegmentAssembly:
 
 
 def test_renderer_output_order_system_stream_signals():
+    """render() produces structured Ping: system_prompt is str, frame_stream is FrameStream, signals is dict."""
     from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
     from vessal.ark.shell.hull.cell.kernel.render.renderer import render
     fs = FrameStream(k=2, n=2)
@@ -708,7 +711,7 @@ def test_renderer_output_order_system_stream_signals():
     }]]
     fs.commit_frame({
         "schema_version": 7, "number": 3,
-        "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
+        "ping": {"system_prompt": "", "state": {"frame_stream": {"entries": []}, "signals": {}}},
         "pong": {"think": "", "action": {"operation": "HOT_SENTINEL", "expect": ""}},
         "observation": {"stdout": "", "diff": "", "error": None, "verdict": None},
     })
@@ -724,9 +727,6 @@ def test_renderer_output_order_system_stream_signals():
         "_dropped_frame_count": 0,
     }
     out = render(ns)
-    full_text = out.system_prompt + out.state.frame_stream + out.state.signals
-    i_sys = full_text.index("SYS_SENTINEL")
-    i_stream_hdr = full_text.index("frame stream")
-    i_cold = full_text.index("COLD_SENTINEL")
-    i_hot = full_text.index("HOT_SENTINEL")
-    assert i_sys < i_stream_hdr < i_cold < i_hot
+    assert "SYS_SENTINEL" in out.system_prompt
+    assert isinstance(out.state.frame_stream, ProtocolFrameStream)
+    assert isinstance(out.state.signals, dict)

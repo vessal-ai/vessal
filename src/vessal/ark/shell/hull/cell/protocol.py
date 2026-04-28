@@ -257,35 +257,78 @@ class FrameStream:
 
 @dataclass(frozen=True, slots=True)
 class State:
-    """Dynamic observation part of Ping. frame_stream + signals.
+    """Spec §4.8 dynamic perceptual state. Kernel populates with dataclass +
+    dict; Core composer stringifies before LLM call.
 
     Attributes:
-        frame_stream: Historical frame summary text (rendered by Kernel).
-        signals: Current system signal text (e.g. goal, vars, verdict, etc.).
+        frame_stream: FrameStream dataclass (visible Entry list per spec §4.10).
+        signals:      dict[(class_name, var_name, scope), payload_dict] from
+                      L["signals"] (spec §6 + §4.4).
     """
 
-    frame_stream: str
-    signals: str
+    frame_stream: "FrameStream"
+    signals: dict
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to a dict.
-
-        Returns:
-            Dict with keys: frame_stream, signals.
-        """
-        return {"frame_stream": self.frame_stream, "signals": self.signals}
+        return {
+            "frame_stream": _framestream_to_dict(self.frame_stream),
+            "signals": {
+                "::".join(k): v for k, v in self.signals.items()
+            },
+        }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "State":
-        """Deserialize from a dict.
+        fs_data = d.get("frame_stream", {"entries": []})
+        signals_data = d.get("signals", {})
+        return cls(
+            frame_stream=_framestream_from_dict(fs_data),
+            signals={tuple(k.split("::")): v for k, v in signals_data.items()},
+        )
 
-        Args:
-            d: Dict with keys frame_stream and signals (missing keys default to empty string).
 
-        Returns:
-            State instance.
-        """
-        return cls(frame_stream=d.get("frame_stream", ""), signals=d.get("signals", ""))
+def _framestream_to_dict(fs: "FrameStream") -> dict:
+    return {
+        "entries": [
+            {
+                "layer": e.layer,
+                "n_start": e.n_start,
+                "n_end": e.n_end,
+                "content": _content_to_dict(e.content),
+            }
+            for e in fs.entries
+        ],
+    }
+
+
+def _content_to_dict(content) -> dict:
+    if isinstance(content, FrameContent):
+        return {
+            "kind": "frame",
+            "think": content.think,
+            "operation": content.operation,
+            "expect": content.expect,
+            "observation": content.observation,
+            "verdict": content.verdict,
+            "signals": {"::".join(k): v for k, v in content.signals.items()},
+        }
+    return {"kind": "summary", "schema_version": content.schema_version, "body": content.body}
+
+
+def _framestream_from_dict(d: dict) -> "FrameStream":
+    entries = []
+    for e in d.get("entries", []):
+        c = e["content"]
+        if c["kind"] == "frame":
+            content = FrameContent(
+                think=c["think"], operation=c["operation"], expect=c["expect"],
+                observation=c["observation"], verdict=c["verdict"],
+                signals={tuple(k.split("::")): v for k, v in c["signals"].items()},
+            )
+        else:
+            content = SummaryContent(schema_version=c["schema_version"], body=c["body"])
+        entries.append(Entry(layer=e["layer"], n_start=e["n_start"], n_end=e["n_end"], content=content))
+    return FrameStream(entries=entries)
 
 
 # ─────────────────────────────────────────────
@@ -420,7 +463,7 @@ class FrameRecord:
         ping = (
             Ping.from_dict(ping_data)
             if ping_data is not None
-            else Ping(system_prompt="", state=State(frame_stream="", signals=""))
+            else Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={}))
         )
         return cls(
             number=d["number"],

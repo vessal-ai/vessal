@@ -9,6 +9,7 @@ from vessal.ark.shell.hull.cell.protocol import (
     FRAME_SCHEMA_VERSION,
     Action,
     FrameRecord,
+    FrameStream,
     Observation,
     Ping,
     Pong,
@@ -42,7 +43,7 @@ def make_frame(
     obs = Observation(stdout=stdout, diff=diff, error=error, verdict=verdict)
     return FrameRecord(
         number=number,
-        ping=Ping(system_prompt="", state=State(frame_stream="", signals="")),
+        ping=Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})),
         pong=pong,
         observation=obs,
     )

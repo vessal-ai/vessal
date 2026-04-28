@@ -16,6 +16,7 @@ import pytest
 from vessal.ark.shell.hull.cell.protocol import (
     Action,
     FrameRecord,
+    FrameStream,
     Observation,
     Ping,
     Pong,
@@ -79,7 +80,7 @@ def make_frame_record(**overrides) -> FrameRecord:
     """Construct a minimal valid FrameRecord, supporting field overrides."""
     defaults: dict = {
         "number": 1,
-        "ping": Ping(system_prompt="", state=State(frame_stream="", signals="")),
+        "ping": Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})),
         "pong": make_pong(),
         "observation": make_observation(),
     }
