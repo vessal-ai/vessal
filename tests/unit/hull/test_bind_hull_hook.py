@@ -22,11 +22,11 @@ def hull_factory(tmp_path, monkeypatch):
 
 
 def test_bind_hull_called_when_method_defined(hull_factory, monkeypatch):
-    from vessal.ark.shell.hull.skill import SkillBase
+    from vessal.skills._base import BaseSkill
 
     called = {}
 
-    class ProbeSkill(SkillBase):
+    class ProbeSkill(BaseSkill):
         name = "probe"
         description = "test"
 
@@ -45,9 +45,9 @@ def test_bind_hull_called_when_method_defined(hull_factory, monkeypatch):
 
 
 def test_skill_without_bind_hull_still_loads(hull_factory, monkeypatch):
-    from vessal.ark.shell.hull.skill import SkillBase
+    from vessal.skills._base import BaseSkill
 
-    class PlainSkill(SkillBase):
+    class PlainSkill(BaseSkill):
         name = "plain"
         description = "no hook"
 

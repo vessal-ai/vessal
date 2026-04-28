@@ -1,21 +1,11 @@
 # tests/test_auxiliary.py — Auxiliary signal module tests
 #
-# Tests the render(ns) function for each module under signals/.
-# Each module is tested independently.
-#
-# kernel/signals/ is the new implementation (no required budget parameter).
+# Tests skill signal_update() contracts for Tasks and Pin skills.
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.render.signals import (
-    namespace_dir as k_namespace_dir,
-    system_vars as k_system_vars,
-    verdict as k_verdict,
-)
 from vessal.skills.tasks.skill import Tasks as _Tasks
 from vessal.skills.pin.skill import Pin as _Pin
-
-from vessal.ark.shell.hull.cell.protocol import Verdict, VerdictFailure
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -103,109 +93,6 @@ class TestTasksSignal:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# kernel/signals/verdict.py (NEW)
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TestVerdictSignal:
-    def test_no_verdict_returns_empty(self):
-        ns = {}
-        assert k_verdict.render(ns) == ""
-
-    def test_verdict_none_returns_empty(self):
-        ns = {"verdict": None}
-        assert k_verdict.render(ns) == ""
-
-    def test_all_passed_no_failures(self):
-        v = Verdict(total=3, passed=3, failures=())
-        ns = {"verdict": v}
-        result = k_verdict.render(ns)
-        assert "3/3" in result
-        assert "assertions passed" in result
-
-    def test_partial_pass_shown(self):
-        v = Verdict(total=4, passed=2, failures=(
-            VerdictFailure(kind="assertion_failed", assertion="assert x == 1", message="x was 0"),
-            VerdictFailure(kind="assertion_failed", assertion="assert y > 0", message="y was -1"),
-        ))
-        ns = {"verdict": v}
-        result = k_verdict.render(ns)
-        assert "2/4" in result
-
-    def test_failures_shown(self):
-        failure = VerdictFailure(
-            kind="assertion_failed",
-            assertion="assert x == 1",
-            message="x was 0",
-        )
-        v = Verdict(total=1, passed=0, failures=(failure,))
-        ns = {"verdict": v}
-        result = k_verdict.render(ns)
-        assert "assertion_failed" in result
-        assert "assert x == 1" in result
-        assert "x was 0" in result
-
-    def test_failure_format(self):
-        failure = VerdictFailure(
-            kind="assertion_failed",
-            assertion="assert z",
-            message="z is False",
-        )
-        v = Verdict(total=1, passed=0, failures=(failure,))
-        ns = {"verdict": v}
-        result = k_verdict.render(ns)
-        # Format: [kind] assertion — message
-        assert "[assertion_failed]" in result
-        assert "—" in result
-
-    def test_no_failure_section_when_all_pass(self):
-        v = Verdict(total=2, passed=2, failures=())
-        ns = {"verdict": v}
-        result = k_verdict.render(ns)
-        # No failure lines when no failures
-        lines = result.splitlines()
-        assert len(lines) == 1  # only summary line
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# kernel/signals/namespace_dir.py
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TestNamespaceDirSignal:
-    def test_renders_user_vars(self):
-        ns = {"x": 42, "_frame": 1}
-        result = k_namespace_dir.render(ns)
-        assert "x" in result
-        assert "int" in result
-
-    def test_excludes_system_vars(self):
-        ns = {"_frame": 1, "_progress": "p", "result": "done"}
-        result = k_namespace_dir.render(ns)
-        assert "_frame" not in result
-        assert "_progress" not in result
-        assert "result" in result
-
-    def test_excludes_builtin_names(self):
-        ns = {"load": lambda: None, "_builtin_names": ["load"]}
-        result = k_namespace_dir.render(ns)
-        assert "load" not in result
-
-    def test_empty_namespace(self):
-        ns = {"_frame": 1, "_builtin_names": []}
-        result = k_namespace_dir.render(ns)
-        assert "(empty)" in result
-
-    def test_label_present(self):
-        ns = {"x": 1}
-        result = k_namespace_dir.render(ns)
-        assert "x:" in result  # variable name shown
-
-    def test_no_budget_param_required(self):
-        ns = {"x": 1}
-        result = k_namespace_dir.render(ns)
-        assert result != ""
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # skills/pin/signals.py — compute_pin_signal
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -242,26 +129,3 @@ class TestPinsSignal:
     def test_no_budget_param_required(self):
         result = _run_pin_signal({"x"}, {"x": 1})
         assert result != ""
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# kernel/signals/system_vars.py
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TestSystemVarsSignal:
-    def test_renders_frame_number(self):
-        ns = {"_frame": 42}
-        result = k_system_vars.render(ns)
-        assert "42" in result
-
-    def test_always_returns_string(self):
-        result = k_system_vars.render({})
-        assert isinstance(result, str)
-        assert len(result) > 0
-
-    def test_no_budget_param_required(self):
-        ns = {"_frame": 1}
-        result = k_system_vars.render(ns)
-        assert result != ""
-
-

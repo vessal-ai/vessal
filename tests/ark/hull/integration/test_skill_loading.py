@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from vessal.ark.shell.hull.skill_loader import SkillLoader
-from vessal.ark.shell.hull.skill import SkillBase
+from vessal.skills._base import BaseSkill
 
 
 @pytest.fixture
@@ -17,13 +17,13 @@ def skill_env(tmp_path):
         "from .skill import TestSkill as Skill\n__all__ = ['Skill']\n"
     )
     (skill_dir / "skill.py").write_text(
-        "from vessal.ark.shell.hull.skill import SkillBase\n"
-        "class TestSkill(SkillBase):\n"
+        "from vessal.skills._base import BaseSkill\n"
+        "class TestSkill(BaseSkill):\n"
         "    name = 'test_skill'\n"
         "    description = 'Test skill.'\n"
         "    def hello(self): return 'world'\n"
-        "    def _signal(self):\n"
-        "        return ('test_skill', 'test_signal')\n"
+        "    def signal_update(self):\n"
+        "        self.signal = {'status': 'test_signal'}\n"
     )
     (skill_dir / "SKILL.md").write_text(
         "---\nname: test_skill\ndescription: Test skill.\n---\nTest guide body.\n"
@@ -31,10 +31,10 @@ def skill_env(tmp_path):
     return tmp_path
 
 
-def test_load_returns_skillbase_subclass(skill_env):
+def test_load_returns_baseskill_subclass(skill_env):
     sm = SkillLoader(skill_paths=[str(skill_env)])
     cls = sm.load("test_skill")
-    assert issubclass(cls, SkillBase)
+    assert issubclass(cls, BaseSkill)
 
 
 def test_load_sets_guide(skill_env):
@@ -47,8 +47,8 @@ def test_instance_signal(skill_env):
     sm = SkillLoader(skill_paths=[str(skill_env)])
     cls = sm.load("test_skill")
     instance = cls()
-    result = instance._signal()
-    assert result == ("test_skill", "test_signal")
+    instance.signal_update()
+    assert instance.signal == {"status": "test_signal"}
 
 
 def test_list_skills(skill_env):

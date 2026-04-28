@@ -17,8 +17,8 @@ def tmp_skill(tmp_path):
         "from .skill import Dummy as Skill\n"
     )
     (skill_dir / "skill.py").write_text(
-        "from vessal.ark.shell.hull.skill import SkillBase\n"
-        "class Dummy(SkillBase):\n"
+        "from vessal.skills._base import BaseSkill\n"
+        "class Dummy(BaseSkill):\n"
         "    name = 'dummy'\n"
         "    description = 'A dummy skill.'\n"
     )
@@ -39,8 +39,8 @@ def test_list_skills(tmp_skill):
 def test_load_returns_class(tmp_skill):
     sm = SkillLoader(skill_paths=[str(tmp_skill)])
     cls = sm.load("dummy")
-    from vessal.ark.shell.hull.skill import SkillBase
-    assert issubclass(cls, SkillBase)
+    from vessal.skills._base import BaseSkill
+    assert issubclass(cls, BaseSkill)
     assert cls.name == "dummy"
     assert cls.guide == "Dummy guide body."
 
@@ -179,8 +179,8 @@ def _make_skill_dir(base: Path, name: str, requires_skills: list[str] | None = N
         f"from .skill import {class_name} as Skill\n"
     )
     (skill_dir / "skill.py").write_text(
-        f"from vessal.ark.shell.hull.skill import SkillBase\n\n"
-        f"class {class_name}(SkillBase):\n"
+        f"from vessal.skills._base import BaseSkill\n\n"
+        f"class {class_name}(BaseSkill):\n"
         f"    name = '{name}'\n"
         f"    description = 'test skill'\n"
     )
