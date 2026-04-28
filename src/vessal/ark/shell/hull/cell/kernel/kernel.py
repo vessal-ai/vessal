@@ -3,18 +3,14 @@
 # lives in L (Agent state dict). G holds preset assets (Skills, boot globals).
 #
 # Public interface:
-#   run(pong, tracer)              single-frame execution: exec → expect → frame → commit
-#   prepare()                      per-frame init: update_signals → render → Ping
-#   exec_operation(operation, frame_number, tracer) -> ExecResult
-#                      execute operation code; does NOT increment _frame or commit to _frame_stream
-#   eval_expect(expect, tracer)  -> Verdict
-#                      evaluate prediction assertions on a shallow copy of L;
-#                      does NOT modify the real L
-#   render()           render current state only, without executing code
-#   snapshot(path)     serialize L to a file
-#   restore(path)      restore L from a file
-#   L                  Agent state dict, fully exposed, readable/writable directly
-#   G                  preset assets dict (Skills, boot globals); read-only by convention
+#   ping(pong, namespace)          single-frame primitive (spec §1.2): exec → eval → signals → commit → render
+#   snapshot(path)                 serialize L to a file
+#   restore(path)                  restore L from a file
+#   L                              Agent state dict, fully exposed, readable/writable directly
+#   G                              preset assets dict (Skills, boot globals); read-only by convention
+#
+# Legacy multi-entry surface (prepare/step/exec_operation/eval_expect/update_signals/render/_commit_frame)
+# is inlined into ping() and deleted in PR 2 Task 7.
 #
 # Initialization: decides where to start (fresh L or snapshot restore),
 # and initializes all system variables.
