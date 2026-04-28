@@ -239,21 +239,19 @@ class HullRuntimeMixin:
         return self._event_loop.event_queue
 
     def _rewrite_runtime_owned(self) -> None:
-        """Re-fill runtime-owned variables each frame: _frame_type, _system_prompt, _soul.
+        """Re-fill runtime-owned variables each frame: _soul in G.
 
-        Hull is the source of truth for these variables; the model may read but should not modify them.
+        Hull is the source of truth for _soul; the model may read but should not modify it.
+        _system_prompt is written to G once at init time by _init_loop and is not re-written
+        per frame.
         """
-        self._cell.L["_frame_type"] = "work"
         # SOUL hot-reload: detect SOUL.md changes each frame (mtime check ~1μs).
-        # Re-read on change; otherwise use cached value. Must run before build() so
-        # _soul is in L when Section("soul") reads ns.get("_soul").
         if self._soul_path.exists():
             current_mtime = self._soul_path.stat().st_mtime
             if current_mtime != self._soul_mtime:
                 self._soul_text = self._soul_path.read_text(encoding="utf-8")
                 self._soul_mtime = current_mtime
-        self._cell.L["_soul"] = self._soul_text
-        self._cell.L["_system_prompt"] = self._prompt_builder.build(self._cell.L)
+        self._cell.G["_soul"] = self._soul_text
 
     def _after_frame(self) -> None:
         """Called after each successful frame."""

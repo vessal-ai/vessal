@@ -189,14 +189,14 @@ class TestRunLoop:
         assert hull._cell.L.get("_sleeping") is False
 
     def test_frame_loop_rewrite_runtime_owned_each_frame(self, tmp_path):
-        """_frame_type is reset to "work" before each frame's step()."""
+        """_rewrite_runtime_owned runs before each frame; G['_soul'] is present when step() is called."""
         hull = _make_hull(tmp_path)
-        frame_types_seen = []
+        soul_seen = []
 
         original_step = hull._cell.step
 
         def capturing_step(tracer=None):
-            frame_types_seen.append(hull._cell.L.get("_frame_type"))
+            soul_seen.append(hull._cell.G.get("_soul"))
             return original_step(tracer)
 
         hull._cell.step = capturing_step
@@ -209,7 +209,7 @@ class TestRunLoop:
         hull._cell.L["_sleeping"] = False
         _run_frame_loop(hull)
 
-        assert all(ft == "work" for ft in frame_types_seen)
+        assert all(s is not None for s in soul_seen)
 
     def test_frame_loop_preserves_namespace_across_runs(self, tmp_path):
         """Namespace is preserved between multiple _frame_loop() calls."""
@@ -384,22 +384,23 @@ class TestNamespaceAccess:
 # ============================================================
 
 
-class TestFrameType:
-    def test_frame_type_default_is_work(self, tmp_path):
-        """_frame_type is "work" after Hull initialization."""
+class TestRuntimeOwned:
+    def test_soul_in_g_after_init(self, tmp_path):
+        """G['_soul'] is set after Hull initialization."""
         hull = _make_hull(tmp_path)
-        assert hull._cell.L["_frame_type"] == "work"
+        assert "_soul" in hull._cell.G
 
-    def test_frame_type_in_ns(self, tmp_path):
-        """_frame_type exists in namespace."""
+    def test_system_prompt_in_g_after_init(self, tmp_path):
+        """G['_system_prompt'] is set after Hull initialization and not in L."""
         hull = _make_hull(tmp_path)
-        assert "_frame_type" in hull._cell.L
+        assert "_system_prompt" in hull._cell.G
+        assert "_system_prompt" not in hull._cell.L
 
-    def test_rewrite_runtime_owned_sets_frame_type(self, tmp_path):
-        """_rewrite_runtime_owned always sets _frame_type to "work"."""
+    def test_rewrite_runtime_owned_updates_soul_in_g(self, tmp_path):
+        """_rewrite_runtime_owned writes _soul to G."""
         hull = _make_hull(tmp_path)
         hull._rewrite_runtime_owned()
-        assert hull._cell.L["_frame_type"] == "work"
+        assert "_soul" in hull._cell.G
 
 
 # ============================================================
@@ -435,18 +436,17 @@ class TestSkills:
 
 class TestSoulMd:
     def test_soul_loaded_from_file(self, tmp_path):
-        """SOUL.md content is loaded into _soul when present (no longer placed in _system_prompt)."""
+        """SOUL.md content is loaded into G['_soul'] when present."""
         soul_content = "# Agent Identity\nYou are a data analysis expert."
         hull = _make_hull(tmp_path, soul_content=soul_content)
-        # _soul holds the raw SOUL.md text; _system_prompt contains only kernel protocol
-        assert soul_content == hull._cell.L["_soul"]
-        assert "Execution Model" in hull._cell.L["_system_prompt"]
+        assert soul_content == hull._cell.G["_soul"]
+        assert "Execution Model" in hull._cell.G["_system_prompt"]
 
     def test_soul_empty_when_no_file(self, tmp_path):
-        """_soul is empty string when SOUL.md does not exist; _system_prompt contains only runtime protocol."""
+        """_soul is empty string in G when SOUL.md does not exist."""
         hull = _make_hull(tmp_path)
-        assert hull._cell.L["_soul"] == ""
-        assert "Execution Model" in hull._cell.L["_system_prompt"]
+        assert hull._cell.G["_soul"] == ""
+        assert "Execution Model" in hull._cell.G["_system_prompt"]
 
     def test_soul_shown_in_rendered_state(self, tmp_path):
         """SOUL.md content appears in the rendered Ping via three-part renderer concatenation."""

@@ -40,7 +40,6 @@ def bare_ns() -> dict:
         "_diff": "",
         "_context_budget": 128000,
         "_token_budget": 4096,
-        "_system_prompt": "",
         "_pins": set(),
         "_log_path": "",
         "_context_pct": 0,
@@ -347,8 +346,8 @@ class TestKernel:
         """After init, ns contains all required system variables (v5 format)."""
         k = minimal_kernel()
         assert k.L.get("_frame") == 0
-        # v5 vars
-        assert k.L.get("_system_prompt") == ""
+        # _system_prompt lives in G (written by boot script, never in L)
+        assert "_system_prompt" not in k.L
         # _frame_stream removed from L in PR 5 (reads from SQLite each ping)
         assert "_frame_stream" not in k.L
         # _history and _history_depth removed in v3
@@ -421,7 +420,7 @@ class TestKernel:
     def test_kernel_ping_returns_ping(self, tmp_path):
         from vessal.ark.shell.hull.cell.protocol import Ping
         kernel = minimal_kernel()
-        kernel.L["_system_prompt"] = "You are an agent."
+        kernel.G["_system_prompt"] = "You are an agent."
         ping = kernel.ping(None, _ns(kernel))
         assert isinstance(ping, Ping)
         assert ping.system_prompt == "You are an agent."
@@ -780,7 +779,7 @@ class TestPingReturnsPing:
         from vessal.ark.shell.hull.cell.protocol import Action, Ping, Pong
 
         k = minimal_kernel()
-        k.L["_system_prompt"] = "test"
+        k.G["_system_prompt"] = "test"
         pong = Pong(think="t", action=Action(operation="x = 1", expect=""))
         result = k.ping(pong, _ns(k))
         assert isinstance(result, Ping), f"Expected Ping, got {type(result)}"

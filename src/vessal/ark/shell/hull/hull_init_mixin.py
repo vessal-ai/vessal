@@ -255,6 +255,7 @@ class HullInitMixin:
         self._load_gate_files()
 
         self._rewrite_runtime_owned()
+        self._cell.G["_system_prompt"] = self._prompt_builder.build(self._cell.G)
 
         hooks = FrameHooks(
             before_frame=self._rewrite_runtime_owned,

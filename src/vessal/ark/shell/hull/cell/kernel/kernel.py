@@ -78,7 +78,6 @@ class Kernel:
         self.G: dict = {}
         # ① empty L — seed system defaults that every agent needs from frame 0
         self.L: dict = {
-            "_system_prompt": "",
             "_frame": 0,
             "signals": {},
             "_errors": [],
@@ -236,7 +235,7 @@ class Kernel:
         else:
             fs = FrameStream(entries=[])
         self._last_ping = Ping(
-            system_prompt=self.L.get("_system_prompt", ""),
+            system_prompt=self.G.get("_system_prompt", ""),
             state=State(frame_stream=fs, signals=dict(self.L.get("signals", {}))),
         )
         return self._last_ping
