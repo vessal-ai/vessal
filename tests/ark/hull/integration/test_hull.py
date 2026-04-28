@@ -119,12 +119,6 @@ class TestConfig:
         assert hull._cell.state_gate == "auto"
         assert hull._cell.action_gate == "auto"
 
-    def test_context_budget_set(self, tmp_path):
-        """[cell].context_budget is written to ns["_context_budget"]."""
-        toml = "[cell]\ncontext_budget = 64000"
-        hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._cell.L["_context_budget"] == 64000
-
     def test_core_timeout_forwarded(self, tmp_path):
         """[core].timeout is forwarded to Core."""
         toml = "[core]\ntimeout = 120.0"

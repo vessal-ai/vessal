@@ -51,17 +51,6 @@ class SystemSkill(BaseSkill):
 
         sig["frame"] = L.get("_frame", 0)
 
-        ctx_pct = L.get("_context_pct", 0)
-        budget_total = L.get("_budget_total", 0) or (
-            L.get("_context_budget", 128000) - L.get("_token_budget", 4096)
-        )
-        used = round(budget_total * ctx_pct / 100) if ctx_pct else 0
-        sig["context"] = f"{ctx_pct}% ({used}/{budget_total} tokens)"
-
-        frame_type = L.get("_frame_type", "")
-        if frame_type:
-            sig["frame_type"] = frame_type
-
         if self._wake:
             sig["wake"] = self._wake
 

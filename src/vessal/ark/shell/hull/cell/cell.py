@@ -206,14 +206,8 @@ class Cell:
             ))
             return StepResult(protocol_error=str(e))
 
-        # Real-token bookkeeping (deferred to PR 5; kept for now)
         if prompt_tokens is not None:
             self._kernel.L["_actual_tokens_in"] = prompt_tokens
-            budget_total = self._kernel.L.get("_budget_total", 0)
-            if budget_total > 0:
-                self._kernel.L["_context_pct"] = round(
-                    prompt_tokens / budget_total * 100
-                )
         if completion_tokens is not None:
             self._kernel.L["_actual_tokens_out"] = completion_tokens
 

@@ -327,12 +327,12 @@ class TestRenderIntegration:
         assert "_context_pct" not in k.L
 
     def test_auxiliary_section_in_output(self):
-        """Signals dict contains system signal key with 'context' payload key."""
+        """Signals dict contains at least one system signal key with a dict payload."""
         k = minimal_kernel()
         pong = k.ping(None, _ns(k))
         assert isinstance(pong.state.signals, dict)
         assert any(
-            isinstance(payload, dict) and "context" in payload
+            isinstance(payload, dict)
             for payload in pong.state.signals.values()
         )
 

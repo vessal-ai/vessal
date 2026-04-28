@@ -179,15 +179,6 @@ class HullInitMixin:
         self._tracer = Tracer(self._log_dir, enabled=trace_enabled)
         self._ensure_log_readme()
 
-        if "context_budget" in cell_cfg:
-            self._cell.L["_context_budget"] = cell_cfg["context_budget"]
-        else:
-            logger.warning(
-                "hull.toml missing [cell].context_budget; using default 128000. "
-                "Recommend setting a value matching the actual context window of OPENAI_MODEL."
-            )
-
-        self._cell.L["_token_budget"] = self._cell.max_tokens
         self._cell.L["_error_buffer_cap"] = cell_cfg.get("error_buffer_cap", 200)
 
         if "language" in agent_cfg:
