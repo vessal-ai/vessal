@@ -4,7 +4,7 @@ Hull is a single facade class (see tests/architecture/test_hull_facade.py).
 Its ~40 methods are grouped into four mixins by theme:
   - HullInitMixin       — hull.toml + Cell + venv + gates wiring
   - HullSkillsMixin     — Skill load/unload/reload + server lifecycle
-  - HullCompactionMixin — frame-stream compaction + snapshots
+  - HullSnapshotMixin   — snapshot management
   - HullRuntimeMixin    — runtime-owned vars + event loop + HTTP.handle()
 
 Callers only see Hull; the mixins are not re-exported.
@@ -15,11 +15,11 @@ from pathlib import Path
 
 from vessal.ark.shell.hull.hull_init_mixin import HullInitMixin
 from vessal.ark.shell.hull.hull_skills_mixin import HullSkillsMixin
-from vessal.ark.shell.hull.hull_compaction_mixin import HullCompactionMixin
+from vessal.ark.shell.hull.hull_snapshot_mixin import HullSnapshotMixin
 from vessal.ark.shell.hull.hull_runtime_mixin import HullRuntimeMixin
 
 
-class Hull(HullInitMixin, HullSkillsMixin, HullCompactionMixin, HullRuntimeMixin):
+class Hull(HullInitMixin, HullSkillsMixin, HullSnapshotMixin, HullRuntimeMixin):
     """Agent runtime orchestrator. See CONTEXT.md for the full responsibility statement."""
 
     def __init__(self, project_dir: str = ".") -> None:
@@ -38,8 +38,6 @@ class Hull(HullInitMixin, HullSkillsMixin, HullCompactionMixin, HullRuntimeMixin
 
         boot_entries = self._init_skills_pre(hull_cfg)
         self._init_cell(core_cfg, cell_cfg, agent_cfg, cells_cfg, boot_entries)
-        self._init_compression(hull_cfg)
         self._init_skills(hull_cfg)
         self._init_prompts(renderer_cfg)
         self._init_loop(gates_cfg)
-        self._resume_pending_compaction()

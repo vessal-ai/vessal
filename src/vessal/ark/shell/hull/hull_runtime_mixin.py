@@ -6,13 +6,10 @@ Methods here may assume the attributes set by Hull.__init__ are available via se
 from __future__ import annotations
 
 import logging
-import queue
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from concurrent.futures import ThreadPoolExecutor
-
     from vessal.ark.shell.hull.cell import Cell
     from vessal.ark.shell.hull.cell.core import Core
     from vessal.ark.shell.hull.cell.kernel import RenderConfig
@@ -137,7 +134,6 @@ class HullRuntimeMixin:
     def stop(self) -> None:
         """Request stop."""
         self._event_loop.stop()
-        self._thread_pool.shutdown(wait=False)
 
     def handle(self, method: str, path: str, body: dict | None = None) -> tuple[int, dict | "StaticResponse"]:
         """Single entry point for HTTP requests. Shell calls this; Hull routes internally.
@@ -184,9 +180,6 @@ class HullRuntimeMixin:
         if method == "POST" and path == "/stop":
             self.stop()
             return 200, {"status": "stopping"}
-        if method == "GET" and path == "/state/compactions":
-            fs = self._cell.L.get("_frame_stream")
-            return 200, ({} if fs is None else fs.project_compactions())
         if method == "POST" and path == "/reload/soul":
             self.reload_soul()
             return 200, {"status": "soul_reloaded"}
@@ -242,52 +235,5 @@ class HullRuntimeMixin:
                 self._soul_mtime = current_mtime
         self._cell.L["_soul"] = self._soul_text
 
-        # Drain compaction result queue and apply to FrameStream
-        fs = self._cell.L.get("_frame_stream")
-        if fs is None:
-            return
-        results_to_apply: list[tuple[dict, int]] = []
-        aborted = False
-        while True:
-            try:
-                item = self._result_queue.get_nowait()
-            except queue.Empty:
-                break
-            record, layer = item
-            if record in ("skip", "error"):
-                aborted = True
-                continue
-            results_to_apply.append((record, layer))
-        if aborted and not results_to_apply:
-            fs.abort_compaction()
-        if results_to_apply:
-            fs.apply_results(results_to_apply)
-            s = fs.stats()
-            frame_number = self._cell.L.get("_frame", 0)
-            self._tracer.log(frame_number, "compaction.layer_stats", "gauge", -1,
-                             f"hot={s['hot_counts']},cold={s['cold_counts']}")
-            self.snapshot()
-            self._compaction_frames_since_snapshot = 0
-
     def _after_frame(self) -> None:
-        """Called after each successful frame. Evaluates try_shift and submits compaction task if due."""
-        fs = self._cell.L.get("_frame_stream")
-        if fs is None:
-            return
-        frame_number = self._cell.L.get("_frame", 0)
-        task = fs.try_shift()
-        if task is None:
-            if len(fs._hot[0]) >= fs.k and fs.in_flight:
-                self._tracer.log(frame_number, "compaction.shift_blocked", "gauge", -1, "value=1")
-        else:
-            self._tracer.log(frame_number, "compaction.in_flight", "gauge", -1, "value=1")
-            raw = task.get("raw_bytes", 0)
-            stripped = task.get("stripped_bytes", 0)
-            if raw > 0:
-                self._tracer.log(frame_number, "compaction.stripping_ratio", "gauge", -1,
-                                 f"raw={raw},stripped={stripped}")
-            self._thread_pool.submit(self._run_compaction_task, task, frame_number)
-        self._compaction_frames_since_snapshot += 1
-        if self._compaction_frames_since_snapshot >= self._compaction_snapshot_every_n:
-            self.snapshot()
-            self._compaction_frames_since_snapshot = 0
+        """Called after each successful frame."""
