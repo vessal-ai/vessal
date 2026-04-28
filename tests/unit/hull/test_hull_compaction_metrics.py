@@ -43,7 +43,7 @@ def _make_hull(tmp_path):
 def test_metric_shift_blocked_emitted(tmp_path):
     """compaction.shift_blocked emitted when B_0 >= k and in_flight."""
     hull, tracer = _make_hull(tmp_path)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fs._in_flight = True
     # Fill B_0 to exactly k frames
     dummy = {"schema_version": 7, "number": 0,
@@ -62,7 +62,7 @@ def test_metric_shift_blocked_emitted(tmp_path):
 def test_metric_in_flight_gauge_emitted(tmp_path):
     """compaction.in_flight emitted after try_shift succeeds."""
     hull, tracer = _make_hull(tmp_path)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fake_task = {"layer": 0, "payload": []}
     fs.try_shift = MagicMock(return_value=fake_task)
     hull._thread_pool.submit = MagicMock()
@@ -76,7 +76,7 @@ def test_metric_in_flight_gauge_emitted(tmp_path):
 def test_metric_layer_stats_emitted_on_drain(tmp_path):
     """compaction.layer_stats emitted when result queue is drained successfully."""
     hull, tracer = _make_hull(tmp_path)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fs._in_flight = True
     fs.apply_results = MagicMock()
 
@@ -122,7 +122,7 @@ def test_metric_latency_ms_emitted_on_worker_completion(tmp_path):
 def test_metric_stripping_ratio_emitted_after_hot_shift(tmp_path):
     """compaction.stripping_ratio emitted when task has raw_bytes/stripped_bytes."""
     hull, tracer = _make_hull(tmp_path)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     task = {"layer": 0, "payload": [], "raw_bytes": 200, "stripped_bytes": 50}
     fs.try_shift = MagicMock(return_value=task)
     hull._thread_pool.submit = MagicMock()

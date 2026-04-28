@@ -22,7 +22,7 @@ def hull(tmp_path):
 
 def _seed_one_frame(hull):
     """Push one synthetic dict-shaped frame into the hot zone."""
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fs.commit_frame({
         "schema_version": 7,
         "number": 42,
@@ -73,7 +73,7 @@ def test_frames_endpoint_omits_legacy_nested_keys(hull):
 
 
 def test_frames_after_filters_by_n(hull):
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     for n in (1, 2, 3):
         fs.commit_frame({
             "schema_version": 7,

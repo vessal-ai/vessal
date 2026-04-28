@@ -2,11 +2,11 @@ def test_sleep_is_bound_method():
     from vessal.ark.shell.hull.cell.kernel import Kernel
     import types
     k = Kernel()
-    sleep = k.ns["sleep"]
+    sleep = k.L["sleep"]
     assert isinstance(sleep, types.MethodType)  # bound method, not closure
     assert sleep.__self__ is k
     sleep()
-    assert k.ns["_sleeping"] is True
+    assert k.L["_sleeping"] is True
 
 
 def test_sleep_survives_cloudpickle_roundtrip(tmp_path):
@@ -14,12 +14,12 @@ def test_sleep_survives_cloudpickle_roundtrip(tmp_path):
     import cloudpickle, types
     from vessal.ark.shell.hull.cell.kernel import Kernel
     k = Kernel()
-    assert k.ns["_sleeping"] is False
-    blob = cloudpickle.dumps(k.ns)
+    assert k.L["_sleeping"] is False
+    blob = cloudpickle.dumps(k.L)
     restored_ns = cloudpickle.loads(blob)
     sleep = restored_ns["sleep"]
     assert isinstance(sleep, types.MethodType)
-    assert sleep.__self__.ns is restored_ns
+    assert sleep.__self__.L is restored_ns
     sleep()
     assert restored_ns["_sleeping"] is True
 
@@ -33,7 +33,7 @@ def test_sleep_rebinds_after_restore(tmp_path):
 
     k2 = Kernel()
     k2.restore(snap)
-    sleep = k2.ns["sleep"]
+    sleep = k2.L["sleep"]
     assert sleep.__self__ is k2  # bound to k2, not k
     sleep()
-    assert k2.ns["_sleeping"] is True
+    assert k2.L["_sleeping"] is True

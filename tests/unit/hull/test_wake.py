@@ -35,10 +35,8 @@ def _make_stub_cell(responses=None) -> MagicMock:
         result.protocol_error = "stub"
         return result
 
-    cell.ns = ns
+    cell.L = ns
     cell.step = fake_step
-    cell.get.side_effect = lambda key, default=None: ns.get(key, default)
-    cell.set.side_effect = lambda key, value: ns.__setitem__(key, value)
     return cell
 
 
@@ -50,7 +48,7 @@ class TestWakeInjection:
         cell = _make_stub_cell()
         loop = EventLoop(cell=cell)
         loop.inject_wake({"reason": "user_message"})
-        assert cell.ns["_wake"] == "user_message"
+        assert cell.L["_wake"] == "user_message"
 
     def test_wake_visible_during_frame_loop(self):
         """_wake is readable by cell.step during _frame_loop() execution."""
@@ -60,7 +58,7 @@ class TestWakeInjection:
         original_step = cell.step
 
         def capturing_step(tracer=None):
-            wake_values.append(cell.ns.get("_wake", "NOT_SET"))
+            wake_values.append(cell.L.get("_wake", "NOT_SET"))
             return original_step(tracer)
 
         cell.step = capturing_step
@@ -74,14 +72,14 @@ class TestWakeInjection:
     def test_inject_wake_clears_idle(self):
         """inject_wake() clears the _sleeping flag."""
         cell = _make_stub_cell()
-        cell.ns["_sleeping"] = True
+        cell.L["_sleeping"] = True
         loop = EventLoop(cell=cell)
         loop.inject_wake({"reason": "heartbeat"})
-        assert cell.ns["_sleeping"] is False
+        assert cell.L["_sleeping"] is False
 
     def test_inject_wake_default_reason(self):
         """Uses heartbeat when the event has no reason field."""
         cell = _make_stub_cell()
         loop = EventLoop(cell=cell)
         loop.inject_wake({})
-        assert cell.ns["_wake"] == "heartbeat"
+        assert cell.L["_wake"] == "heartbeat"

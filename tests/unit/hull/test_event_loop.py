@@ -10,7 +10,7 @@ from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 @pytest.fixture
 def mock_cell():
     cell = MagicMock()
-    cell.ns = {
+    cell.L = {
         "_sleeping": False,
         "_wake": "",
         "_next_wake": None,
@@ -18,8 +18,6 @@ def mock_cell():
         "_signal_outputs": [],
         "_frame_stream": FrameStream(),
     }
-    cell.get.side_effect = lambda key, default=None: cell.ns.get(key, default)
-    cell.set.side_effect = lambda key, value: cell.ns.__setitem__(key, value)
     return cell
 
 
@@ -27,29 +25,29 @@ def test_inject_wake_sets_namespace(mock_cell):
     """inject_wake writes the wake reason into namespace."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "user_message"})
-    assert mock_cell.ns["_wake"] == "user_message"
+    assert mock_cell.L["_wake"] == "user_message"
 
 
 def test_inject_wake_clears_idle(mock_cell):
     """inject_wake clears the _sleeping flag."""
-    mock_cell.ns["_sleeping"] = True
+    mock_cell.L["_sleeping"] = True
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "heartbeat"})
-    assert mock_cell.ns["_sleeping"] is False
+    assert mock_cell.L["_sleeping"] is False
 
 
 def test_inject_wake_default_reason(mock_cell):
     """Uses heartbeat when the event has no reason field."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({})
-    assert mock_cell.ns["_wake"] == "heartbeat"
+    assert mock_cell.L["_wake"] == "heartbeat"
 
 
 def test_inject_wake_does_not_touch_skills(mock_cell):
     """inject_wake no longer looks up or calls any Skill."""
     from vessal.skills.chat.skill import Chat
     h = Chat()
-    mock_cell.ns["chat"] = h
+    mock_cell.L["chat"] = h
     loop = EventLoop(mock_cell)
     loop.inject_wake({"reason": "user_message", "content": "hello"})
     # chat skill inbox should have no messages (inject_wake does not deliver)
@@ -62,7 +60,7 @@ def test_run_wake_cycle_skips_frame_logger_without_log_dir(mock_cell):
     from vessal.ark.util.logging import Tracer
 
     after_step_calls = []
-    mock_cell.ns["_sleeping"] = True  # sleep immediately, zero frame loop
+    mock_cell.L["_sleeping"] = True  # sleep immediately, zero frame loop
 
     loop = EventLoop(
         cell=mock_cell,
@@ -76,7 +74,7 @@ def test_inject_wake_alarm_reason(mock_cell):
     """alarm wake writes _wake = 'alarm'."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "alarm"})
-    assert mock_cell.ns["_wake"] == "alarm"
+    assert mock_cell.L["_wake"] == "alarm"
 
 
 def test_frame_loop_calls_before_frame_hook(mock_cell):
@@ -92,12 +90,12 @@ def test_frame_loop_calls_before_frame_hook(mock_cell):
 
     # Agent sleeps immediately after one frame
     def step_then_idle(tracer=None):
-        mock_cell.ns["_sleeping"] = True
+        mock_cell.L["_sleeping"] = True
         r = MagicMock()
         r.protocol_error = None
         return r
 
-    mock_cell.ns["_sleeping"] = False
+    mock_cell.L["_sleeping"] = False
     mock_cell.step = step_then_idle
 
     loop = EventLoop(cell=mock_cell, hooks=hooks)
@@ -118,11 +116,11 @@ def test_inject_wake_fn_puts_event_on_queue():
     import queue as queue_mod
     from unittest.mock import MagicMock
     cell = MagicMock()
-    cell.ns = {}
+    cell.L = {}
     loop = EventLoop(cell)
     # Simulate Hull exposing _inject_wake
     inject_fn = lambda reason="user_message": loop.event_queue.put({"reason": reason})
-    cell.ns["_inject_wake"] = inject_fn
+    cell.L["_inject_wake"] = inject_fn
 
     inject_fn("user_message")
     event = loop.event_queue.get(timeout=1)
@@ -141,12 +139,12 @@ def test_after_frame_hook_fires(mock_cell):
     hooks = FrameHooks(after_frame=after)
 
     def step_then_idle(tracer=None):
-        mock_cell.ns["_sleeping"] = True
+        mock_cell.L["_sleeping"] = True
         r = MagicMock()
         r.protocol_error = None
         return r
 
-    mock_cell.ns["_sleeping"] = False
+    mock_cell.L["_sleeping"] = False
     mock_cell.step = step_then_idle
 
     loop = EventLoop(cell=mock_cell, hooks=hooks)
@@ -171,5 +169,5 @@ def test_frame_loop_breaks_on_protocol_error(mock_cell):
     loop._frame_loop()
 
     assert call_count == 1, f"expected 1 call, got {call_count}"
-    assert mock_cell.ns["_sleeping"] is True
-    assert "protocol error" in mock_cell.ns.get("_error", "")
+    assert mock_cell.L["_sleeping"] is True
+    assert "protocol error" in mock_cell.L.get("_error", "")

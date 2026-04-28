@@ -50,12 +50,12 @@ class HullRuntimeMixin:
             - frame (int): Current frame number
             - wake (str): Most recent wake reason
         """
-        sleeping = self._cell.get("_sleeping", False)
+        sleeping = self._cell.L.get("_sleeping", False)
         return {
             "idle": sleeping,
             "sleeping": sleeping,
-            "frame": self._cell.get("_frame", 0),
-            "wake": self._cell.get("_wake", ""),
+            "frame": self._cell.L.get("_frame", 0),
+            "wake": self._cell.L.get("_wake", ""),
         }
 
     def reload_soul(self) -> None:
@@ -71,15 +71,15 @@ class HullRuntimeMixin:
 
     def get_ns(self, key: str) -> Any:
         """Get a value from Cell namespace."""
-        return self._cell.get(key)
+        return self._cell.L.get(key)
 
     def set_ns(self, key: str, value: Any) -> None:
         """Set a value in Cell namespace."""
-        self._cell.set(key, value)
+        self._cell.L[key] = value
 
     def ns_keys(self) -> list[str]:
         """Return all keys in Cell namespace."""
-        return list(self._cell.keys())
+        return list(self._cell.L.keys())
 
     def frames(self, after: int | None = None) -> list[dict]:
         """Query hot-zone frames from the frame stream, in flat wire shape.
@@ -93,7 +93,7 @@ class HullRuntimeMixin:
         """
         from vessal.ark.shell.hull.cell.protocol import flatten_frame_dict
 
-        fs = self._cell.get("_frame_stream")
+        fs = self._cell.L.get("_frame_stream")
         if fs is None:
             return []
         # Flatten hot buckets oldest-first (B_4..B_0) into a single list
@@ -114,7 +114,7 @@ class HullRuntimeMixin:
         Returns:
             Alarm timestamp (float), or None if no alarm is set.
         """
-        next_wake = self._cell.get("_next_wake")
+        next_wake = self._cell.L.get("_next_wake")
         if isinstance(next_wake, (int, float)) and next_wake > 0:
             return float(next_wake)
         return None
@@ -185,7 +185,7 @@ class HullRuntimeMixin:
             self.stop()
             return 200, {"status": "stopping"}
         if method == "GET" and path == "/state/compactions":
-            fs = self._cell.get("_frame_stream")
+            fs = self._cell.L.get("_frame_stream")
             return 200, ({} if fs is None else fs.project_compactions())
         if method == "POST" and path == "/reload/soul":
             self.reload_soul()
@@ -230,9 +230,9 @@ class HullRuntimeMixin:
 
         Hull is the source of truth for these variables; the model may read but should not modify them.
         """
-        self._cell.set("_frame_type", "work")
-        self._cell.set("_render_config", self._work_render_config)
-        self._cell.set("_system_prompt", self._prompt_builder.build(self._cell.ns))
+        self._cell.L["_frame_type"] = "work"
+        self._cell.L["_render_config"] = self._work_render_config
+        self._cell.L["_system_prompt"] = self._prompt_builder.build(self._cell.L)
         # SOUL hot-reload: detect SOUL.md changes each frame (mtime check ~1μs).
         # Re-read on change; otherwise use cached value.
         if self._soul_path.exists():
@@ -240,10 +240,10 @@ class HullRuntimeMixin:
             if current_mtime != self._soul_mtime:
                 self._soul_text = self._soul_path.read_text(encoding="utf-8")
                 self._soul_mtime = current_mtime
-        self._cell.set("_soul", self._soul_text)
+        self._cell.L["_soul"] = self._soul_text
 
         # Drain compaction result queue and apply to FrameStream
-        fs = self._cell.get("_frame_stream")
+        fs = self._cell.L.get("_frame_stream")
         if fs is None:
             return
         results_to_apply: list[tuple[dict, int]] = []
@@ -263,7 +263,7 @@ class HullRuntimeMixin:
         if results_to_apply:
             fs.apply_results(results_to_apply)
             s = fs.stats()
-            frame_number = self._cell.get("_frame", 0)
+            frame_number = self._cell.L.get("_frame", 0)
             self._tracer.log(frame_number, "compaction.layer_stats", "gauge", -1,
                              f"hot={s['hot_counts']},cold={s['cold_counts']}")
             self.snapshot()
@@ -271,10 +271,10 @@ class HullRuntimeMixin:
 
     def _after_frame(self) -> None:
         """Called after each successful frame. Evaluates try_shift and submits compaction task if due."""
-        fs = self._cell.get("_frame_stream")
+        fs = self._cell.L.get("_frame_stream")
         if fs is None:
             return
-        frame_number = self._cell.get("_frame", 0)
+        frame_number = self._cell.L.get("_frame", 0)
         task = fs.try_shift()
         if task is None:
             if len(fs._hot[0]) >= fs.k and fs.in_flight:

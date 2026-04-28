@@ -78,7 +78,7 @@ def test_isinstance_scan_integration(skill_env):
     sm = SkillLoader(skill_paths=[str(skill_env)])
     cls = sm.load("test_skill")
     k = Kernel()
-    k.ns["ts"] = cls()
+    k.L["ts"] = cls()
     k.update_signals()
-    outputs = k.ns["_signal_outputs"]
+    outputs = k.L["_signal_outputs"]
     assert any("test_signal" in body for _, body in outputs)

@@ -72,10 +72,10 @@ class HullSkillsMixin:
             sig = inspect.signature(skill_cls.__init__)
             params = [p for p in sig.parameters if p != "self"]
             if params and "ns" in sig.parameters:
-                instance = skill_cls(ns=self._cell.ns)
+                instance = skill_cls(ns=self._cell.L)
             else:
                 instance = skill_cls()
-            self._cell.set(name, instance)
+            self._cell.L[name] = instance
             bind = getattr(instance, "_bind_hull", None)
             if callable(bind):
                 bind(self)
@@ -101,7 +101,7 @@ class HullSkillsMixin:
         import inspect
         start_params = inspect.signature(mod.start).parameters
         if "skill" in start_params:
-            skill_instance = self._cell.ns.get(name)
+            skill_instance = self._cell.L.get(name)
             if skill_instance is not None:
                 kwargs["skill"] = skill_instance
         mod.start(scoped_api, **kwargs)

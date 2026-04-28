@@ -84,8 +84,8 @@ class EventLoop:
         Args:
             event: Event dict; must contain a reason key; defaults to "heartbeat" if absent.
         """
-        self._cell.set("_wake", event.get("reason", "heartbeat"))
-        self._cell.set("_sleeping", False)
+        self._cell.L["_wake"] = event.get("reason", "heartbeat")
+        self._cell.L["_sleeping"] = False
 
     async def run_forever(self) -> None:
         """Main event loop. Runs inside asyncio; frame execution happens in a thread."""
@@ -143,7 +143,7 @@ class EventLoop:
         hooks = self._hooks
         frame_count = 0
 
-        while not self._cell.get("_sleeping", False):
+        while not self._cell.L.get("_sleeping", False):
             if self._max_frames > 0 and frame_count >= self._max_frames:
                 logger.warning("max frames per wake reached (%d)", self._max_frames)
                 break
@@ -152,11 +152,11 @@ class EventLoop:
             if hooks.before_frame is not None:
                 hooks.before_frame()
 
-            self._cell.set("_memories", self._cell.get("_memories", []))
+            self._cell.L["_memories"] = self._cell.L.get("_memories", [])
             result = self._cell.step(self._tracer)
 
             if result.protocol_error is None:
-                fs = self._cell.get("_frame_stream")
+                fs = self._cell.L.get("_frame_stream")
                 last_frame = fs.latest_hot_frame() if fs is not None else None
                 if last_frame is not None:
                     if frame_logger is not None:
@@ -167,14 +167,11 @@ class EventLoop:
             else:
                 logger.error(
                     "protocol error at frame %d: %s",
-                    self._cell.get("_frame", -1),
+                    self._cell.L.get("_frame", -1),
                     result.protocol_error,
                 )
-                self._cell.set(
-                    "_error",
-                    f"protocol error: {result.protocol_error}",
-                )
-                self._cell.set("_sleeping", True)
+                self._cell.L["_error"] = f"protocol error: {result.protocol_error}"
+                self._cell.L["_sleeping"] = True
                 break
 
     def stop(self) -> None:

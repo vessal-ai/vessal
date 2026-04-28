@@ -68,6 +68,11 @@ class TestUnresolvedRefRepr:
         assert ref.qualname == "q"
         assert ref.reason == "r"
 
+    def test_setstate_discards_state(self):
+        ref = UnresolvedRef("m", "q", "r")
+        ref.__setstate__({"greeting": "hi"})  # must not raise, must not modify ref
+        assert ref.module == "m"
+
 
 # ─── LenientUnpickler ──────────────────────────────────────────────────
 
@@ -131,13 +136,15 @@ class TestKernelRestoreLenient:
         class FakeSkill:
             def __init__(self, greeting: str):
                 self.greeting = greeting
+        # Remove .<locals>. so cloudpickle uses by-reference (not by-value bytecode embedding).
+        FakeSkill.__qualname__ = "FakeSkill"
         mod.FakeSkill = FakeSkill
         FakeSkill.__module__ = mod_name
         sys.modules[mod_name] = mod
 
         try:
             k = Kernel()
-            k.ns["my_skill"] = FakeSkill("hi")
+            k.L["my_skill"] = FakeSkill("hi")
             snap = str(tmp_path / "snap.bin")
             k.snapshot(snap)
         finally:
@@ -145,22 +152,24 @@ class TestKernelRestoreLenient:
 
         k2 = Kernel()
         k2.restore(snap)  # must NOT raise
-        assert "my_skill" in k2.ns
+        assert "my_skill" in k2.L
+        # By-reference path was forced: placeholder must be UnresolvedRef.
+        assert isinstance(k2.L["my_skill"], UnresolvedRef)
 
     def test_restored_missing_ref_repr_contains_unresolved(self, tmp_path: Path):
-        """If cloudpickle used by-reference, the slot is an UnresolvedRef with
-        a useful repr. If by-value, it's a real instance. Either way, no raise."""
         mod_name = "vessal_test_skill_repr_check_e2e"
         mod = types.ModuleType(mod_name)
         class ReprSkill:
             pass
+        # Force by-reference serialization.
+        ReprSkill.__qualname__ = "ReprSkill"
         mod.ReprSkill = ReprSkill
         ReprSkill.__module__ = mod_name
         sys.modules[mod_name] = mod
 
         try:
             k = Kernel()
-            k.ns["rs"] = ReprSkill()
+            k.L["rs"] = ReprSkill()
             snap = str(tmp_path / "snap.bin")
             k.snapshot(snap)
         finally:
@@ -168,9 +177,6 @@ class TestKernelRestoreLenient:
 
         k2 = Kernel()
         k2.restore(snap)
-        val = k2.ns["rs"]
-        # Either the instance was restored (by-value) or it's an UnresolvedRef (by-reference).
-        if isinstance(val, UnresolvedRef):
-            assert "UnresolvedRef" in repr(val)
-        else:
-            assert isinstance(val, object)
+        val = k2.L["rs"]
+        assert isinstance(val, UnresolvedRef)
+        assert "UnresolvedRef" in repr(val)

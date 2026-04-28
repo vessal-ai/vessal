@@ -89,7 +89,7 @@ class HullInitMixin:
         self._ensure_log_readme()
 
         if "context_budget" in cell_cfg:
-            self._cell.set("_context_budget", cell_cfg["context_budget"])
+            self._cell.L["_context_budget"] = cell_cfg["context_budget"]
         else:
             logger.warning(
                 "hull.toml missing [cell].context_budget; using default 128000. "
@@ -98,11 +98,11 @@ class HullInitMixin:
 
         self._snapshots_dir = self._project_dir / "snapshots"
         self._restore_latest_snapshot()
-        self._cell.set("_token_budget", self._cell.max_tokens)
-        self._cell.set("_error_buffer_cap", cell_cfg.get("error_buffer_cap", 200))
+        self._cell.L["_token_budget"] = self._cell.max_tokens
+        self._cell.L["_error_buffer_cap"] = cell_cfg.get("error_buffer_cap", 200)
 
         if "language" in agent_cfg:
-            self._cell.set("language", agent_cfg["language"])
+            self._cell.L["language"] = agent_cfg["language"]
 
     def _init_compression(self, hull_cfg: dict) -> None:
         """Phase 2b: Create compression Core, result queue, and single-worker ThreadPoolExecutor."""
@@ -124,7 +124,7 @@ class HullInitMixin:
         self._compaction_snapshot_every_n = int(hull_cfg.get("snapshot_every_n_frames", 20))
         prompt_path = Path(__file__).parent / "prompts" / "compression.md"
         self._compression_prompt = prompt_path.read_text(encoding="utf-8")
-        self._cell.set("_compression_prompt", self._compression_prompt)
+        self._cell.L["_compression_prompt"] = self._compression_prompt
 
     def _init_skills(self, hull_cfg: dict) -> None:
         """Phase 3: SkillLoader, route table, pre-load Skills, start servers."""
@@ -135,16 +135,16 @@ class HullInitMixin:
         resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
 
         self._skill_manager = SkillLoader(skill_paths=resolved_paths)
-        self._cell.set("_builtin_names", [])
+        self._cell.L["_builtin_names"] = []
 
-        self._cell.set("skill_paths", resolved_paths)
-        self._cell.set("_data_dir", str(self._project_dir / "data"))
+        self._cell.L["skill_paths"] = resolved_paths
+        self._cell.L["_data_dir"] = str(self._project_dir / "data")
         compress_threshold = hull_cfg.get("compress_threshold", 50)
-        self._cell.set("_compress_threshold", compress_threshold)
+        self._cell.L["_compress_threshold"] = compress_threshold
         if "compaction_k" in hull_cfg:
-            self._cell.set("_compaction_k", hull_cfg["compaction_k"])
+            self._cell.L["_compaction_k"] = hull_cfg["compaction_k"]
         if "compaction_n" in hull_cfg:
-            self._cell.set("_compaction_n", hull_cfg["compaction_n"])
+            self._cell.L["_compaction_n"] = hull_cfg["compaction_n"]
 
         self._routes: dict[tuple[str, str], object] = {}
         self._running_servers: dict[str, object] = {}
@@ -154,11 +154,11 @@ class HullInitMixin:
         self._hull_api = HullApi(routes=self._routes, wake_fn=self.wake)
 
         for skill_name in hull_cfg.get("skills", []):
-            restored = skill_name in self._cell.ns
+            restored = skill_name in self._cell.L
             try:
                 if restored:
                     self._skill_manager.load(skill_name)
-                    description = getattr(type(self._cell.ns[skill_name]), "description", "")
+                    description = getattr(type(self._cell.L[skill_name]), "description", "")
                     print(f"{skill_name} loaded — {description}")
                 else:
                     self._load_and_instantiate_skill(skill_name)
@@ -220,7 +220,7 @@ class HullInitMixin:
             hooks=hooks,
         )
 
-        self._cell.set("_inject_wake", lambda reason="user_message": self.wake(reason))
+        self._cell.L["_inject_wake"] = lambda reason="user_message": self.wake(reason)
 
     def _ensure_log_readme(self) -> None:
         """Ensure the logs directory has a README.md file."""

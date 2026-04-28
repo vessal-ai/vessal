@@ -54,7 +54,7 @@ def bare_ns() -> dict:
 def _kw() -> "Kernel":
     """Create Kernel with minimal namespace setup (test helper)."""
     k = Kernel()
-    k.ns["_builtin_names"] = []
+    k.L["_builtin_names"] = []
     return k
 
 
@@ -91,9 +91,9 @@ class TestExecute:
         """Empty operation resets the four side-effect variables to empty values; no code is executed."""
         ns = bare_ns()
         # execute once to leave side effects
-        execute("x = 1", ns, frame_number=1)
+        execute("x = 1", {}, ns, frame_number=1)
         # execute empty code
-        execute("", ns, frame_number=2)
+        execute("", {}, ns, frame_number=2)
         assert ns["_operation"] == ""
         assert ns["_stdout"] == ""
         assert ns["_error"] is None
@@ -101,112 +101,112 @@ class TestExecute:
 
     def test_whitespace_action_treated_as_empty(self):
         ns = bare_ns()
-        execute("   \n  ", ns, frame_number=1)
+        execute("   \n  ", {}, ns, frame_number=1)
         assert ns["_operation"] == ""
 
     def test_none_action_treated_as_empty(self):
         ns = bare_ns()
-        execute(None, ns, frame_number=1)
+        execute(None, {}, ns, frame_number=1)
         assert ns["_operation"] == ""
 
     def test_returns_exec_result(self):
         """execute returns an ExecResult."""
         ns = bare_ns()
-        result = execute("x = 1", ns, frame_number=1)
+        result = execute("x = 1", {}, ns, frame_number=1)
         assert isinstance(result, ExecResult)
 
     def test_operation_recorded(self):
         ns = bare_ns()
         code = "x = 42"
-        execute(code, ns, frame_number=1)
+        execute(code, {}, ns, frame_number=1)
         assert ns["_operation"] == code
 
     def test_simple_assignment(self):
         ns = bare_ns()
-        execute("x = 42", ns, frame_number=1)
+        execute("x = 42", {}, ns, frame_number=1)
         assert ns["x"] == 42
         assert ns["_error"] is None
 
     def test_stdout_captured(self):
         ns = bare_ns()
-        execute("print('hello world')", ns, frame_number=1)
+        execute("print('hello world')", {}, ns, frame_number=1)
         assert ns["_stdout"] == "hello world\n"
         assert ns["_error"] is None
 
     def test_multiple_prints(self):
         ns = bare_ns()
-        execute("print('a')\nprint('b')", ns, frame_number=1)
+        execute("print('a')\nprint('b')", {}, ns, frame_number=1)
         assert "a\n" in ns["_stdout"]
         assert "b\n" in ns["_stdout"]
 
     def test_stdout_empty_when_no_print(self):
         ns = bare_ns()
-        execute("x = 1", ns, frame_number=1)
+        execute("x = 1", {}, ns, frame_number=1)
         assert ns["_stdout"] == ""
 
     def test_runtime_error_captured(self):
         ns = bare_ns()
-        execute("1 / 0", ns, frame_number=1)
+        execute("1 / 0", {}, ns, frame_number=1)
         assert ns["_error"] is not None
         assert "ZeroDivisionError" in ns["_error"]
 
     def test_syntax_error_captured(self):
         ns = bare_ns()
-        execute("def foo(:\n    pass", ns, frame_number=1)
+        execute("def foo(:\n    pass", {}, ns, frame_number=1)
         assert ns["_error"] is not None
 
     def test_name_error_captured(self):
         ns = bare_ns()
-        execute("y = undefined_var", ns, frame_number=1)
+        execute("y = undefined_var", {}, ns, frame_number=1)
         assert ns["_error"] is not None
         assert "NameError" in ns["_error"]
 
     def test_error_none_on_success(self):
         ns = bare_ns()
-        execute("x = 1", ns, frame_number=1)
+        execute("x = 1", {}, ns, frame_number=1)
         assert ns["_error"] is None
 
     def test_no_builtins_pollution(self):
         """__builtins__ injected by exec should be cleaned up."""
         ns = bare_ns()
-        execute("x = 1", ns, frame_number=1)
+        execute("x = 1", {}, ns, frame_number=1)
         assert "__builtins__" not in ns
 
     def test_diff_added(self):
         ns = bare_ns()
-        execute("a = 1\nb = 'hello'", ns, frame_number=1)
+        execute("a = 1\nb = 'hello'", {}, ns, frame_number=1)
         assert "+a = 1" in ns["_diff"]
         assert "+b = hello" in ns["_diff"]
 
     def test_diff_modified(self):
         ns = bare_ns()
-        execute("x = 1", ns, frame_number=1)
-        execute("x = 99", ns, frame_number=2)
+        execute("x = 1", {}, ns, frame_number=1)
+        execute("x = 99", {}, ns, frame_number=2)
         assert "-x = 1" in ns["_diff"]
         assert "+x = 99" in ns["_diff"]
 
     def test_diff_deleted(self):
         ns = bare_ns()
-        execute("x = 1", ns, frame_number=1)
-        execute("del x", ns, frame_number=2)
+        execute("x = 1", {}, ns, frame_number=1)
+        execute("del x", {}, ns, frame_number=2)
         assert "-x = 1" in ns["_diff"]
 
     def test_diff_ignores_system_vars(self):
         """Variables starting with _ do not participate in diff."""
         ns = bare_ns()
-        execute("_observe = ['x']", ns, frame_number=1)
+        execute("_observe = ['x']", {}, ns, frame_number=1)
         assert ns["_diff"] == ""
 
     def test_diff_empty_when_no_change(self):
         ns = bare_ns()
-        execute("pass", ns, frame_number=1)
+        execute("pass", {}, ns, frame_number=1)
         assert ns["_diff"] == ""
 
     def test_history_not_managed_by_execute(self):
         """executor does not commit to _frame_stream; frame logging is managed by Cell (Phase 3)."""
         ns = bare_ns()
-        execute("x = 1", ns, frame_number=1)
-        execute("y = 2", ns, frame_number=2)
+        execute("x = 1", {}, ns, frame_number=1)
+        execute("y = 2", {}, ns, frame_number=2)
         # execute should not commit to _frame_stream
         assert ns["_frame_stream"].hot_frame_count() == 0
 
@@ -214,7 +214,7 @@ class TestExecute:
         """Function source is recoverable via inspect.getsource (linecache)."""
         ns = bare_ns()
         code = "def add(a, b):\n    return a + b"
-        execute(code, ns, frame_number=1)
+        execute(code, {}, ns, frame_number=1)
         src = inspect.getsource(ns["add"])
         assert "def add(a, b):" in src
         assert "return a + b" in src
@@ -223,7 +223,7 @@ class TestExecute:
         """Class source is recoverable via inspect.getsource (linecache)."""
         ns = bare_ns()
         code = "class Foo:\n    def bar(self):\n        pass"
-        execute(code, ns, frame_number=1)
+        execute(code, {}, ns, frame_number=1)
         src = inspect.getsource(ns["Foo"])
         assert "class Foo:" in src
 
@@ -231,7 +231,7 @@ class TestExecute:
         """Each function's inspect.getsource returns its own definition span."""
         ns = bare_ns()
         code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
-        execute(code, ns, frame_number=1)
+        execute(code, {}, ns, frame_number=1)
         foo_src = inspect.getsource(ns["foo"])
         bar_src = inspect.getsource(ns["bar"])
         assert "def foo" in foo_src
@@ -243,41 +243,41 @@ class TestExecute:
         """After redefinition under a different frame number, inspect.getsource
         on the new function returns the new source."""
         ns = bare_ns()
-        execute("def greet():\n    return 'old'", ns, frame_number=1)
-        execute("def greet():\n    return 'new'", ns, frame_number=2)
+        execute("def greet():\n    return 'old'", {}, ns, frame_number=1)
+        execute("def greet():\n    return 'new'", {}, ns, frame_number=2)
         src = inspect.getsource(ns["greet"])
         assert "new" in src
 
     def test_function_callable_after_execute(self):
         ns = bare_ns()
-        execute("def double(x):\n    return x * 2", ns, frame_number=1)
+        execute("def double(x):\n    return x * 2", {}, ns, frame_number=1)
         assert ns["double"](5) == 10
 
     def test_persistent_across_calls(self):
         """Multiple execute calls share the same ns; variables persist."""
         ns = bare_ns()
-        execute("x = 10", ns, frame_number=1)
-        execute("y = x + 5", ns, frame_number=2)
+        execute("x = 10", {}, ns, frame_number=1)
+        execute("y = x + 5", {}, ns, frame_number=2)
         assert ns["y"] == 15
 
     def test_system_exit_captured_as_error(self):
         """LLM calling sys.exit() should not terminate the process; it should be captured as _error."""
         ns = bare_ns()
-        execute("import sys; sys.exit(0)", ns, frame_number=1)
+        execute("import sys; sys.exit(0)", {}, ns, frame_number=1)
         assert ns["_error"] is not None
         assert "SystemExit" in ns["_error"]
 
     def test_exit_builtin_captured_as_error(self):
         """LLM calling builtin exit() should not terminate the process; it should be captured as _error."""
         ns = bare_ns()
-        execute("exit(0)", ns, frame_number=1)
+        execute("exit(0)", {}, ns, frame_number=1)
         assert ns["_error"] is not None
         assert "SystemExit" in ns["_error"]
 
     def test_redefine_to_builtin_no_crash(self):
         """When a function is reassigned to a builtin object, execute does not crash."""
         ns = bare_ns()
-        execute("def foo():\n    pass\nfoo = 42", ns, frame_number=1)
+        execute("def foo():\n    pass\nfoo = 42", {}, ns, frame_number=1)
         assert ns["_error"] is None
         assert ns["foo"] == 42
 
@@ -285,7 +285,7 @@ class TestExecute:
         """execute() does not write ns['_frame']; that is _commit_frame's responsibility."""
         ns = bare_ns()
         initial = ns.get("_frame", 0)
-        execute("x = 1", ns, frame_number=5)
+        execute("x = 1", {}, ns, frame_number=5)
         assert ns.get("_frame", 0) == initial
 
 
@@ -348,7 +348,8 @@ class TestCompressTraceback:
             f"def f{i}(): return f{i+1}()" for i in range(20)
         )
         code = f"{funcs}\ndef f20(): return 1/0\nf0()"
-        execute(code, ns, frame_number=1)
+        # Pass ns as both G and L so cross-function calls resolve via ns
+        execute(code, ns, ns, frame_number=1)
         error = ns["_error"]
         assert error is not None
         assert "ZeroDivisionError" in error
@@ -358,7 +359,7 @@ class TestCompressTraceback:
     def test_execute_short_error_not_compressed(self):
         """Simple exceptions in execute() are not compressed; full traceback is retained."""
         ns = bare_ns()
-        execute("1 / 0", ns, frame_number=1)
+        execute("1 / 0", {}, ns, frame_number=1)
         error = ns["_error"]
         assert error is not None
         # Short traceback does not contain omission notice
@@ -389,7 +390,7 @@ class TestRenderIntegration:
         """render reflects state changes after exec_operation."""
         from vessal.ark.shell.hull.cell.protocol import Ping
         k = Kernel()
-        frame = k.ns.get("_frame", 0) + 1
+        frame = k.L.get("_frame", 0) + 1
         k.exec_operation("print('hi')\nx = 1", frame_number=frame)
         state = k.render()
         assert isinstance(state, Ping)
@@ -398,14 +399,14 @@ class TestRenderIntegration:
         """_stdout is written to ns after exec_operation; readable."""
         k = Kernel()
         k.exec_operation("print('hello from kernel')", frame_number=1)
-        assert "hello from kernel" in k.ns["_stdout"]
+        assert "hello from kernel" in k.L["_stdout"]
 
     def test_frame_stream_in_state(self):
         """Frame stream section appears in the rendered output."""
         from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
         k = Kernel()
         # Manually commit a frame dict into _frame_stream to trigger the frame stream section
-        k.ns["_frame_stream"].commit_frame({
+        k.L["_frame_stream"].commit_frame({
             "schema_version": FRAME_SCHEMA_VERSION,
             "number": 1,
             "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
@@ -418,8 +419,8 @@ class TestRenderIntegration:
     def test_context_budget_default_set_by_kernel(self):
         """Kernel init sets the default _context_budget in ns."""
         k = Kernel()
-        assert "_context_budget" in k.ns
-        assert k.ns["_context_budget"] == 128000
+        assert "_context_budget" in k.L
+        assert k.L["_context_budget"] == 128000
 
     def test_auxiliary_section_in_output(self):
         """Auxiliary section (system variables) appears in render output after update_signals()."""
@@ -437,20 +438,20 @@ class TestKernel:
     def test_init_creates_system_vars(self):
         """After init, ns contains all required system variables (v4 format)."""
         k = Kernel()
-        assert k.ns.get("_frame") == 0
+        assert k.L.get("_frame") == 0
         # v4 vars
-        assert k.ns.get("_system_prompt") == ""
-        assert isinstance(k.ns.get("_frame_stream"), FrameStream)
+        assert k.L.get("_system_prompt") == ""
+        assert isinstance(k.L.get("_frame_stream"), FrameStream)
         # _history and _history_depth removed in v3
-        assert "_history" not in k.ns
-        assert "_history_depth" not in k.ns
+        assert "_history" not in k.L
+        assert "_history_depth" not in k.L
 
     def test_init_creates_lifecycle_vars(self):
         """After init, ns contains _sleeping/_wake/_next_wake lifecycle variables."""
         k = Kernel()
-        assert k.ns["_sleeping"] is False
-        assert k.ns["_wake"] == ""
-        assert k.ns["_next_wake"] is None
+        assert k.L["_sleeping"] is False
+        assert k.L["_wake"] == ""
+        assert k.L["_next_wake"] is None
 
     def test_init_from_snapshot(self):
         """snapshot_path parameter: restore namespace from file to continue a previous session."""
@@ -464,17 +465,17 @@ class TestKernel:
             k.snapshot(snap_path)
             # Init new Kernel with snapshot_path; restores state directly
             k2 = Kernel(snapshot_path=snap_path)
-            assert k2.ns["counter"] == 10
+            assert k2.L["counter"] == 10
         finally:
             os.unlink(snap_path)
 
     def test_ns_is_exposed(self):
-        """kernel.ns is fully exposed and directly readable/writable."""
+        """kernel.L is fully exposed and directly readable/writable."""
         k = Kernel()
-        assert isinstance(k.ns, dict)
+        assert isinstance(k.L, dict)
         # can write directly
-        k.ns["custom_var"] = "hello"
-        assert k.ns["custom_var"] == "hello"
+        k.L["custom_var"] = "hello"
+        assert k.L["custom_var"] == "hello"
 
     def test_exec_operation_returns_exec_result(self):
         """exec_operation() returns ExecResult."""
@@ -500,21 +501,21 @@ class TestKernel:
     def test_render_method_does_not_increment_frame(self):
         """render() does not increment the frame number."""
         k = Kernel()
-        frame_before = k.ns["_frame"]
+        frame_before = k.L["_frame"]
         k.render()
-        assert k.ns["_frame"] == frame_before
+        assert k.L["_frame"] == frame_before
 
     def test_render_method_does_not_append_frame_stream(self):
         """render() does not commit to the frame stream (_frame_stream)."""
         k = Kernel()
         k.render()
         k.render()
-        assert k.ns["_frame_stream"].hot_frame_count() == 0
+        assert k.L["_frame_stream"].hot_frame_count() == 0
 
     def test_kernel_render_returns_ping(self, tmp_path):
         from vessal.ark.shell.hull.cell.protocol import Ping
         kernel = Kernel()
-        kernel.ns["_system_prompt"] = "You are an agent."
+        kernel.L["_system_prompt"] = "You are an agent."
         ping = kernel.render()
         assert isinstance(ping, Ping)
         assert ping.system_prompt == "You are an agent."
@@ -522,41 +523,41 @@ class TestKernel:
     def test_exec_operation_does_not_set_frame(self):
         """exec_operation does not write ns['_frame']; that is _commit_frame's responsibility."""
         k = Kernel()
-        initial = k.ns["_frame"]
+        initial = k.L["_frame"]
         k.exec_operation("pass", frame_number=5)
-        assert k.ns["_frame"] == initial
+        assert k.L["_frame"] == initial
 
     def test_exec_operation_does_not_append_frame_stream(self):
         """exec_operation does not commit to _frame_stream (Cell's responsibility, Phase 3)."""
         k = Kernel()
         k.exec_operation("x = 1", frame_number=1)
         k.exec_operation("y = 2", frame_number=2)
-        assert k.ns["_frame_stream"].hot_frame_count() == 0
+        assert k.L["_frame_stream"].hot_frame_count() == 0
 
     def test_variable_persists_across_exec_operations(self):
         k = Kernel()
         k.exec_operation("x = 42", frame_number=1)
         k.exec_operation("y = x + 1", frame_number=2)
-        assert k.ns["y"] == 43
+        assert k.L["y"] == 43
 
     def test_stdout_in_ns_after_exec(self):
         """_stdout is written to ns after execution."""
         k = Kernel()
         k.exec_operation("print('hello from kernel')", frame_number=1)
-        assert "hello from kernel" in k.ns["_stdout"]
+        assert "hello from kernel" in k.L["_stdout"]
 
     def test_error_in_ns_after_exec(self):
         """Exception is captured into ns['_error']."""
         k = Kernel()
         k.exec_operation("1 / 0", frame_number=1)
-        assert k.ns["_error"] is not None
-        assert "ZeroDivisionError" in k.ns["_error"]
+        assert k.L["_error"] is not None
+        assert "ZeroDivisionError" in k.L["_error"]
 
     def test_diff_in_ns_after_exec(self):
         """New variables appear in diff."""
         k = Kernel()
         k.exec_operation("alpha = 999", frame_number=1)
-        assert "alpha" in k.ns["_diff"]
+        assert "alpha" in k.L["_diff"]
 
     def test_snapshot_restore(self):
         k = Kernel()
@@ -572,8 +573,8 @@ class TestKernel:
             k.restore(snap_path)
             # counter should be 10 after restore
             k.exec_operation("result = counter", frame_number=1)
-            assert "counter" in k.ns
-            assert k.ns["counter"] == 10
+            assert "counter" in k.L
+            assert k.L["counter"] == 10
         finally:
             os.unlink(snap_path)
 
@@ -586,8 +587,8 @@ class TestKernel:
 
         k2 = Kernel()
         k2.restore(snap)
-        assert k2.ns["x"] == 42
-        assert k2.ns.get("_loaded_skills", {}) == {}
+        assert k2.L["x"] == 42
+        assert k2.L.get("_loaded_skills", {}) == {}
 
     def test_snapshot_restore_preserves_builtin_names(self, tmp_path):
         """snapshot/restore preserves _builtin_names list."""
@@ -597,7 +598,7 @@ class TestKernel:
 
         k2 = Kernel()
         k2.restore(snap)
-        assert isinstance(k2.ns["_builtin_names"], list)
+        assert isinstance(k2.L["_builtin_names"], list)
 
     def test_snapshot_is_single_blob_of_ns_dict(self, tmp_path):
         """The snapshot file is a single cloudpickle blob containing the ns dict."""
@@ -621,10 +622,10 @@ class TestKernel:
         with patch.dict(sys.modules):
             k = Kernel()
             sm = SkillLoader(skill_paths=[skills_root])
-            k.ns["_builtin_names"] = []
+            k.L["_builtin_names"] = []
 
             skill_cls = sm.load("tasks")
-            k.ns["tasks_cls"] = skill_cls
+            k.L["tasks_cls"] = skill_cls
 
             assert issubclass(skill_cls, SkillBase)
 
@@ -634,7 +635,7 @@ class TestKernel:
             k2 = Kernel()
             k2.restore(snap)
 
-            assert issubclass(k2.ns["tasks_cls"], SkillBase)
+            assert issubclass(k2.L["tasks_cls"], SkillBase)
 
     def test_snapshot_restore_skill_with_data(self, tmp_path):
         """Skill-produced data and instances are correctly restored together."""
@@ -643,13 +644,13 @@ class TestKernel:
         with patch.dict(sys.modules):
             k = Kernel()
             sm = SkillLoader(skill_paths=[skills_root])
-            k.ns["_builtin_names"] = []
+            k.L["_builtin_names"] = []
 
             TasksCls = sm.load("tasks")
-            k.ns["TasksCls"] = TasksCls
+            k.L["TasksCls"] = TasksCls
             k.exec_operation('t = TasksCls(); task_id = t.add("test goal")', frame_number=1)
 
-            assert k.ns["task_id"] == "1"
+            assert k.L["task_id"] == "1"
 
             snap = str(tmp_path / "test.pkl")
             k.snapshot(snap)
@@ -657,8 +658,8 @@ class TestKernel:
             k2 = Kernel()
             k2.restore(snap)
 
-            assert k2.ns["task_id"] == "1"
-            assert issubclass(k2.ns["TasksCls"], SkillBase)
+            assert k2.L["task_id"] == "1"
+            assert issubclass(k2.L["TasksCls"], SkillBase)
 
     def test_snapshot_partial_on_unpicklable(self, tmp_path):
         """When namespace contains unpicklable objects, snapshot does partial save without raising.
@@ -670,14 +671,14 @@ class TestKernel:
         from unittest.mock import patch
 
         k = Kernel()
-        k.ns["good"] = {"data": 42}
-        k.ns["bad"] = object()  # placeholder; will be marked unpicklable by mock
-        bad_obj = k.ns["bad"]
+        k.L["good"] = {"data": 42}
+        k.L["bad"] = object()  # placeholder; will be marked unpicklable by mock
+        bad_obj = k.L["bad"]
         original_dumps = cp.dumps
 
         # Full ns dump fails; individual dump of bad_obj also fails; others succeed.
         def selective_dumps(obj, *args, **kwargs):
-            if obj is k.ns:
+            if obj is k.L:
                 raise TypeError("simulate: cannot pickle namespace")
             if obj is bad_obj:
                 raise TypeError("simulate: cannot pickle bad_obj")
@@ -689,8 +690,8 @@ class TestKernel:
 
         k2 = Kernel()
         k2.restore(snap)
-        assert k2.ns["good"] == {"data": 42}
-        assert "bad" not in k2.ns  # unpicklable key was skipped
+        assert k2.L["good"] == {"data": 42}
+        assert "bad" not in k2.L  # unpicklable key was skipped
 
     def test_restore_cleans_sys_modules(self, tmp_path):
         """restore clears sys.modules cache; does not use stale in-process modules."""
@@ -699,10 +700,10 @@ class TestKernel:
         with patch.dict(sys.modules):
             k = Kernel()
             sm = SkillLoader(skill_paths=[skills_root])
-            k.ns["_builtin_names"] = []
+            k.L["_builtin_names"] = []
 
             TasksCls = sm.load("tasks")
-            k.ns["TasksCls"] = TasksCls
+            k.L["TasksCls"] = TasksCls
 
             snap = str(tmp_path / "test.pkl")
             k.snapshot(snap)
@@ -711,30 +712,30 @@ class TestKernel:
             k2.restore(snap)
 
             # Skill class should be usable after restore
-            assert issubclass(k2.ns["TasksCls"], SkillBase)
+            assert issubclass(k2.L["TasksCls"], SkillBase)
 
     def test_ns_direct_write_affects_exec(self):
-        """Writing directly to kernel.ns is visible to subsequent exec_operation() calls."""
+        """Writing directly to kernel.L is visible to subsequent exec_operation() calls."""
         k = Kernel()
-        k.ns["injected"] = 42
+        k.L["injected"] = 42
         k.exec_operation("answer = injected + 1", frame_number=1)
-        assert k.ns["answer"] == 43
+        assert k.L["answer"] == 43
 
     def test_sleeping_lifecycle_var(self):
         """_sleeping is a lifecycle variable in namespace; Agent can set it via sleep()."""
         k = Kernel()
-        assert k.ns["_sleeping"] is False
+        assert k.L["_sleeping"] is False
         k.exec_operation("sleep()", frame_number=1)
-        assert k.ns["_sleeping"] is True
+        assert k.L["_sleeping"] is True
 
     def test_wake_driven_exec(self):
         """Simulate event-driven execution: write _wake, execute, then call sleep()."""
         k = Kernel()
-        k.ns["_wake"] = "user_message: compute 1+2+3"
+        k.L["_wake"] = "user_message: compute 1+2+3"
         k.exec_operation("total = 1 + 2 + 3", frame_number=1)
         k.exec_operation("sleep()", frame_number=2)
-        assert k.ns["total"] == 6
-        assert k.ns["_sleeping"] is True
+        assert k.L["total"] == 6
+        assert k.L["_sleeping"] is True
 
     def test_eval_expect_returns_verdict(self):
         """eval_expect() returns a Verdict."""
@@ -766,10 +767,10 @@ class TestKernel:
         """eval_expect() evaluates on a shallow copy of the namespace; does not modify the real one."""
         k = Kernel()
         k.exec_operation("x = 1", frame_number=1)
-        ns_keys_before = set(k.ns.keys())
+        ns_keys_before = set(k.L.keys())
         k.eval_expect("assert x == 1")
-        assert set(k.ns.keys()) == ns_keys_before
-        assert k.ns["x"] == 1
+        assert set(k.L.keys()) == ns_keys_before
+        assert k.L["x"] == 1
 
     def test_run_returns_none_and_commits_frame(self):
         """run(Pong) returns None; _frame_stream gets one frame committed; _frame increments by 1.
@@ -780,8 +781,8 @@ class TestKernel:
         from vessal.ark.shell.hull.cell.kernel.executor import ExecResult
 
         k = Kernel()
-        frame_before = k.ns["_frame"]
-        count_before = k.ns["_frame_stream"].hot_frame_count()
+        frame_before = k.L["_frame"]
+        count_before = k.L["_frame_stream"].hot_frame_count()
 
         pong = Pong(think="", action=Action(operation="x = 1", expect=""))
 
@@ -795,8 +796,8 @@ class TestKernel:
             result = k.step(pong)
 
         assert result is None
-        assert k.ns["_frame"] == frame_before + 1
-        assert k.ns["_frame_stream"].hot_frame_count() == count_before + 1
+        assert k.L["_frame"] == frame_before + 1
+        assert k.L["_frame_stream"].hot_frame_count() == count_before + 1
         mock_exec.assert_called_once_with(
             "x = 1", frame_before + 1, None
         )
@@ -813,51 +814,51 @@ class TestExprCapture:
         """Value of a bare variable name is appended to _stdout."""
         ns = bare_ns()
         ns["x"] = 42
-        execute("x", ns, frame_number=1)
+        execute("x", {}, ns, frame_number=1)
         assert "42" in ns["_stdout"]
 
     def test_bare_expression_result(self):
         """Value of a bare expression (e.g. 1+2) is appended to _stdout."""
         ns = bare_ns()
-        execute("1 + 2", ns, frame_number=1)
+        execute("1 + 2", {}, ns, frame_number=1)
         assert "3" in ns["_stdout"]
 
     def test_assignment_no_capture(self):
         """Assignment statements do not trigger expression capture."""
         ns = bare_ns()
-        execute("x = 42", ns, frame_number=1)
+        execute("x = 42", {}, ns, frame_number=1)
         assert ns["_stdout"] == ""
 
     def test_function_def_no_capture(self):
         """Function definitions do not trigger expression capture."""
         ns = bare_ns()
-        execute("def foo(): pass", ns, frame_number=1)
+        execute("def foo(): pass", {}, ns, frame_number=1)
         assert ns["_stdout"] == ""
 
     def test_print_plus_expr(self):
         """Both print output and bare expression value appear in _stdout."""
         ns = bare_ns()
-        execute("print('out')\n1 + 1", ns, frame_number=1)
+        execute("print('out')\n1 + 1", {}, ns, frame_number=1)
         assert "out" in ns["_stdout"]
         assert "2" in ns["_stdout"]
 
     def test_none_result_not_shown(self):
         """Expression value of None is not appended to _stdout."""
         ns = bare_ns()
-        execute("None", ns, frame_number=1)
+        execute("None", {}, ns, frame_number=1)
         assert ns["_stdout"] == ""
 
     def test_long_repr_truncated(self):
         """Oversized repr is truncated to _EXPR_REPR_MAX_LEN characters."""
         ns = bare_ns()
         ns["big"] = list(range(100000))
-        execute("big", ns, frame_number=1)
+        execute("big", {}, ns, frame_number=1)
         assert len(ns["_stdout"]) <= 2010  # repr + "\n"
 
     def test_syntax_error_passthrough(self):
         """Syntax errors are executed as-is; the error is captured in _error; no crash."""
         ns = bare_ns()
-        execute("def foo(:\n    pass", ns, frame_number=1)
+        execute("def foo(:\n    pass", {}, ns, frame_number=1)
         assert ns["_error"] is not None
 
     def test_source_uses_original_action(self):
@@ -867,7 +868,7 @@ class TestExprCapture:
         verify via inspect.getsource."""
         ns = bare_ns()
         code = "def add(a, b):\n    return a + b"
-        execute(code, ns, frame_number=1)
+        execute(code, {}, ns, frame_number=1)
         src = inspect.getsource(ns["add"])
         assert "def add(a, b):" in src
         assert "return a + b" in src
@@ -875,13 +876,13 @@ class TestExprCapture:
     def test_expr_result_not_in_namespace(self):
         """_expr_result does not persist in namespace."""
         ns = bare_ns()
-        execute("42", ns, frame_number=1)
+        execute("42", {}, ns, frame_number=1)
         assert "_expr_result" not in ns
 
     def test_expr_result_not_in_diff(self):
         """_expr_result does not appear in _diff (system variable with _ prefix)."""
         ns = bare_ns()
-        execute("42", ns, frame_number=1)
+        execute("42", {}, ns, frame_number=1)
         assert "_expr_result" not in ns["_diff"]
 
     def test_maybe_capture_assignment_unchanged(self):
@@ -902,7 +903,7 @@ class TestExprCapture:
     def test_print_returns_none_no_extra_stdout(self):
         """print() is a bare expression but returns None; no extra output is produced."""
         ns = bare_ns()
-        execute("print('hi')", ns, frame_number=1)
+        execute("print('hi')", {}, ns, frame_number=1)
         assert ns["_stdout"] == "hi\n"
 
 
@@ -919,7 +920,7 @@ class TestStepReturnsNone:
         from vessal.ark.shell.hull.cell.protocol import Action, Pong
 
         k = Kernel()
-        k.ns["_system_prompt"] = "test"
+        k.L["_system_prompt"] = "test"
         pong = Pong(think="t", action=Action(operation="x = 1", expect=""))
         result = k.step(pong)
         assert result is None, f"Expected None, got {type(result)}"
@@ -942,8 +943,8 @@ def test_restore_clears_incompatible_frame_stream(tmp_path):
     k = Kernel()
     k.restore(str(snap_path))
 
-    assert isinstance(k.ns["_frame_stream"], FrameStream)
-    assert k.ns["_frame_stream"].hot_frame_count() == 0
+    assert isinstance(k.L["_frame_stream"], FrameStream)
+    assert k.L["_frame_stream"].hot_frame_count() == 0
 
 
 def test_restore_keeps_current_schema_frame_stream(tmp_path):
@@ -972,9 +973,9 @@ def test_restore_keeps_current_schema_frame_stream(tmp_path):
     k = Kernel()
     k.restore(str(snap_path))
 
-    assert isinstance(k.ns["_frame_stream"], FrameStream)
-    assert k.ns["_frame_stream"].hot_frame_count() == 1
-    assert k.ns["_frame_stream"]._hot[0][0]["schema_version"] == FRAME_SCHEMA_VERSION
+    assert isinstance(k.L["_frame_stream"], FrameStream)
+    assert k.L["_frame_stream"].hot_frame_count() == 1
+    assert k.L["_frame_stream"]._hot[0][0]["schema_version"] == FRAME_SCHEMA_VERSION
 
 
 def test_restore_migrates_legacy_two_blob_format(tmp_path):
@@ -995,7 +996,7 @@ def test_restore_migrates_legacy_two_blob_format(tmp_path):
     k = Kernel()
     k.restore(str(legacy_path))
 
-    assert k.ns["x"] == 99
+    assert k.L["x"] == 99
 
     # File must be rewritten in new single-blob format (fast path on subsequent restore)
     raw = legacy_path.read_bytes()
@@ -1013,9 +1014,9 @@ def test_snapshot_tracks_dropped_keys(tmp_path):
     """
     import socket as _socket
     kernel = Kernel()
-    kernel.ns["normal_var"] = 42
+    kernel.L["normal_var"] = 42
     sock = _socket.socket()
-    kernel.ns["sock_handle"] = sock
+    kernel.L["sock_handle"] = sock
 
     path = str(tmp_path / "snap.pkl")
     try:
@@ -1026,18 +1027,18 @@ def test_snapshot_tracks_dropped_keys(tmp_path):
     kernel2 = Kernel()
     kernel2.restore(path)
 
-    dropped = kernel2.ns.get("_dropped_keys", [])
+    dropped = kernel2.L.get("_dropped_keys", [])
     assert "normal_var" not in dropped
-    assert kernel2.ns["normal_var"] == 42
+    assert kernel2.L["normal_var"] == 42
     assert "sock_handle" in dropped
 
 
 def test_restore_emits_reconstruction_signal(tmp_path):
     """After restore(), if _dropped_keys exist, the signal should include reconstruction hints."""
     kernel = Kernel()
-    kernel.ns["x"] = 42
-    kernel.ns["_dropped_keys"] = ["db_conn", "file_handle"]
-    kernel.ns["_dropped_keys_context"] = {
+    kernel.L["x"] = 42
+    kernel.L["_dropped_keys"] = ["db_conn", "file_handle"]
+    kernel.L["_dropped_keys_context"] = {
         "db_conn": "db_conn = connect('postgres://...')",
         "file_handle": "file_handle = open('data.csv')",
     }
@@ -1049,7 +1050,7 @@ def test_restore_emits_reconstruction_signal(tmp_path):
     kernel2.restore(path)
     kernel2.update_signals()
 
-    signals = kernel2.ns.get("_signal_outputs", [])
+    signals = kernel2.L.get("_signal_outputs", [])
     signal_text = "\n".join(body for _, body in signals)
     assert "db_conn" in signal_text
 
@@ -1057,8 +1058,8 @@ def test_restore_emits_reconstruction_signal(tmp_path):
 def test_init_namespace_has_compaction_defaults():
     from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
     k = Kernel()
-    assert k.ns["_compaction_k"] == 16
-    assert k.ns["_compaction_n"] == 8
+    assert k.L["_compaction_k"] == 16
+    assert k.L["_compaction_n"] == 8
 
 
 # ─────────────────────────────────────────────
@@ -1080,7 +1081,7 @@ class TestInspectGetSource:
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.exec_operation("def add(a, b):\n    return a + b", frame_number=1)
-        src = inspect.getsource(k.ns["add"])
+        src = inspect.getsource(k.L["add"])
         assert "def add(a, b):" in src
         assert "return a + b" in src
 
@@ -1088,7 +1089,7 @@ class TestInspectGetSource:
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.exec_operation("class Bar:\n    def m(self):\n        return 1", frame_number=2)
-        src = inspect.getsource(k.ns["Bar"])
+        src = inspect.getsource(k.L["Bar"])
         assert "class Bar:" in src
         assert "def m(self):" in src
 
@@ -1096,7 +1097,7 @@ class TestInspectGetSource:
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.exec_operation("async def waiter():\n    return 42", frame_number=3)
-        src = inspect.getsource(k.ns["waiter"])
+        src = inspect.getsource(k.L["waiter"])
         assert "async def waiter" in src
 
     def test_inspect_getsource_decorated_function_includes_decorator(self):
@@ -1111,7 +1112,7 @@ class TestInspectGetSource:
             "    return 42"
         )
         k.exec_operation(code, frame_number=4)
-        src = inspect.getsource(k.ns["decorated"])
+        src = inspect.getsource(k.L["decorated"])
         assert "@my_decorator" in src
         assert "def decorated" in src
 
@@ -1123,8 +1124,8 @@ class TestInspectGetSource:
         k = Kernel()
         code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
         k.exec_operation(code, frame_number=5)
-        foo_src = inspect.getsource(k.ns["foo"])
-        bar_src = inspect.getsource(k.ns["bar"])
+        foo_src = inspect.getsource(k.L["foo"])
+        bar_src = inspect.getsource(k.L["bar"])
         assert "def foo" in foo_src
         assert "def bar" not in foo_src
         assert "def bar" in bar_src

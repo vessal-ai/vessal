@@ -120,21 +120,29 @@ def _assert_to_source(node: ast.Assert) -> str:
         return "<assert>"
 
 
-def evaluate_expect(expect: str, ns: dict[str, Any], frame_number: int) -> Verdict:
-    """Evaluate expect assertions on a shallow copy of the namespace.
+def evaluate_expect(
+    expect: str,
+    G: dict[str, Any],
+    L: dict[str, Any],
+    frame_number: int,
+) -> Verdict:
+    """Evaluate expect assertions on a shallow copy of L, with G as the global namespace.
 
     Evaluation steps:
     1. Call validate_expect_ast() to check syntax and safety.
-    2. Shallow-copy ns to prevent expect from modifying the execution namespace.
-    3. Compile + exec each assert independently, collect all failures without
-       short-circuiting.
+    2. Shallow-copy L to prevent expect from modifying the execution namespace.
+    3. Compile + exec each assert independently using exec(code, G, copy(L)),
+       collect all failures without short-circuiting.
     4. Return Verdict.
 
     This function never raises — all errors are collected into the failures list.
 
     Args:
         expect: expect code string.
-        ns: Namespace after operation execution (shallow-copied; original not modified).
+        G: Preset assets dict (Skills, boot globals); used as the global namespace
+            so names in G are visible to expect code via LEGB fallback.
+        L: Agent state dict after operation execution (shallow-copied; original not
+            modified).
         frame_number: Current frame number; used as the linecache filename suffix
             (`<frame-{n}-expect>`) so inspect.getsource and traceback show
             the right context.
@@ -143,7 +151,7 @@ def evaluate_expect(expect: str, ns: dict[str, Any], frame_number: int) -> Verdi
         Verdict containing total/passed/failures.
 
     Side effects:
-        Does not modify the passed-in ns. The shallow-copy may be read by expect
+        Does not modify the passed-in L. The shallow-copy may be read by expect
         code but should not be written to (validate_expect_ast blocks assignment
         statements).
     """
@@ -176,8 +184,8 @@ def evaluate_expect(expect: str, ns: dict[str, Any], frame_number: int) -> Verdi
     if total == 0:
         return Verdict(total=0, passed=0, failures=())
 
-    # Shallow-copy namespace: prevent expect from writing to the execution environment
-    eval_ns = dict(ns)
+    # Shallow-copy L: prevent expect from writing to the execution environment
+    eval_ns = dict(L)
 
     failures: list[VerdictFailure] = []
 
@@ -188,7 +196,7 @@ def evaluate_expect(expect: str, ns: dict[str, Any], frame_number: int) -> Verdi
         ast.fix_missing_locations(mini_module)
         try:
             code = compile(mini_module, filename=f"<frame-{frame_number}-expect>", mode="exec")
-            exec(code, eval_ns)  # noqa: S102
+            exec(code, G, eval_ns)  # noqa: S102
         except AssertionError as exc:
             msg = str(exc) if str(exc) else f"Assertion is False: {source}"
             failures.append(VerdictFailure(

@@ -25,11 +25,11 @@ def test_ns_frame_increments_exactly_once_per_step():
     cell = _make_cell()
     _stub_core(cell, _fixed_pong("x = 1"))
 
-    initial = cell.ns["_frame"]
+    initial = cell.L["_frame"]
     result = cell.step()
 
     assert result.protocol_error is None
-    assert cell.ns["_frame"] == initial + 1
+    assert cell.L["_frame"] == initial + 1
 
 
 def test_ns_frame_increments_exactly_once_over_multiple_steps():
@@ -41,7 +41,7 @@ def test_ns_frame_increments_exactly_once_over_multiple_steps():
         cell._core.step = MagicMock(return_value=(_fixed_pong("pass"), None, None))
         result = cell.step()
         assert result.protocol_error is None
-        assert cell.ns["_frame"] == step_n
+        assert cell.L["_frame"] == step_n
 
 
 def test_ns_frame_not_incremented_on_core_error():
@@ -49,11 +49,11 @@ def test_ns_frame_not_incremented_on_core_error():
     cell = _make_cell()
     cell._core.step = MagicMock(side_effect=RuntimeError("network failure"))
 
-    initial = cell.ns["_frame"]
+    initial = cell.L["_frame"]
     result = cell.step()
 
     assert result.protocol_error is not None
-    assert cell.ns["_frame"] == initial
+    assert cell.L["_frame"] == initial
 
 
 def test_frame_number_passed_to_core_equals_ns_frame_plus_one():
@@ -68,7 +68,7 @@ def test_frame_number_passed_to_core_equals_ns_frame_plus_one():
 
     cell._core.step = MagicMock(side_effect=_capture_frame)
 
-    initial = cell.ns["_frame"]
+    initial = cell.L["_frame"]
     cell.step()
 
     assert len(received_frames) == 1
@@ -89,21 +89,21 @@ def test_ns_frame_write_is_single_source_commit_frame():
     pong = _fixed_pong("pass")
     cell._core.step = MagicMock(return_value=(pong, None, None))
 
-    initial = cell.ns["_frame"]
+    initial = cell.L["_frame"]
     frame_after_execute: list[int] = []
 
-    def _tracking_execute(operation, ns, frame_number):
-        result = real_execute(operation, ns, frame_number)
-        # Capture ns["_frame"] immediately after execute() returns,
+    def _tracking_execute(operation, G, L, frame_number):
+        result = real_execute(operation, G, L, frame_number)
+        # Capture L["_frame"] immediately after execute() returns,
         # before _commit_frame has a chance to write it.
-        frame_after_execute.append(ns["_frame"])
+        frame_after_execute.append(L["_frame"])
         return result
 
     with patch.object(kernel_mod, "execute", side_effect=_tracking_execute):
         cell.step()
 
     # After step: ns["_frame"] must equal initial + 1
-    assert cell.ns["_frame"] == initial + 1
+    assert cell.L["_frame"] == initial + 1
     # Immediately after executor returned (before _commit_frame): must still be initial
     assert len(frame_after_execute) == 1
     assert frame_after_execute[0] == initial, (

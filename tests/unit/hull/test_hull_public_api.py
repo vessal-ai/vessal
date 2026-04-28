@@ -93,9 +93,9 @@ class TestHullStatus:
         """status() values reflect the current state in namespace."""
         hull = _make_hull_with_mock_cell(tmp_path)
         # Manually set namespace values to verify
-        hull._cell.ns["_sleeping"] = True
-        hull._cell.ns["_frame"] = 42
-        hull._cell.ns["_wake"] = "heartbeat"
+        hull._cell.L["_sleeping"] = True
+        hull._cell.L["_frame"] = 42
+        hull._cell.L["_wake"] = "heartbeat"
         result = hull.status()
         assert result["idle"] is True
         assert result["frame"] == 42
@@ -106,7 +106,7 @@ class TestHullStatus:
         hull = _make_hull_with_mock_cell(tmp_path)
         result = hull.status()
         result["idle"] = "tampered"
-        assert hull._cell.ns.get("_sleeping") != "tampered"
+        assert hull._cell.L.get("_sleeping") != "tampered"
 
 
 class TestHullNextAlarm:
@@ -121,7 +121,7 @@ class TestHullNextAlarm:
         """After Agent sets _next_wake, next_alarm() returns that timestamp."""
         hull = _make_hull_with_mock_cell(tmp_path)
         future = time.time() + 3600
-        hull._cell.ns["_next_wake"] = future
+        hull._cell.L["_next_wake"] = future
         result = hull.next_alarm()
         assert result == pytest.approx(future, abs=1.0)
 
@@ -163,7 +163,7 @@ class TestHullFrames:
         fs.commit_frame(_frame_dict(1, diff="+a = 1"))
         fs.commit_frame(_frame_dict(2, diff="+b = 2"))
         fs.commit_frame(_frame_dict(3, diff="+c = 3"))
-        hull._cell.ns["_frame_stream"] = fs
+        hull._cell.L["_frame_stream"] = fs
         result = hull.frames(after=1)
         assert len(result) == 2
         assert result[0]["n"] == 2
@@ -173,7 +173,7 @@ class TestHullFrames:
         hull = _make_hull_with_mock_cell(tmp_path)
         fs = FrameStream()
         fs.commit_frame(_frame_dict(1))
-        hull._cell.ns["_frame_stream"] = fs
+        hull._cell.L["_frame_stream"] = fs
         result = hull.frames()
         result.append({"number": 999})
-        assert hull._cell.ns["_frame_stream"].hot_frame_count() == 1
+        assert hull._cell.L["_frame_stream"].hot_frame_count() == 1

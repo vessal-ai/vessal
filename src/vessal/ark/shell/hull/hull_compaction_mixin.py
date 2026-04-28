@@ -71,12 +71,12 @@ class HullCompactionMixin:
 
     def _resume_pending_compaction(self) -> None:
         """Re-submit any in-flight compaction that survived in the snapshot after a crash-restart."""
-        fs = self._cell.get("_frame_stream")
+        fs = self._cell.L.get("_frame_stream")
         if fs is None:
             return
         if fs.compression_zone is None:
             return
-        frame_number = self._cell.get("_frame", 0)
+        frame_number = self._cell.L.get("_frame", 0)
         payload = list(fs.compression_zone)
         task = {"layer": 0, "payload": payload}
         self._thread_pool.submit(self._run_compaction_task, task, frame_number)
