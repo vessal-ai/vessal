@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, Union
 
 FRAME_SCHEMA_VERSION = 7
 
@@ -210,6 +210,44 @@ class Action:
             Action instance.
         """
         return Action(operation=d.get("operation", ""), expect=d.get("expect", ""))
+
+
+# ─────────────────────────────────────────────
+# FrameStream (Spec §4.8)
+# ─────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class FrameContent:
+    """Spec §4.8 layer=0 content — flat fields mirroring frame_content table."""
+    think: str
+    operation: str
+    expect: str
+    observation: dict        # {"stdout","stderr","diff","error"}
+    verdict: dict | None     # {"value","error"} or None
+    signals: dict            # {(class_name, var_name, scope): payload}
+
+
+@dataclass(frozen=True, slots=True)
+class SummaryContent:
+    """Spec §4.8 layer>=1 content — opaque YAML body."""
+    schema_version: int
+    body: str
+
+
+@dataclass(frozen=True, slots=True)
+class Entry:
+    """Spec §4.2 — (layer, n_start, n_end, content)."""
+    layer: int
+    n_start: int
+    n_end: int
+    content: Union[FrameContent, SummaryContent]
+
+
+@dataclass(frozen=True, slots=True)
+class FrameStream:
+    """Spec §4.8 — single ordered list, layer DESC + n_start ASC."""
+    entries: list[Entry]
 
 
 # ─────────────────────────────────────────────
@@ -526,4 +564,5 @@ __all__ = [
     "ErrorRecord",
     "CompactionRecord",
     "flatten_frame_dict",
+    "FrameContent", "SummaryContent", "Entry", "FrameStream",
 ]
