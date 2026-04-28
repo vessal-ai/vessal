@@ -42,7 +42,7 @@ flowchart LR
     Agent["Agent code"]
     Skill["memory skill"]
     JSON["data/memory.json"]
-    Signal["_signal()\noutput all memories + pressure warning each frame"]
+    Signal["_signal()\noutput all memories each frame"]
     FL["_frame_log"]
 
     Agent -->|"memory.save(key, value)"| Skill
