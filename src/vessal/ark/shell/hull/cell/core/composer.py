@@ -18,7 +18,8 @@ def compose(ping: Ping) -> list[dict]:
     """Build OpenAI-style messages list from a dataclass Ping."""
     messages: list[dict] = []
     sys_text = ping.system_prompt.strip()
-    messages.append({"role": "system", "content": sys_text})
+    if sys_text:
+        messages.append({"role": "system", "content": sys_text})
 
     user_text = _compose_user(ping.state.frame_stream, ping.state.signals)
     if user_text:

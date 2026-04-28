@@ -30,7 +30,6 @@ class Hull(HullInitMixin, HullSkillsMixin, HullSnapshotMixin, HullRuntimeMixin):
         core_cfg = config.get("core", {})
         cell_cfg = config.get("cell", {})
         hull_cfg = config.get("hull", {})
-        renderer_cfg = config.get("renderer", {})
         agent_cfg = config.get("agent", {})
         gates_cfg = config.get("gates", {})
 
@@ -39,5 +38,5 @@ class Hull(HullInitMixin, HullSkillsMixin, HullSnapshotMixin, HullRuntimeMixin):
         boot_entries = self._init_skills_pre(hull_cfg)
         self._init_cell(core_cfg, cell_cfg, agent_cfg, cells_cfg, boot_entries)
         self._init_skills(hull_cfg)
-        self._init_prompts(renderer_cfg)
+        self._init_prompts()
         self._init_loop(gates_cfg)

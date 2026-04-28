@@ -20,7 +20,7 @@ def render_frame_stream(conn: sqlite3.Connection) -> FrameStream:
     """Spec §4.10: visibility SQL → fetch content rows → assemble dataclass.
 
     Layer DESC + n_start ASC ordering enforced by the visibility SQL itself.
-    Single read transaction; no Python-side O(N^2) coverage check.
+    Non-transactional reads (no concurrent compaction writer at this phase); no Python-side O(N^2) coverage check.
     """
     with conn:
         visible = conn.execute(

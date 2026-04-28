@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import sys
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -29,18 +29,6 @@ def _load_prompt(name: str) -> str:
 # Hull-owned renderer helpers
 # (moved from the deleted kernel/render/ directory in PR 5)
 # ─────────────────────────────────────────────
-
-
-@dataclass
-class RenderConfig:
-    """Hull renderer configuration passed via hull.toml [renderer] section.
-
-    Attributes:
-        system_prompt_key: L-key holding the assembled system prompt. Default "_system_prompt".
-        frame_budget_ratio: Ratio of context budget allocated to frame history. Default 0.7.
-    """
-    system_prompt_key: str = "_system_prompt"
-    frame_budget_ratio: float = 0.7
 
 
 @dataclass(frozen=True)
@@ -240,8 +228,8 @@ class HullInitMixin:
                 except Exception as e:
                     print(f"[error] skill server '{skill_name}' failed to start: {e}", flush=True)
 
-    def _init_prompts(self, renderer_cfg: dict) -> None:
-        """Phase 4: Load system prompts, SOUL, build RenderConfig."""
+    def _init_prompts(self) -> None:
+        """Phase 4: Load system prompts and SOUL; build SystemPromptBuilder."""
         protocol_text = _load_prompt("system.md")
         self._soul_path = self._project_dir / "SOUL.md"
         if self._soul_path.exists():
@@ -255,11 +243,6 @@ class HullInitMixin:
         self._prompt_builder.register(Section("protocol", 0, True, lambda ns: protocol_text))
         self._prompt_builder.register(Section("soul", 10, False, lambda ns: ns.get("_soul", "")))
         self._prompt_builder.register(Section("capabilities", 20, False, render_capabilities))
-
-        self._work_render_config = RenderConfig(
-            system_prompt_key=renderer_cfg.get("system_prompt_key", "_system_prompt"),
-            frame_budget_ratio=renderer_cfg.get("frame_budget_ratio", 0.7),
-        )
 
     def _init_loop(self, gates_cfg: dict) -> None:
         """Phase 5: Gates, FrameHooks, EventLoop, wake injection."""

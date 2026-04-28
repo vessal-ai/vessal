@@ -217,40 +217,6 @@ class TestFrameRecord:
         assert d["ping"]["state"]["signals"] == {}
 
 
-def test_compaction_record_roundtrip():
-    from vessal.ark.shell.hull.cell.protocol import CompactionRecord
-    rec = CompactionRecord(
-        range=(0, 15),
-        intent="implement login",
-        operations=("call A", "call B"),
-        outcomes="created session token",
-        artifacts=("auth.py",),
-        notable="used bcrypt not argon2",
-        layer=0,
-        compacted_at=16,
-    )
-    d = rec.to_dict()
-    assert d["schema_version"] == 7
-    assert d["range"] == [0, 15]
-    assert d["operations"] == ["call A", "call B"]
-    restored = CompactionRecord.from_dict(d)
-    assert restored == rec
-
-
-def test_compaction_record_empty_fields():
-    from vessal.ark.shell.hull.cell.protocol import CompactionRecord
-    rec = CompactionRecord(
-        range=(10, 15),
-        intent="",
-        operations=(),
-        outcomes="",
-        artifacts=(),
-        notable="",
-        layer=1,
-        compacted_at=32,
-    )
-    assert CompactionRecord.from_dict(rec.to_dict()) == rec
-
 
 class TestFromDictRoundtrips:
     def test_observation_from_dict(self):

@@ -57,7 +57,7 @@ def test_compose_layer0_frame_block_format():
             signals={},
         ),
     )
-    body = compose(ping)[1]["content"]
+    body = compose(ping)[0]["content"]
     assert "── frame 42 ──" in body
     assert "[think]\nthinking" in body
     assert "[operation]\nx = 1" in body
@@ -77,7 +77,7 @@ def test_compose_layer1_summary_block_format():
             signals={},
         ),
     )
-    body = compose(ping)[1]["content"]
+    body = compose(ping)[0]["content"]
     assert "── summary [1..16] ──" in body
     assert "summary text" in body
 
@@ -93,6 +93,15 @@ def test_compose_empty_frame_stream_omits_section():
     assert messages[0]["role"] == "system"
 
 
+def test_compose_empty_system_prompt_omits_system_message():
+    ping = Ping(
+        system_prompt="",
+        state=State(frame_stream=FrameStream(entries=[]), signals={}),
+    )
+    messages = compose(ping)
+    assert messages == []
+
+
 def test_compose_signals_grouped_by_skill():
     ping = Ping(
         system_prompt="",
@@ -104,6 +113,6 @@ def test_compose_signals_grouped_by_skill():
             },
         ),
     )
-    body = compose(ping)[1]["content"]
+    body = compose(ping)[0]["content"]
     assert "ChatSkill" in body and "chat" in body and "unread" in body
     assert "ClockSkill" in body and "clock" in body and "now" in body

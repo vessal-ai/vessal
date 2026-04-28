@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from vessal.ark.shell.hull.cell.core import Core
     from vessal.ark.shell.hull.event_loop import EventLoop
     from vessal.ark.shell.hull.hull_api import HullApi
-    from vessal.ark.shell.hull.hull_init_mixin import RenderConfig, SystemPromptBuilder
+    from vessal.ark.shell.hull.hull_init_mixin import SystemPromptBuilder
     from vessal.ark.shell.hull.skill_loader import SkillLoader
     from vessal.ark.util.logging import Tracer
 
@@ -238,12 +238,11 @@ class HullRuntimeMixin:
         return self._event_loop.event_queue
 
     def _rewrite_runtime_owned(self) -> None:
-        """Re-fill runtime-owned variables each frame: _frame_type, _render_config, _system_prompt, _soul.
+        """Re-fill runtime-owned variables each frame: _frame_type, _system_prompt, _soul.
 
         Hull is the source of truth for these variables; the model may read but should not modify them.
         """
         self._cell.L["_frame_type"] = "work"
-        self._cell.L["_render_config"] = self._work_render_config
         # SOUL hot-reload: detect SOUL.md changes each frame (mtime check ~1μs).
         # Re-read on change; otherwise use cached value. Must run before build() so
         # _soul is in L when Section("soul") reads ns.get("_soul").
