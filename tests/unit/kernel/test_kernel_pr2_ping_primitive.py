@@ -124,7 +124,7 @@ def test_legacy_scalar_keys_absent_after_ping(k):
 
 
 def test_multi_entry_methods_removed():
-    """The 7 multi-entry Kernel methods deleted in PR 2 must not exist."""
+    """The 8 multi-entry Kernel methods deleted in PR 2 must not exist."""
     forbidden_attrs = {
         "prepare", "step", "exec_operation", "eval_expect",
         "update_signals", "render", "_commit_frame",
