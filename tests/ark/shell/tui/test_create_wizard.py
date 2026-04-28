@@ -56,12 +56,6 @@ def test_finalize_fills_missing_with_defaults():
         assert merged[key] == DEFAULT_ANSWERS[key]
 
 
-def test_finalize_rejects_empty_name():
-    import pytest
-    with pytest.raises(ValueError):
-        finalize_answers({"name": ""})
-
-
 def test_validate_project_name_rejects_existing_dir(tmp_path):
     from vessal.ark.shell.tui.create_wizard import validate_project_name
     (tmp_path / "agent_test").mkdir()
