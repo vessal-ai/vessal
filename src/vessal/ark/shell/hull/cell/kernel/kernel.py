@@ -1,6 +1,6 @@
-"""kernel.py — Kernel main class: the Agent's execution kernel, holding the namespace and coordinating rendering and execution."""
+"""kernel.py — Kernel main class: the Agent's execution kernel, holding G (preset assets) and L (Agent state)."""
 # All Agent state (variables, functions, classes, instances, history, templates)
-# lives in this dict.
+# lives in L (Agent state dict). G holds preset assets (Skills, boot globals).
 #
 # Public interface:
 #   run(pong, tracer)              single-frame execution: exec → expect → frame → commit
@@ -8,16 +8,17 @@
 #   exec_operation(operation, frame_number, tracer) -> ExecResult
 #                      execute operation code; does NOT increment _frame or commit to _frame_stream
 #   eval_expect(expect, tracer)  -> Verdict
-#                      evaluate prediction assertions on a shallow copy of the namespace;
-#                      does NOT modify the real namespace
+#                      evaluate prediction assertions on a shallow copy of L;
+#                      does NOT modify the real L
 #   render()           render current state only, without executing code
-#   snapshot(path)     serialize namespace to a file
-#   restore(path)      restore namespace from a file
-#   ns                 namespace dict, fully exposed, readable/writable directly
+#   snapshot(path)     serialize L to a file
+#   restore(path)      restore L from a file
+#   L                  Agent state dict, fully exposed, readable/writable directly
+#   G                  preset assets dict (Skills, boot globals); read-only by convention
 #
-# Initialization: decides where to start (fresh namespace or snapshot restore),
+# Initialization: decides where to start (fresh L or snapshot restore),
 # and initializes all system variables.
-# Kernel has no state outside of ns — no Gate, no counters, no config attributes.
+# Kernel has no state outside of G and L — no Gate, no counters, no config attributes.
 
 from __future__ import annotations
 
@@ -74,9 +75,9 @@ class Kernel:
     Core equation: exec_result = kernel.exec_operation(operation, frame_number)
     operation is a Python code string; exec_result contains stdout/diff/error.
 
-    ns is fully exposed; external code may read/write it directly. Keys starting
+    L is fully exposed; external code may read/write it directly. Keys starting
     with _ are system variables; modify them at your own risk.
-    Kernel itself is stateless — it is simply the executor and renderer of the namespace.
+    Kernel itself is stateless — it is simply the executor and renderer of L.
 
     Construction and appending of _frame_log is Cell's responsibility (Phase 3 implementation).
     """
@@ -85,79 +86,77 @@ class Kernel:
         """Initialize Kernel.
 
         Args:
-            snapshot_path: If provided, restore namespace from this file (continuing
-                           a previous session). Otherwise, start a fresh namespace
-                           with factory defaults.
-            db_path: Optional path to a SQLite database for the frame_log. When set,
-                     opens (or creates) the database and exposes a FrameLog via
-                     self.frame_log. When None (default), self.frame_log is None and
-                     no database is opened.
+            snapshot_path: If provided, restore L from this file (continuing a
+                           previous session). G is rebuilt fresh by __init__
+                           (boot script comes in PR 4).
+            db_path: Optional path to a SQLite database for the frame_log.
         """
-        self.ns: dict = {}
+        self.G: dict = {}
+        self.L: dict = {}
         if snapshot_path:
             self.restore(snapshot_path)
         else:
-            self._init_namespace()
+            self._init_L()
         self.frame_log: FrameLog | None = None
         if db_path is not None:
             conn = open_db(db_path)
             source_cache.reload_from_db(conn)
             self.frame_log = FrameLog(conn)
 
-    def _init_namespace(self) -> None:
-        """Inject system variable factory defaults into an empty namespace."""
-        ns = self.ns
+    def _init_L(self) -> None:
+        """Inject Agent-state factory defaults into an empty L."""
+        L = self.L
         # v3 system prompt and pinned observations
-        ns["_system_prompt"] = ""                 # system prompt; Hull loads from SOUL.md
-        ns["_frame_type"] = "work"               # frame type; Hull rewrites each frame (always "work")
-        ns["_render_config"] = None              # RenderConfig written by Hull; uses default when None
-        ns["_wake"] = ""                         # wake reason; written by Hull.run()
+        L["_system_prompt"] = ""
+        L["_frame_type"] = "work"
+        L["_render_config"] = None
+        L["_wake"] = ""
 
         # Hierarchical compaction config (must precede _frame_stream init)
-        ns["_compaction_k"] = 16                  # hot-bucket depth; frames before shift
-        ns["_compaction_n"] = 8                   # max cold-zone layers
+        L["_compaction_k"] = 16
+        L["_compaction_n"] = 8
 
         # Execution state
-        ns["_frame"] = 0                          # last committed frame number; written by _commit_frame
-        ns["_ns_meta"] = {}                       # variable usage tracking; rewritten by executor each frame
-        ns["_frame_stream"] = FrameStream(
-            k=ns["_compaction_k"],
-            n=ns["_compaction_n"],
+        L["_frame"] = 0
+        L["_ns_meta"] = {}
+        L["_frame_stream"] = FrameStream(
+            k=L["_compaction_k"],
+            n=L["_compaction_n"],
         )
-        ns["_signal_outputs"] = []               # populated by update_signals() each frame
+        L["_signal_outputs"] = []
 
         # Context utilization (written by renderer on each frame render)
-        ns["_context_pct"] = 0                    # context utilization percentage
-        ns["_budget_total"] = 0                   # total render budget; written by renderer each frame
+        L["_context_pct"] = 0
+        L["_budget_total"] = 0
 
         # Context budget (used by renderer to calculate utilization)
-        ns["_context_budget"] = 128000            # total context window (estimated tokens); Hull can override
-        ns["_token_budget"] = 4096                # reserved for LLM reply; Hull writes via cell.set("_token_budget", cell.max_tokens)
+        L["_context_budget"] = 128000
+        L["_token_budget"] = 4096
 
         # Initial values of side-effect variables written by executor
         # (ensures fields exist when rendering the first frame)
-        ns["_operation"] = ""                     # operation code executed in the previous frame
-        ns["_stdout"] = ""                        # stdout from this frame
-        ns["_error"] = None                       # exception from this frame
-        ns["_errors"] = []                        # error history, list[ErrorRecord]; cap enforced by append_error() via _error_buffer_cap
-        ns["_actual_tokens_in"] = None            # actual input token count returned by API (None if unavailable)
-        ns["_actual_tokens_out"] = None           # actual output token count returned by API (None if unavailable)
-        ns["_diff"] = ""                          # change summary for this frame (git-style +/- format)
+        L["_operation"] = ""
+        L["_stdout"] = ""
+        L["_error"] = None
+        L["_errors"] = []
+        L["_actual_tokens_in"] = None
+        L["_actual_tokens_out"] = None
+        L["_diff"] = ""
 
         # Mirror variable (updated by Cell._commit_frame())
-        ns["_verdict"] = None                     # verdict from the previous frame
+        L["_verdict"] = None
 
         # Frame drop count
-        ns["_dropped_frame_count"] = 0            # number of frames dropped in this render; written by renderer
+        L["_dropped_frame_count"] = 0
 
         # Lifecycle variables
-        ns["_sleeping"] = False                   # set to True when Agent sleeps → frame loop pauses
-        ns["sleep"] = self.sleep
-        ns["_next_wake"] = None                  # next wake time set by Agent (absolute timestamp)
+        L["_sleeping"] = False
+        L["sleep"] = self.sleep
+        L["_next_wake"] = None
 
-        # Protected keys: all keys present at namespace init time.
+        # Protected keys: all keys present at L init time.
         # executor restores any of these that agent code deletes.
-        ns["_protected_keys"] = list(ns.keys())
+        L["_protected_keys"] = list(L.keys())
 
     def exec_operation(
         self,
@@ -173,7 +172,7 @@ class Kernel:
         Args:
             operation: Python code string to execute.
             frame_number: Current frame number; passed to executor for ErrorRecord/_ns_meta tracking.
-                          Not written to ns["_frame"] — that is _commit_frame's responsibility.
+                          Not written to L["_frame"] — that is _commit_frame's responsibility.
             tracer: Optional TracerLike for recording execution time.
 
         Returns:
@@ -181,7 +180,7 @@ class Kernel:
         """
         if tracer:
             tracer.start(frame_number, "executor.execute")
-        result = execute(operation, self.ns, frame_number)
+        result = execute(operation, self.L, frame_number)
         if tracer:
             tracer.end(frame_number, "executor.execute")
         return result
@@ -200,41 +199,41 @@ class Kernel:
             expect: Expect code string (containing assert statements).
             tracer: Optional TracerLike for recording evaluation time.
             frame_number: Current frame number for linecache registration. When None,
-                falls back to ns["_frame"] + 1 (next frame).
+                falls back to L["_frame"] + 1 (next frame).
 
         Returns:
             Verdict containing total/passed/failures fields.
         """
-        frame = frame_number if frame_number is not None else self.ns.get("_frame", 0) + 1
+        frame = frame_number if frame_number is not None else self.L.get("_frame", 0) + 1
         if tracer:
             tracer.start(frame, "kernel.eval_expect")
-        result = evaluate_expect(expect, self.ns, frame)
+        result = evaluate_expect(expect, self.L, frame)
         if tracer:
             tracer.end(frame, "kernel.eval_expect")
         return result
 
     def update_signals(self) -> None:
-        """Collect base signals + duck-typing signal sources into ns["_signal_outputs"].
+        """Collect base signals + duck-typing signal sources into L["_signal_outputs"].
 
         Signal format is uniformly a (title, body) tuple.
 
-        1. Iterate over BASE_SIGNALS (list of (name, fn(ns) -> str)); include fn result
+        1. Iterate over BASE_SIGNALS (list of (name, fn(L) -> str)); include fn result
            in outputs when it returns a non-empty str.
-        2. Iterate over all objects in the namespace that have a _signal method
+        2. Iterate over all objects in L that have a _signal method
            (duck-typing); call _signal() and collect returned (title, body) tuples.
            Any object only needs to implement the _signal protocol; no inheritance
            from SkillBase is required.
         3. Signal errors are caught and logged; they never interrupt the agent.
 
         Side effects:
-            Writes to ns["_signal_outputs"] (list[tuple[str, str]]).
+            Writes to L["_signal_outputs"] (list[tuple[str, str]]).
         """
         outputs: list[tuple[str, str]] = []
 
         # Base signals (system-level, always present)
         for signal_name, fn in BASE_SIGNALS:
             try:
-                result = fn(self.ns)
+                result = fn(self.L)
                 if isinstance(result, str) and result.strip():
                     outputs.append((signal_name, result))
             except Exception as e:
@@ -242,11 +241,11 @@ class Kernel:
                 logger.warning("Base signal '%s' failed: %s", fn_name, e)
 
         # TODO: future optimization — switch to explicit registry via
-        # ns["_signal_sources"] when O(|ns|) full scan becomes measurable.
+        # L["_signal_sources"] when O(|L|) full scan becomes measurable.
         # Current duck-typing scan is intentional design — see console/1-active/
         # 20260421-cell-architecture-review.md C16.
-        # Duck-typing signal scan: any object in namespace with a _signal method
-        for obj in list(self.ns.values()):
+        # Duck-typing signal scan: any object in L with a _signal method
+        for obj in list(self.L.values()):
             if hasattr(obj, "_signal") and callable(getattr(obj, "_signal")):
                 try:
                     result = obj._signal()
@@ -258,7 +257,7 @@ class Kernel:
                     obj_name = getattr(obj, "name", repr(obj))
                     logger.warning("Signal source '%s' failed: %s", obj_name, e)
 
-        self.ns["_signal_outputs"] = outputs
+        self.L["_signal_outputs"] = outputs
 
     def render(self) -> Ping:
         """Render current namespace state only, without executing code.
@@ -266,7 +265,7 @@ class Kernel:
         Returns:
             Ping(system_prompt, state)
         """
-        return _render(self.ns, self.ns.get("_render_config"))
+        return _render(self.L, self.L.get("_render_config"))
 
     def snapshot(self, path: str) -> None:
         """Serialize namespace to file. Pure bytes — no Skill awareness.
@@ -289,10 +288,10 @@ class Kernel:
         path = str(path)
 
         try:
-            body_bytes = cloudpickle.dumps(self.ns)
+            body_bytes = cloudpickle.dumps(self.L)
         except Exception as e:
-            picklable = {k: v for k, v in self.ns.items() if _picklable(v)}
-            dropped = [k for k in self.ns if k not in picklable]
+            picklable = {k: v for k, v in self.L.items() if _picklable(v)}
+            dropped = [k for k in self.L if k not in picklable]
             logger.debug(
                 "full namespace serialization failed (%s), "
                 "dropping %d unpicklable keys: %s",
@@ -321,13 +320,13 @@ class Kernel:
             raise
 
     def restore(self, path: str) -> None:
-        """Restore ns from file. Caller MUST have prepared sys.path / sys.modules.
+        """Restore L from file. Caller MUST have prepared sys.path / sys.modules.
 
         Args:
             path: File path written by snapshot().
 
         Side effects:
-            Completely replaces self.ns.
+            Completely replaces self.L.
         """
         import io as _io
         with open(path, "rb") as f:
@@ -336,14 +335,14 @@ class Kernel:
         first = LenientUnpickler(buf).load()
         remaining = len(raw) - buf.tell()
         if remaining > 0:
-            # Legacy layout: [cloudpickle(header_dict)][cloudpickle(ns)]
-            # Discard header; load the actual namespace from remaining bytes.
-            self.ns = LenientUnpickler(buf).load()
+            # Legacy layout: [cloudpickle(header_dict)][cloudpickle(L)]
+            # Discard header; load the actual L from remaining bytes.
+            self.L = LenientUnpickler(buf).load()
             # Write back in new format so subsequent restores use fast path.
             with open(path, "wb") as f:
-                f.write(cloudpickle.dumps(self.ns))
+                f.write(cloudpickle.dumps(self.L))
         else:
-            self.ns = first
+            self.L = first
         self._migrate_snapshot()
 
     def _find_creation_operation(self, key: str) -> str:
@@ -355,7 +354,7 @@ class Kernel:
         Returns:
             The operation string that created the variable, or empty string if not found.
         """
-        fs = self.ns.get("_frame_stream")
+        fs = self.L.get("_frame_stream")
         if fs is None:
             return ""
         return fs.find_creation(key) or ""
@@ -367,13 +366,13 @@ class Kernel:
         No backfill is attempted.
         """
         # Drop stale _frame_log if present (v6 and earlier)
-        self.ns.pop("_frame_log", None)
+        self.L.pop("_frame_log", None)
 
-        fs = self.ns.get("_frame_stream")
+        fs = self.L.get("_frame_stream")
         if fs is None:
-            self.ns["_frame_stream"] = FrameStream(
-                k=self.ns.get("_compaction_k", 16),
-                n=self.ns.get("_compaction_n", 8),
+            self.L["_frame_stream"] = FrameStream(
+                k=self.L.get("_compaction_k", 16),
+                n=self.L.get("_compaction_n", 8),
             )
         else:
             try:
@@ -381,16 +380,16 @@ class Kernel:
                 if d.get("schema_version") != FRAME_SCHEMA_VERSION:
                     raise ValueError("schema mismatch")
             except Exception:
-                self.ns["_frame_stream"] = FrameStream(
-                    k=self.ns.get("_compaction_k", 16),
-                    n=self.ns.get("_compaction_n", 8),
+                self.L["_frame_stream"] = FrameStream(
+                    k=self.L.get("_compaction_k", 16),
+                    n=self.L.get("_compaction_n", 8),
                 )
                 logger.info("Cleared incompatible frame_stream (schema mismatch)")
-        self.ns["sleep"] = self.sleep
+        self.L["sleep"] = self.sleep
 
     def sleep(self) -> None:
         """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
-        self.ns["_sleeping"] = True
+        self.L["_sleeping"] = True
 
     # ------------------------------------------------------------------ High-level interface
 
@@ -426,11 +425,11 @@ class Kernel:
             tracer:       Optional TracerLike, forwarded to exec_operation and eval_expect.
             ping:         Perceptual input seen by the model for this frame (optional;
                           used to write into FrameRecord v6).
-            frame_number: Frame sequence number. When None, computed from ns["_frame"] + 1
+            frame_number: Frame sequence number. When None, computed from L["_frame"] + 1
                           (backward-compatibility guard for callers that do not pass it).
         """
         if frame_number is None:
-            frame_number = self.ns["_frame"] + 1
+            frame_number = self.L["_frame"] + 1
 
         exec_result = self.exec_operation(pong.action.operation, frame_number, tracer)
 
@@ -464,7 +463,7 @@ class Kernel:
             ping:         Perceptual input seen by the model for this frame
                           (optional; uses empty Ping when absent).
         """
-        ns = self.ns
+        L = self.L
         effective_ping = ping if ping is not None else Ping(
             system_prompt="", state=State(frame_stream="", signals="")
         )
@@ -474,13 +473,13 @@ class Kernel:
             pong=pong,
             observation=observation,
         )
-        fs = ns.get("_frame_stream")
+        fs = L.get("_frame_stream")
         if fs is None:
-            fs = FrameStream(k=ns.get("_compaction_k", 16), n=ns.get("_compaction_n", 8))
-            ns["_frame_stream"] = fs
+            fs = FrameStream(k=L.get("_compaction_k", 16), n=L.get("_compaction_n", 8))
+            L["_frame_stream"] = fs
         fs.commit_frame(record.to_dict())
-        ns["_frame"] = frame_number
-        ns["_verdict"] = observation.verdict
+        L["_frame"] = frame_number
+        L["_verdict"] = observation.verdict
         if self.frame_log is not None:
             self.frame_log.write_frame(self._build_frame_write_spec(record))
 
