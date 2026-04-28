@@ -561,7 +561,7 @@ def _make_frame_dict(
     frame = FrameRecord(
         number=number,
         pong=Pong(think="", action=Action(operation="pass", expect="")),
-        observation=Observation(stdout="", diff=diff, error=error, verdict=None),
+        observation=Observation(stdout="", stderr="", diff=diff, error=error),
     )
     return frame.to_dict()
 
