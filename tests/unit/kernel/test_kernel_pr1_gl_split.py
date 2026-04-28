@@ -17,6 +17,15 @@ from vessal.ark.shell.hull.cell.kernel import Kernel
 from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
 
 
+def _ns(k):
+    return {"globals": k.G, "locals": k.L}
+
+
+def _exec(k, op, expect=""):
+    from vessal.ark.shell.hull.cell.protocol import Action, Pong
+    return k.ping(Pong(think="", action=Action(operation=op, expect=expect)), _ns(k))
+
+
 class TestKernelHasGAndL:
     def test_kernel_exposes_g_and_l_as_dicts(self):
         k = Kernel()
@@ -34,16 +43,16 @@ class TestKernelHasGAndL:
 
     def test_l_has_init_namespace_keys(self):
         k = Kernel()
-        # Spot-check a few keys that belonged to _init_namespace pre-PR1
+        # Spot-check a few keys that belong to _init_L
         assert "_frame" in k.L
-        assert "_protected_keys" in k.L
         assert "_frame_stream" in k.L
+        assert "_signal_outputs" in k.L
 
 
 class TestThreeArgExecWritesToLOnly:
     def test_assignment_in_operation_lands_in_L(self):
         k = Kernel()
-        k.exec_operation("x = 42", frame_number=1)
+        _exec(k, "x = 42")
         assert k.L["x"] == 42
         assert "x" not in k.G
 
@@ -51,14 +60,14 @@ class TestThreeArgExecWritesToLOnly:
         k = Kernel()
         k.G["chat"] = "g_chat_marker"
         # Agent reads `chat`; Python LEGB falls back from L to G
-        k.exec_operation("found = chat", frame_number=2)
+        _exec(k, "found = chat")
         assert k.L["found"] == "g_chat_marker"
         assert "chat" not in k.L  # still only in G
 
     def test_g_is_not_written_by_assignment(self):
         k = Kernel()
         k.G["counter"] = 0
-        k.exec_operation("counter = 99", frame_number=3)
+        _exec(k, "counter = 99")
         # Agent's reassignment shadows in L; G stays put
         assert k.L["counter"] == 99
         assert k.G["counter"] == 0
@@ -71,7 +80,7 @@ class TestEvalExpectUsesCopyOfL:
         k = Kernel()
         k.L["base"] = 1
         # Use a benign expect that reads but does not assign
-        k.eval_expect("assert base == 1", frame_number=4)
+        _exec(k, "pass", expect="assert base == 1")
         assert k.L["base"] == 1
         # No new L key should appear from expect machinery
         assert "tmp" not in k.L

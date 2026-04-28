@@ -112,12 +112,12 @@ class TestVerdictSignal:
         assert k_verdict.render(ns) == ""
 
     def test_verdict_none_returns_empty(self):
-        ns = {"_verdict": None}
+        ns = {"verdict": None}
         assert k_verdict.render(ns) == ""
 
     def test_all_passed_no_failures(self):
         v = Verdict(total=3, passed=3, failures=())
-        ns = {"_verdict": v}
+        ns = {"verdict": v}
         result = k_verdict.render(ns)
         assert "3/3" in result
         assert "assertions passed" in result
@@ -127,7 +127,7 @@ class TestVerdictSignal:
             VerdictFailure(kind="assertion_failed", assertion="assert x == 1", message="x was 0"),
             VerdictFailure(kind="assertion_failed", assertion="assert y > 0", message="y was -1"),
         ))
-        ns = {"_verdict": v}
+        ns = {"verdict": v}
         result = k_verdict.render(ns)
         assert "2/4" in result
 
@@ -138,7 +138,7 @@ class TestVerdictSignal:
             message="x was 0",
         )
         v = Verdict(total=1, passed=0, failures=(failure,))
-        ns = {"_verdict": v}
+        ns = {"verdict": v}
         result = k_verdict.render(ns)
         assert "assertion_failed" in result
         assert "assert x == 1" in result
@@ -151,7 +151,7 @@ class TestVerdictSignal:
             message="z is False",
         )
         v = Verdict(total=1, passed=0, failures=(failure,))
-        ns = {"_verdict": v}
+        ns = {"verdict": v}
         result = k_verdict.render(ns)
         # Format: [kind] assertion — message
         assert "[assertion_failed]" in result
@@ -159,7 +159,7 @@ class TestVerdictSignal:
 
     def test_no_failure_section_when_all_pass(self):
         v = Verdict(total=2, passed=2, failures=())
-        ns = {"_verdict": v}
+        ns = {"verdict": v}
         result = k_verdict.render(ns)
         # No failure lines when no failures
         lines = result.splitlines()

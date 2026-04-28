@@ -499,7 +499,8 @@ class TestSoulMd:
     def test_soul_shown_in_rendered_state(self, tmp_path):
         """SOUL.md content appears in the rendered Ping via three-part renderer concatenation."""
         hull = _make_hull(tmp_path, soul_content="You are a data expert")
-        ping = hull._cell._kernel.render()
+        kernel = hull._cell._kernel
+        ping = kernel.ping(None, {"globals": kernel.G, "locals": kernel.L})
         assert "You are a data expert" in ping.system_prompt
 
 

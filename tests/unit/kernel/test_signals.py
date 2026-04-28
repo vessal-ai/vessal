@@ -17,10 +17,14 @@ class FakeSkill(SkillBase):
         return None
 
 
+def _ns(k):
+    return {"globals": k.G, "locals": k.L}
+
+
 def test_update_signals_collects_base_signals():
     """Base signals (goal, verdict, etc.) still collected."""
     k = Kernel()
-    k.update_signals()
+    k.ping(None, _ns(k))
     outputs = k.L["_signal_outputs"]
     # system_vars always returns non-empty — check any tuple body contains "frame"
     assert any("frame" in body.lower() for _, body in outputs)
@@ -32,7 +36,7 @@ def test_update_signals_scans_skill_instances():
     s = FakeSkill()
     s.data = "hello"
     k.L["my_skill"] = s
-    k.update_signals()
+    k.ping(None, _ns(k))
     outputs = k.L["_signal_outputs"]
     assert any("fake=hello" in body for _, body in outputs)
 
@@ -43,7 +47,7 @@ def test_update_signals_skips_empty_skill_output():
     s = FakeSkill()
     s.data = ""  # _signal() will return None
     k.L["my_skill"] = s
-    k.update_signals()
+    k.ping(None, _ns(k))
     outputs = k.L["_signal_outputs"]
     assert not any("fake=" in body for _, body in outputs)
 
@@ -58,7 +62,7 @@ def test_update_signals_skill_error_does_not_crash():
 
     k = Kernel()
     k.L["bad"] = BadSkill()
-    k.update_signals()  # should NOT raise
+    k.ping(None, _ns(k))  # should NOT raise
     assert isinstance(k.L["_signal_outputs"], list)
 
 
@@ -71,7 +75,7 @@ def test_update_signals_multiple_skills():
     s2.data = "two"
     k.L["s1"] = s1
     k.L["s2"] = s2
-    k.update_signals()
+    k.ping(None, _ns(k))
     outputs = k.L["_signal_outputs"]
     bodies = [body for _, body in outputs]
     assert any("fake=one" in b for b in bodies)
@@ -84,11 +88,11 @@ def test_skill_removed_from_ns_stops_signal():
     s = FakeSkill()
     s.data = "present"
     k.L["s"] = s
-    k.update_signals()
+    k.ping(None, _ns(k))
     outputs = k.L["_signal_outputs"]
     assert any("fake=present" in body for _, body in outputs)
     del k.L["s"]
-    k.update_signals()
+    k.ping(None, _ns(k))
     outputs = k.L["_signal_outputs"]
     assert not any("fake=present" in body for _, body in outputs)
 

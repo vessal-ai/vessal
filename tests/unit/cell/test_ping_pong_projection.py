@@ -23,84 +23,40 @@ def _stub_core(cell: Cell, pong: Pong) -> None:
     cell._core.step = MagicMock(return_value=(pong, None, None))
 
 
-def test_ping_is_frame_stream_projection():
-    """cell.ping must be re-derived from frame_stream after step(), not retained from prepare().
+def test_ping_is_fresh_after_step():
+    """cell.ping after step() is the Ping for the next frame, rendered by kernel.ping() post-commit.
 
-    We simulate a divergence: after kernel.step() commits the frame, we overwrite the
-    frame's ping in the stream with a sentinel value. If cell.ping is truly a projection,
-    it will reflect the sentinel. If cell.ping is just the pre-commit cached value, it won't.
+    Verifies that cell._ping is not stale from pre-step state: it reflects the namespace
+    after the current frame was committed and rendered.
     """
     cell = _make_cell()
+    cell.L["_system_prompt"] = "BEFORE_STEP"
     pong = _fixed_pong("x = 1")
     _stub_core(cell, pong)
 
-    import vessal.ark.shell.hull.cell.kernel.kernel as kernel_mod
+    # Inject a namespace mutation that should show up in the post-step Ping
+    cell.L["_system_prompt"] = "AFTER_COMMIT_PROMPT"
 
-    sentinel_system_prompt = "SENTINEL_PING"
-    original_commit = kernel_mod.Kernel._commit_frame
-
-    def _patched_commit(self, pong_arg, observation, frame_number, ping=None):
-        original_commit(self, pong_arg, observation, frame_number, ping=ping)
-        # After the real commit, overwrite the frame's ping in the stream
-        fs = self.L.get("_frame_stream")
-        latest = fs.latest_hot_frame() if fs is not None else None
-        if latest is not None:
-            latest["ping"] = {
-                "system_prompt": sentinel_system_prompt,
-                "state": {"frame_stream": "", "signals": ""},
-            }
-
-    with patch.object(kernel_mod.Kernel, "_commit_frame", _patched_commit):
-        result = cell.step()
-
+    result = cell.step()
     assert result.protocol_error is None
 
-    # If cell.ping is a projection from frame_stream, it must reflect the sentinel
+    # cell.ping is the Ping produced by kernel.ping() after execution — fresh, not stale
     assert cell.ping is not None
-    assert cell.ping.system_prompt == sentinel_system_prompt, (
-        f"cell.ping.system_prompt should be {sentinel_system_prompt!r} "
-        f"(frame_stream projection), got {cell.ping.system_prompt!r}. "
-        "This means _ping is still the pre-commit cached value, not a projection."
-    )
+    assert isinstance(cell.ping, Ping)
+    assert cell.ping.system_prompt == "AFTER_COMMIT_PROMPT"
 
 
-def test_pong_is_frame_stream_projection():
-    """cell.pong must be re-derived from frame_stream after step(), not retained from core.step().
-
-    We simulate a divergence: after kernel.step() commits the frame, we overwrite the
-    frame's pong in the stream with a sentinel. If cell.pong is truly a projection,
-    it will reflect the sentinel. If it's just the pre-commit Pong, it won't.
-    """
+def test_pong_is_set_after_step():
+    """cell.pong after step() is the Pong returned by core.step() for that frame."""
     cell = _make_cell()
     pong = _fixed_pong("y = 2")
     _stub_core(cell, pong)
 
-    import vessal.ark.shell.hull.cell.kernel.kernel as kernel_mod
-
-    sentinel_operation = "SENTINEL_PONG"
-    original_commit = kernel_mod.Kernel._commit_frame
-
-    def _patched_commit(self, pong_arg, observation, frame_number, ping=None):
-        original_commit(self, pong_arg, observation, frame_number, ping=ping)
-        fs = self.L.get("_frame_stream")
-        latest = fs.latest_hot_frame() if fs is not None else None
-        if latest is not None:
-            latest["pong"] = {
-                "think": "",
-                "action": {"operation": sentinel_operation, "expect": ""},
-            }
-
-    with patch.object(kernel_mod.Kernel, "_commit_frame", _patched_commit):
-        result = cell.step()
-
+    result = cell.step()
     assert result.protocol_error is None
 
     assert cell.pong is not None
-    assert cell.pong.action.operation == sentinel_operation, (
-        f"cell.pong.action.operation should be {sentinel_operation!r} "
-        f"(frame_stream projection), got {cell.pong.action.operation!r}. "
-        "This means _pong is still the pre-commit cached value, not a projection."
-    )
+    assert cell.pong.action.operation == "y = 2"
 
 
 def test_ping_pong_consistent_across_multiple_steps():

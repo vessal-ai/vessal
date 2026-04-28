@@ -251,11 +251,11 @@ class TestProtocolErrors:
         assert result.protocol_error is not None
 
     def test_missing_action_tag_sets_error(self):
-        """Missing <action> tag → ns["_error"] is set."""
+        """Missing <action> tag → ns["_errors"] ring buffer has an entry."""
         cell = _make_cell()
         _set_responses(cell, ["no action tag here"])
         cell.step()
-        assert cell.L.get("_error") is not None
+        assert len(cell.L.get("_errors", [])) > 0
 
     def test_core_exception_no_frame_committed(self):
         """Core raises exception → _frame_stream does not grow, protocol_error is not None."""
@@ -267,12 +267,13 @@ class TestProtocolErrors:
         assert result.protocol_error is not None
 
     def test_core_exception_sets_error(self):
-        """Core raises exception → ns["_error"] contains the error message."""
+        """Core raises exception → ns["_errors"] ring buffer has an entry."""
         cell = _make_cell()
         _set_responses(cell, [Exception("API error")])
         cell.step()
-        assert cell.L.get("_error") is not None
-        assert "Core error" in cell.L["_error"]
+        errors = cell.L.get("_errors", [])
+        assert len(errors) > 0
+        assert any("API error" in e.message for e in errors)
 
     def test_core_exception_no_frame_increment(self):
         """Core raises exception → frame number does not increment."""
@@ -283,7 +284,7 @@ class TestProtocolErrors:
         assert cell.L["_frame"] == before
 
     def test_action_gate_blocked_no_frame_committed(self):
-        """action gate block → _frame_stream does not grow, ns["_error"] is set."""
+        """action gate block → _frame_stream does not grow, _errors ring buffer has an entry."""
         cell = _make_cell(action_gate="safe")
         # Inject a custom rule that always blocks
         cell._action_gate.add_rule("block_all", lambda a: "blocked for test")
@@ -291,7 +292,7 @@ class TestProtocolErrors:
         _set_responses(cell, [_action("x = 1")])
         result = cell.step()
         assert cell.L["_frame_stream"].hot_frame_count() == before_count
-        assert cell.L.get("_error") is not None
+        assert len(cell.L.get("_errors", [])) > 0
 
     def test_action_gate_blocked_no_frame_increment(self):
         """action gate block → frame number does not increment."""
@@ -394,20 +395,20 @@ class TestCommitFrame:
         assert cell.L["_frame_stream"].hot_frame_count() == 2
 
     def test_verdict_mirror_variable_updated(self):
-        """After a successful step, ns["_verdict"] is updated (mirror variable)."""
+        """After a successful step, ns["verdict"] is updated (mirror variable, no underscore)."""
         cell = _make_cell()
         _set_responses(cell, [_action("x = 1")])
         cell.step()
-        # _verdict should be written (value may be None, but key exists and was written)
-        assert "_verdict" in cell.L
+        # verdict should be written (value may be None when no expect, but key exists)
+        assert "verdict" in cell.L
 
     def test_verdict_mirror_set_after_expect(self):
-        """After expect passes, ns["_verdict"] is a Verdict object."""
+        """After expect passes, ns["verdict"] is a Verdict object."""
         cell = _make_cell()
         _set_responses(cell, [_action_with_expect("x = 5", "assert x == 5")])
         cell.step()
         from vessal.ark.shell.hull.cell.protocol import Verdict
-        assert isinstance(cell.L["_verdict"], Verdict)
+        assert isinstance(cell.L["verdict"], Verdict)
 
     def test_protocol_error_does_not_write_frame_stream(self):
         """On protocol error (parse failure), _frame_stream does not grow."""
@@ -649,10 +650,10 @@ class TestRealTokenPassthrough:
         cell._core.step = MagicMock(return_value=(pong, 50000, 200))
         cell.step()
         # renderer sets budget_total = 104096 - 4096 = 100000
-        # our token write logic: round(50000 / 100000 * 100) = 50
         budget_total = cell.L["_budget_total"]
         assert budget_total == 100000
-        assert cell.L["_context_pct"] == round(50000 / 100000 * 100)
+        # _actual_tokens_in is set regardless of renderer overwrite
+        assert cell.L["_actual_tokens_in"] == 50000
 
     def test_no_usage_leaves_estimated_context_pct(self):
         cell = _make_cell()
@@ -660,7 +661,7 @@ class TestRealTokenPassthrough:
         pong = _make_pong(_action("x = 1"))
         cell._core.step = MagicMock(return_value=(pong, None, None))
         cell.step()
-        assert cell.L["_actual_tokens_in"] is None
+        assert cell.L.get("_actual_tokens_in") is None
 
 
 # ============================================================

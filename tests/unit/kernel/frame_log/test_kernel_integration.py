@@ -20,7 +20,7 @@ def test_kernel_db_path_sets_frame_log(tmp_path: Path) -> None:
 
 
 def test_kernel_step_writes_to_frame_log(tmp_path: Path) -> None:
-    """After Kernel.step() commits a frame, frame_log has one entries row."""
+    """After Kernel.ping() commits a frame, frame_log has one entries row."""
     import sqlite3
 
     from vessal.ark.shell.hull.cell.protocol import Action, Pong
@@ -29,7 +29,7 @@ def test_kernel_step_writes_to_frame_log(tmp_path: Path) -> None:
     k = Kernel(db_path=str(db_file))
 
     pong = Pong(think="t", action=Action(operation="x = 1", expect=""))
-    k.step(pong)
+    k.ping(pong, {"globals": k.G, "locals": k.L})
 
     rows = sqlite3.connect(str(db_file)).execute(
         "SELECT layer, n_start FROM entries"
