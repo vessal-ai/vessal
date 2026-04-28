@@ -359,7 +359,6 @@ class TestKernel:
         k = minimal_kernel()
         assert k.L["_sleeping"] is False
         assert k.L["_next_wake"] is None
-        # _wake moved to G["_system"].set_wake() in PR 3
         assert "_wake" not in k.L
 
     def test_init_from_snapshot(self):
