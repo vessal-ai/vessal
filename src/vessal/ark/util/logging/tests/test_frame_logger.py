@@ -14,6 +14,7 @@ from vessal.ark.shell.hull.cell.protocol import (
     FRAME_SCHEMA_VERSION,
     Action,
     FrameRecord,
+    FrameStream,
     Observation,
     Ping,
     Pong,
@@ -31,7 +32,7 @@ def _make_frame(number: int = 1) -> FrameRecord:
     """Construct a minimal valid FrameRecord for testing."""
     return FrameRecord(
         number=number,
-        ping=Ping(system_prompt="", state=State(frame_stream="", signals="")),
+        ping=Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})),
         pong=Pong(think="", action=Action(operation="pass", expect="")),
         observation=Observation(
             stdout="",

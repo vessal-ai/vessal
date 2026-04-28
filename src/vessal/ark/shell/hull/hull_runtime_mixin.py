@@ -5,20 +5,17 @@ Methods here may assume the attributes set by Hull.__init__ are available via se
 """
 from __future__ import annotations
 
+import json
 import logging
-import queue
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from concurrent.futures import ThreadPoolExecutor
-
     from vessal.ark.shell.hull.cell import Cell
     from vessal.ark.shell.hull.cell.core import Core
-    from vessal.ark.shell.hull.cell.kernel import RenderConfig
-    from vessal.ark.shell.hull.cell.kernel.render.prompt import SystemPromptBuilder
     from vessal.ark.shell.hull.event_loop import EventLoop
     from vessal.ark.shell.hull.hull_api import HullApi
+    from vessal.ark.shell.hull.hull_init_mixin import SystemPromptBuilder
     from vessal.ark.shell.hull.skill_loader import SkillLoader
     from vessal.ark.util.logging import Tracer
 
@@ -82,25 +79,45 @@ class HullRuntimeMixin:
         return list(self._cell.L.keys())
 
     def frames(self, after: int | None = None) -> list[dict]:
-        """Query hot-zone frames from the frame stream, in flat wire shape.
+        """Query layer-0 frames from SQLite frame_log in flat wire shape.
 
         Args:
             after: Only return frames with n > after. Returns all if None.
 
         Returns:
             Frames in the flat wire shape (kernel doc §4.3 frame_content columns),
-            ordered oldest to newest. See cell.protocol.flatten_frame_dict.
+            ordered oldest to newest.
         """
-        from vessal.ark.shell.hull.cell.protocol import flatten_frame_dict
+        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
 
-        fs = self._cell.L.get("_frame_stream")
-        if fs is None:
+        frame_log = self._cell._kernel.frame_log
+        if frame_log is None:
             return []
-        # Flatten hot buckets oldest-first (B_4..B_0) into a single list
-        raw: list[dict] = []
-        for bucket in reversed(fs._hot):
-            raw.extend(bucket)
-        flat = [flatten_frame_dict(f) for f in raw]
+        fs = render_frame_stream(frame_log.conn)
+        flat: list[dict] = []
+        for entry in fs.entries:
+            if entry.layer != 0:
+                continue
+            c = entry.content
+            flat.append({
+                "n": entry.n_start,
+                "layer": entry.layer,
+                "n_start": entry.n_start,
+                "n_end": entry.n_end,
+                "pong_think": c.think,
+                "pong_operation": c.operation,
+                "pong_expect": c.expect,
+                "obs_stdout": c.observation.get("stdout", ""),
+                "obs_stderr": c.observation.get("stderr", ""),
+                "obs_diff_json": json.dumps(c.observation.get("diff") or {}),
+                "obs_error": c.observation.get("error"),
+                "verdict_value": c.verdict.get("value") if c.verdict else None,
+                "verdict_error": c.verdict.get("error") if c.verdict else None,
+                "signals": [
+                    {"class_name": k[0], "var_name": k[1], "scope": k[2], "payload": v}
+                    for k, v in c.signals.items()
+                ],
+            })
         if after is not None:
             flat = [f for f in flat if f["n"] > after]
         return flat
@@ -137,7 +154,6 @@ class HullRuntimeMixin:
     def stop(self) -> None:
         """Request stop."""
         self._event_loop.stop()
-        self._thread_pool.shutdown(wait=False)
 
     def handle(self, method: str, path: str, body: dict | None = None) -> tuple[int, dict | "StaticResponse"]:
         """Single entry point for HTTP requests. Shell calls this; Hull routes internally.
@@ -184,9 +200,6 @@ class HullRuntimeMixin:
         if method == "POST" and path == "/stop":
             self.stop()
             return 200, {"status": "stopping"}
-        if method == "GET" and path == "/state/compactions":
-            fs = self._cell.L.get("_frame_stream")
-            return 200, ({} if fs is None else fs.project_compactions())
         if method == "POST" and path == "/reload/soul":
             self.reload_soul()
             return 200, {"status": "soul_reloaded"}
@@ -226,68 +239,22 @@ class HullRuntimeMixin:
         return self._event_loop.event_queue
 
     def _rewrite_runtime_owned(self) -> None:
-        """Re-fill runtime-owned variables each frame: _frame_type, _render_config, _system_prompt, _soul.
+        """Re-fill runtime-owned variables each frame: _frame_type, _system_prompt, _soul.
 
         Hull is the source of truth for these variables; the model may read but should not modify them.
         """
         self._cell.L["_frame_type"] = "work"
-        self._cell.L["_render_config"] = self._work_render_config
-        self._cell.L["_system_prompt"] = self._prompt_builder.build(self._cell.L)
         # SOUL hot-reload: detect SOUL.md changes each frame (mtime check ~1μs).
-        # Re-read on change; otherwise use cached value.
+        # Re-read on change; otherwise use cached value. Must run before build() so
+        # _soul is in L when Section("soul") reads ns.get("_soul").
         if self._soul_path.exists():
             current_mtime = self._soul_path.stat().st_mtime
             if current_mtime != self._soul_mtime:
                 self._soul_text = self._soul_path.read_text(encoding="utf-8")
                 self._soul_mtime = current_mtime
         self._cell.L["_soul"] = self._soul_text
-
-        # Drain compaction result queue and apply to FrameStream
-        fs = self._cell.L.get("_frame_stream")
-        if fs is None:
-            return
-        results_to_apply: list[tuple[dict, int]] = []
-        aborted = False
-        while True:
-            try:
-                item = self._result_queue.get_nowait()
-            except queue.Empty:
-                break
-            record, layer = item
-            if record in ("skip", "error"):
-                aborted = True
-                continue
-            results_to_apply.append((record, layer))
-        if aborted and not results_to_apply:
-            fs.abort_compaction()
-        if results_to_apply:
-            fs.apply_results(results_to_apply)
-            s = fs.stats()
-            frame_number = self._cell.L.get("_frame", 0)
-            self._tracer.log(frame_number, "compaction.layer_stats", "gauge", -1,
-                             f"hot={s['hot_counts']},cold={s['cold_counts']}")
-            self.snapshot()
-            self._compaction_frames_since_snapshot = 0
+        self._cell.L["_system_prompt"] = self._prompt_builder.build(self._cell.L)
 
     def _after_frame(self) -> None:
-        """Called after each successful frame. Evaluates try_shift and submits compaction task if due."""
-        fs = self._cell.L.get("_frame_stream")
-        if fs is None:
-            return
-        frame_number = self._cell.L.get("_frame", 0)
-        task = fs.try_shift()
-        if task is None:
-            if len(fs._hot[0]) >= fs.k and fs.in_flight:
-                self._tracer.log(frame_number, "compaction.shift_blocked", "gauge", -1, "value=1")
-        else:
-            self._tracer.log(frame_number, "compaction.in_flight", "gauge", -1, "value=1")
-            raw = task.get("raw_bytes", 0)
-            stripped = task.get("stripped_bytes", 0)
-            if raw > 0:
-                self._tracer.log(frame_number, "compaction.stripping_ratio", "gauge", -1,
-                                 f"raw={raw},stripped={stripped}")
-            self._thread_pool.submit(self._run_compaction_task, task, frame_number)
-        self._compaction_frames_since_snapshot += 1
-        if self._compaction_frames_since_snapshot >= self._compaction_snapshot_every_n:
-            self.snapshot()
-            self._compaction_frames_since_snapshot = 0
+        """Called after each successful frame."""
+        pass

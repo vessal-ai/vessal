@@ -94,3 +94,45 @@ def test_cell_outside_kernel_does_not_import_sqlite3() -> None:
                 if node.module == "sqlite3":
                     offenders.append(f"{path}: from sqlite3")
     assert offenders == [], "Cell (outside kernel/) imports sqlite3:\n  " + "\n  ".join(offenders)
+
+
+def test_kernel_does_not_import_render_module():
+    """Spec §1.4: Kernel does not stringify."""
+    import os
+    import importlib
+    kernel_mod = importlib.import_module("vessal.ark.shell.hull.cell.kernel.kernel")
+    kernel_dir = os.path.dirname(kernel_mod.__file__)
+    forbidden = {"render", "frame_stream", "compression_parser"}
+    for root, dirs, files in os.walk(kernel_dir):
+        # Skip the frame_log/reader.py which is allowed (it reads, not renders)
+        dirs[:] = [d for d in dirs if d != "frame_log"]
+        for f in files:
+            if not f.endswith(".py"):
+                continue
+            text = open(os.path.join(root, f)).read()
+            for sym in forbidden:
+                bad = f"from vessal.ark.shell.hull.cell.kernel.{sym}"
+                assert bad not in text, f"{f} imports forbidden {sym}"
+
+
+def test_kernel_does_not_compute_token_budget():
+    """Spec §1.4: Kernel does not compute token budgets."""
+    import inspect
+    from vessal.ark.shell.hull.cell.kernel import kernel
+    src = inspect.getsource(kernel)
+    forbidden = ["estimate_tokens", "_context_budget", "_token_budget", "_budget_total", "_context_pct"]
+    for sym in forbidden:
+        assert sym not in src, f"kernel.py mentions forbidden symbol: {sym}"
+
+
+def test_ping_state_protocol_is_dataclass():
+    """Spec §4.8: State.frame_stream is FrameStream dataclass, signals is dict."""
+    import dataclasses
+    from vessal.ark.shell.hull.cell.protocol import State, FrameStream
+    fields = {f.name: f.type for f in dataclasses.fields(State)}
+    assert "frame_stream" in fields
+    assert "signals" in fields
+    # Verify the actual values (not just field names)
+    state = State(frame_stream=FrameStream(entries=[]), signals={})
+    assert isinstance(state.frame_stream, FrameStream)
+    assert isinstance(state.signals, dict)

@@ -234,23 +234,32 @@ class Cell:
 
         Args:
             gate_type: "action" or "state".
-            fn: callable(code_or_state: str) -> tuple[bool, str], returns (allowed, reason).
+            fn: For "action": callable(code: str) -> tuple[bool, str].
+                For "state": callable(frame_stream: FrameStream) -> tuple[bool, str].
+                Returns (allowed, reason).
 
         Raises:
             ValueError: Raised when gate_type is not "action" or "state".
         """
-        def _wrap(user_fn):
+        def _wrap_action(user_fn):
             def wrapper(value: str) -> str | None:
+                allowed, reason = user_fn(value)
+                return None if allowed else reason
+            return wrapper
+
+        def _wrap_state(user_fn):
+            from vessal.ark.shell.hull.cell.protocol import FrameStream as _FrameStream
+            def wrapper(value: _FrameStream) -> str | None:
                 allowed, reason = user_fn(value)
                 return None if allowed else reason
             return wrapper
 
         if gate_type == "action":
             self._action_gate = ActionGate(mode="safe")
-            self._action_gate.replace_rules([("custom", _wrap(fn))])
+            self._action_gate.replace_rules([("custom", _wrap_action(fn))])
         elif gate_type == "state":
             self._state_gate = StateGate(mode="safe")
-            self._state_gate.replace_rules([("custom", _wrap(fn))])
+            self._state_gate.replace_rules([("custom", _wrap_state(fn))])
         else:
             raise ValueError(f"Unknown gate type: {gate_type!r}. Use 'action' or 'state'.")
 

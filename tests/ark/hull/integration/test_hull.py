@@ -147,17 +147,6 @@ class TestConfig:
         hull = _make_hull(tmp_path)
         assert hull._cell._core._max_retries == 3
 
-    def test_renderer_config_parsed(self, tmp_path):
-        """[renderer] section is parsed correctly (auxiliary_modules removed from RenderConfig)."""
-        toml = """
-[renderer]
-system_prompt_key = "_my_prompt"
-frame_budget_ratio = 0.8
-"""
-        hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._work_render_config.system_prompt_key == "_my_prompt"
-        assert hull._work_render_config.frame_budget_ratio == 0.8
-
 # ============================================================
 # Frame loop tests
 # ============================================================
@@ -414,43 +403,6 @@ class TestFrameType:
 
 
 # ============================================================
-# RenderConfig tests
-# ============================================================
-
-
-class TestRenderConfig:
-    def test_work_render_config_created(self, tmp_path):
-        """Hull has a work frame RenderConfig after initialization."""
-        hull = _make_hull(tmp_path)
-        assert hull._work_render_config is not None
-
-    def test_work_config_system_prompt_key(self, tmp_path):
-        """Work frame config's system_prompt_key defaults to _system_prompt."""
-        hull = _make_hull(tmp_path)
-        assert hull._work_render_config.system_prompt_key == "_system_prompt"
-
-    def test_work_config_frame_budget_ratio(self, tmp_path):
-        """Work frame config's frame_budget_ratio defaults to 0.7."""
-        hull = _make_hull(tmp_path)
-        assert hull._work_render_config.frame_budget_ratio == 0.7
-
-    def test_render_config_in_ns_is_work_config(self, tmp_path):
-        """_render_config in namespace defaults to the work frame config."""
-        hull = _make_hull(tmp_path)
-        assert hull._cell.L.get("_render_config") is hull._work_render_config
-
-    def test_custom_renderer_config(self, tmp_path):
-        """hull.toml [renderer] section config takes effect."""
-        toml = """
-[renderer]
-system_prompt_key = "_custom_prompt"
-frame_budget_ratio = 0.6
-"""
-        hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._work_render_config.system_prompt_key == "_custom_prompt"
-        assert hull._work_render_config.frame_budget_ratio == 0.6
-
-
 # ============================================================
 # Cold storage injection tests
 # ============================================================

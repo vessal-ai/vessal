@@ -8,12 +8,9 @@ from __future__ import annotations
 import logging
 import sys
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import queue
-
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +23,61 @@ def _load_prompt(name: str) -> str:
     if path.exists():
         return path.read_text(encoding="utf-8")
     return ""
+
+
+# ─────────────────────────────────────────────
+# Hull-owned renderer helpers
+# (moved from the deleted kernel/render/ directory in PR 5)
+# ─────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Section:
+    """An independent segment of system_prompt, participating in assembly by priority.
+
+    Attributes:
+        name:     Segment name, unique identifier.
+        priority: Rendering order; lower value renders first.
+        required: When True, cannot be trimmed.
+        render:   Render function with signature (ns: dict) -> str.
+    """
+    name: str
+    priority: int
+    required: bool
+    render: Callable[[dict], str]
+
+
+class SystemPromptBuilder:
+    """system_prompt assembler. Registers Sections; build(ns) sorts and joins them."""
+
+    def __init__(self) -> None:
+        self._sections: list[Section] = []
+
+    def register(self, section: Section) -> None:
+        self._sections.append(section)
+
+    def build(self, ns: dict) -> str:
+        sorted_sections = sorted(self._sections, key=lambda s: s.priority)
+        parts: list[str] = []
+        for section in sorted_sections:
+            text = section.render(ns)
+            if text.strip():
+                parts.append(text)
+        return "\n\n".join(parts)
+
+
+def render_capabilities(ns: dict) -> str:
+    """Generate the Loaded Tools section from Skill instances in the namespace."""
+    lines: list[str] = []
+    for key, obj in ns.items():
+        if isinstance(getattr(obj, "name", None), str) and isinstance(getattr(obj, "description", None), str):
+            name = getattr(obj, "name", key)
+            description = getattr(obj, "description", "")
+            if description:
+                lines.append(f"- `{name}` — {description}")
+    if not lines:
+        return ""
+    return "## Loaded Tools\n\n" + "\n".join(sorted(lines))
 
 
 class HullInitMixin:
@@ -141,28 +193,6 @@ class HullInitMixin:
         if "language" in agent_cfg:
             self._cell.L["language"] = agent_cfg["language"]
 
-    def _init_compression(self, hull_cfg: dict) -> None:
-        """Phase 2b: Create compression Core, result queue, and single-worker ThreadPoolExecutor."""
-        import queue
-        from concurrent.futures import ThreadPoolExecutor
-        from vessal.ark.shell.hull.cell.core import Core
-
-        self._compression_core = Core(
-            timeout=float(hull_cfg.get("compression_timeout", 120.0)),
-            max_retries=int(hull_cfg.get("compression_max_retries", 2)),
-            api_params={
-                "temperature": float(hull_cfg.get("compression_temperature", 0.3)),
-                "max_tokens": int(hull_cfg.get("compression_max_tokens", 2048)),
-            },
-        )
-        self._result_queue: queue.Queue = queue.Queue()
-        self._thread_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="compaction")
-        self._compaction_frames_since_snapshot = 0
-        self._compaction_snapshot_every_n = int(hull_cfg.get("snapshot_every_n_frames", 20))
-        prompt_path = Path(__file__).parent / "prompts" / "compression.md"
-        self._compression_prompt = prompt_path.read_text(encoding="utf-8")
-        self._cell.L["_compression_prompt"] = self._compression_prompt
-
     def _init_skills(self, hull_cfg: dict) -> None:
         """Phase 3: route table, bind hull to G skills, start servers."""
         from vessal.ark.shell.hull.hull_api import HullApi
@@ -173,12 +203,6 @@ class HullInitMixin:
         self._cell.L["_builtin_names"] = []
         self._cell.L["skill_paths"] = resolved_paths
         self._cell.L["_data_dir"] = str(self._project_dir / "data")
-        compress_threshold = hull_cfg.get("compress_threshold", 50)
-        self._cell.L["_compress_threshold"] = compress_threshold
-        if "compaction_k" in hull_cfg:
-            self._cell.L["_compaction_k"] = hull_cfg["compaction_k"]
-        if "compaction_n" in hull_cfg:
-            self._cell.L["_compaction_n"] = hull_cfg["compaction_n"]
 
         self._routes: dict[tuple[str, str], object] = {}
         self._running_servers: dict[str, object] = {}
@@ -204,11 +228,8 @@ class HullInitMixin:
                 except Exception as e:
                     print(f"[error] skill server '{skill_name}' failed to start: {e}", flush=True)
 
-    def _init_prompts(self, renderer_cfg: dict) -> None:
-        """Phase 4: Load system prompts, SOUL, build RenderConfig."""
-        from vessal.ark.shell.hull.cell.kernel import RenderConfig
-        from vessal.ark.shell.hull.cell.kernel.render.prompt import Section, SystemPromptBuilder, render_capabilities
-
+    def _init_prompts(self) -> None:
+        """Phase 4: Load system prompts and SOUL; build SystemPromptBuilder."""
         protocol_text = _load_prompt("system.md")
         self._soul_path = self._project_dir / "SOUL.md"
         if self._soul_path.exists():
@@ -220,12 +241,8 @@ class HullInitMixin:
 
         self._prompt_builder = SystemPromptBuilder()
         self._prompt_builder.register(Section("protocol", 0, True, lambda ns: protocol_text))
+        self._prompt_builder.register(Section("soul", 10, False, lambda ns: ns.get("_soul", "")))
         self._prompt_builder.register(Section("capabilities", 20, False, render_capabilities))
-
-        self._work_render_config = RenderConfig(
-            system_prompt_key=renderer_cfg.get("system_prompt_key", "_system_prompt"),
-            frame_budget_ratio=renderer_cfg.get("frame_budget_ratio", 0.7),
-        )
 
     def _init_loop(self, gates_cfg: dict) -> None:
         """Phase 5: Gates, FrameHooks, EventLoop, wake injection."""

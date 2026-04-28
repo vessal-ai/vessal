@@ -18,7 +18,7 @@ def test_hull_is_importable_from_package_root() -> None:
 def test_hull_mixins_not_exported_from_package() -> None:
     import vessal.ark.shell.hull as pkg
     exported = getattr(pkg, "__all__", [])
-    forbidden = {"HullInitMixin", "HullSkillsMixin", "HullCompactionMixin", "HullRuntimeMixin"}
+    forbidden = {"HullInitMixin", "HullSkillsMixin", "HullSnapshotMixin", "HullRuntimeMixin"}
     assert forbidden.isdisjoint(exported), (
         f"Hull mixins must stay internal; found in __all__: {forbidden & set(exported)}"
     )
@@ -28,7 +28,7 @@ def test_hull_composes_all_four_mixins() -> None:
     from vessal.ark.shell.hull.hull import Hull
     from vessal.ark.shell.hull.hull_init_mixin import HullInitMixin
     from vessal.ark.shell.hull.hull_skills_mixin import HullSkillsMixin
-    from vessal.ark.shell.hull.hull_compaction_mixin import HullCompactionMixin
+    from vessal.ark.shell.hull.hull_snapshot_mixin import HullSnapshotMixin
     from vessal.ark.shell.hull.hull_runtime_mixin import HullRuntimeMixin
-    for mixin in (HullInitMixin, HullSkillsMixin, HullCompactionMixin, HullRuntimeMixin):
+    for mixin in (HullInitMixin, HullSkillsMixin, HullSnapshotMixin, HullRuntimeMixin):
         assert issubclass(Hull, mixin), f"Hull must inherit from {mixin.__name__}"

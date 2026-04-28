@@ -38,7 +38,7 @@ class FrameHooks:
     """Called before each frame. Hull uses it to re-fill runtime-owned variables."""
 
     after_frame: Callable[[], None] | None = None
-    """Called after each successful frame. Hull uses it to drain compaction results."""
+    """Post-frame hook; reserved for future Hull-owned work after each frame."""
 
     snapshot: Callable[[], None] | None = None
     """Called after each wake cycle ends. Hull uses it to save a snapshot."""

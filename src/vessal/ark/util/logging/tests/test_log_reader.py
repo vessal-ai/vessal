@@ -10,6 +10,7 @@ import pytest
 from vessal.ark.shell.hull.cell.protocol import (
     Action,
     FrameRecord,
+    FrameStream,
     Observation,
     Ping,
     Pong,
@@ -33,7 +34,7 @@ def _make_frame(
     """Construct a test FrameRecord."""
     return FrameRecord(
         number=number,
-        ping=Ping(system_prompt="", state=State(frame_stream="", signals="")),
+        ping=Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})),
         pong=Pong(think="", action=Action(operation="pass", expect="")),
         observation=Observation(stdout="", diff=diff, error=error, verdict=verdict),
     )

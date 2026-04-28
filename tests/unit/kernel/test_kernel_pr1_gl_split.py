@@ -37,9 +37,9 @@ class TestKernelHasGAndL:
 
     def test_l_has_init_namespace_keys(self):
         k = minimal_kernel()
-        # Spot-check a few keys that belong to _init_L
+        # Spot-check a few keys that belong to _init_L (v5: _frame_stream removed)
         assert "_frame" in k.L
-        assert "_frame_stream" in k.L
+        assert "_frame_stream" not in k.L
         assert "signals" in k.L
 
 

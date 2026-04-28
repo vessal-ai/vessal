@@ -1,6 +1,6 @@
 """state_gate.py — Gate for state before it is sent to the LLM.
 
-StateGate checks the state string before it is sent to Core.step().
+StateGate checks the FrameStream before it is sent to Core.step().
 Goal: intercept abnormally large context to protect API budget.
 
 Design principles:
@@ -12,12 +12,10 @@ Design principles:
 from __future__ import annotations
 
 import logging
-import time as _time
 from collections.abc import Callable
 
-from vessal.ark.shell.hull.cell._errors_helper import append_error
 from vessal.ark.shell.hull.cell.gate.gate_base import _GateBase
-from vessal.ark.shell.hull.cell.protocol import ErrorRecord
+from vessal.ark.shell.hull.cell.protocol import FrameStream
 
 logger = logging.getLogger(__name__)
 
@@ -26,21 +24,21 @@ class StateGateResult:
     """Gate check result.
 
     Attributes:
-        allowed: True means the state is permitted to be sent to the LLM, False means blocked.
-        state:   Original state string (may be modified by rules).
-        reason:  Reason for blocking (empty string when allowed=True).
+        allowed:      True means the state is permitted to be sent to the LLM, False means blocked.
+        frame_stream: Original FrameStream passed to check().
+        reason:       Reason for blocking (empty string when allowed=True).
     """
 
-    __slots__ = ("allowed", "state", "reason")
+    __slots__ = ("allowed", "frame_stream", "reason")
 
-    def __init__(self, allowed: bool, state: str, reason: str = "") -> None:
+    def __init__(self, allowed: bool, frame_stream: FrameStream, reason: str = "") -> None:
         self.allowed = allowed
-        self.state = state
+        self.frame_stream = frame_stream
         self.reason = reason
 
 
 class StateGate(_GateBase):
-    """Safety gate for the state string before it is sent to the LLM.
+    """Safety gate for the FrameStream before it is sent to the LLM.
 
     Three modes:
     - "auto":  no checking, pass through directly (for development/debugging)
@@ -49,7 +47,7 @@ class StateGate(_GateBase):
 
     Usage:
         gate = StateGate(mode="safe")
-        result = gate.check(state)
+        result = gate.check(frame_stream)
         if not result.allowed:
             append_error(ns, ErrorRecord(
                 "protocol", f"State gate blocked: {result.reason}",
@@ -64,35 +62,35 @@ class StateGate(_GateBase):
             mode: Gate mode. "auto" passes all through; "safe"/"human" runs rule checks.
         """
         self.mode = mode
-        self._rules: list[tuple[str, Callable[[str], str | None]]] = []
+        self._rules: list[tuple[str, Callable[[FrameStream], str | None]]] = []
 
-    def check(self, state: str) -> StateGateResult:
-        """Check whether a state is permitted to be sent to the LLM.
+    def check(self, frame_stream: FrameStream) -> StateGateResult:
+        """Check whether a FrameStream is permitted to be sent to the LLM.
 
         auto mode returns allowed=True immediately.
         safe/human mode runs all rules; if any blocks, returns allowed=False.
 
         Args:
-            state: State string to check (rendered prompt).
+            frame_stream: FrameStream dataclass to check.
 
         Returns:
             StateGateResult instance.
         """
         if self.mode == "auto":
-            return StateGateResult(allowed=True, state=state)
+            return StateGateResult(allowed=True, frame_stream=frame_stream)
 
         for rule_name, check_fn in self._rules:
             try:
-                result = check_fn(state)
+                result = check_fn(frame_stream)
                 if result is not None:
                     logger.info("state blocked by rule %r: %s", rule_name, result)
                     return StateGateResult(
                         allowed=False,
-                        state=state,
+                        frame_stream=frame_stream,
                         reason=f"[{rule_name}] {result}",
                     )
             except Exception as e:
                 logger.warning("gate rule %r raised exception: %s", rule_name, e)
 
-        return StateGateResult(allowed=True, state=state)
+        return StateGateResult(allowed=True, frame_stream=frame_stream)
 

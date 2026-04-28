@@ -19,11 +19,11 @@ class FrameLog:
     """Transactional writer for the 5-table frame_log SQLite schema.
 
     Attributes:
-        _conn: open sqlite3.Connection (caller owns lifecycle).
+        conn: open sqlite3.Connection (caller owns lifecycle).
     """
 
     def __init__(self, conn: sqlite3.Connection) -> None:
-        self._conn = conn
+        self.conn = conn
 
     def write_frame(self, spec: FrameWriteSpec) -> None:
         """Persist one layer=0 frame in a single transaction.
@@ -31,7 +31,7 @@ class FrameLog:
         Args:
             spec: FrameWriteSpec with all fields populated.
         """
-        cur = self._conn.cursor()
+        cur = self.conn.cursor()
         cur.execute("BEGIN")
         try:
             obs_error_id = self._maybe_insert_error(cur, spec.n, spec.operation_error)
@@ -102,7 +102,7 @@ class FrameLog:
 
         On boot, the next frame number is `(last_committed_frame() or 0) + 1`.
         """
-        row = self._conn.execute(
+        row = self.conn.execute(
             "SELECT MAX(n_start) FROM entries WHERE layer = 0"
         ).fetchone()
         return None if row is None or row[0] is None else int(row[0])
@@ -115,7 +115,7 @@ class FrameLog:
         """
         last = self.last_committed_frame()
         threshold = -1 if last is None else last
-        cur = self._conn.execute(
+        cur = self.conn.execute(
             "DELETE FROM frame_content WHERE n > ?", (threshold,)
         )
         return cur.rowcount

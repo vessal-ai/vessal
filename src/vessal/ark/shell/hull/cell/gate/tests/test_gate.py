@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from vessal.ark.shell.hull.cell.gate import ActionGate, ActionGateResult, StateGate, StateGateResult
+from vessal.ark.shell.hull.cell.protocol import FrameStream
 
 
 # ────────────────────────────────────────────── ActionGate
@@ -77,35 +78,35 @@ class TestActionGateCustomRules:
 class TestStateGateAutoMode:
     def test_auto_allows_any_state(self) -> None:
         gate = StateGate(mode="auto")
-        result = gate.check("a" * 100_000)
+        result = gate.check(FrameStream(entries=[]))
         assert result.allowed is True
 
-    def test_auto_returns_state_unchanged(self) -> None:
+    def test_auto_returns_frame_stream_unchanged(self) -> None:
         gate = StateGate(mode="auto")
-        state = "some rendered prompt"
-        result = gate.check(state)
-        assert result.state == state
+        fs = FrameStream(entries=[])
+        result = gate.check(fs)
+        assert result.frame_stream is fs
 
 
 class TestStateGateSafeMode:
     def test_safe_with_no_rules_allows_all(self) -> None:
         # StateGate safe mode has no builtin rules currently
         gate = StateGate(mode="safe")
-        result = gate.check("anything")
+        result = gate.check(FrameStream(entries=[]))
         assert result.allowed is True
 
     def test_add_rule_blocks(self) -> None:
         gate = StateGate(mode="safe")
-        gate.add_rule("no_empty", lambda s: "empty state" if not s.strip() else None)
-        result = gate.check("   ")
+        gate.add_rule("no_entries", lambda fs: "empty stream" if not fs.entries else None)
+        result = gate.check(FrameStream(entries=[]))
         assert result.allowed is False
-        assert "no_empty" in result.reason
+        assert "no_entries" in result.reason
 
     def test_remove_rule_stops_blocking(self) -> None:
         gate = StateGate(mode="safe")
-        gate.add_rule("no_empty", lambda s: "empty state" if not s.strip() else None)
-        gate.remove_rule("no_empty")
-        result = gate.check("")
+        gate.add_rule("no_entries", lambda fs: "empty stream" if not fs.entries else None)
+        gate.remove_rule("no_entries")
+        result = gate.check(FrameStream(entries=[]))
         assert result.allowed is True
 
 
@@ -118,7 +119,7 @@ class TestGateResult:
         assert r.reason == ""
 
     def test_state_gate_result_defaults(self) -> None:
-        r = StateGateResult(allowed=True, state="prompt")
+        r = StateGateResult(allowed=True, frame_stream=FrameStream(entries=[]))
         assert r.reason == ""
 
     def test_action_gate_result_blocked(self) -> None:

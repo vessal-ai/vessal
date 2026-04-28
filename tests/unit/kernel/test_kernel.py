@@ -15,10 +15,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, execute, _compress_traceback, _maybe_capture_last_expr
-from vessal.ark.shell.hull.cell.kernel.render import render
 from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
@@ -48,7 +46,6 @@ def bare_ns() -> dict:
         "_log_path": "",
         "_context_pct": 0,
         "_ns_meta": {},
-        "_frame_stream": FrameStream(k=16, n=8),
         "_progress": "",
     }
 
@@ -207,12 +204,11 @@ class TestExecute:
         assert result.diff == ""
 
     def test_history_not_managed_by_execute(self):
-        """executor does not commit to _frame_stream; frame logging is managed by Cell (Phase 3)."""
+        """executor does not write _frame_stream; frame logging is managed by Cell via SQLite."""
         ns = bare_ns()
         execute("x = 1", {}, ns, frame_number=1)
         execute("y = 2", {}, ns, frame_number=2)
-        # execute should not commit to _frame_stream
-        assert ns["_frame_stream"].hot_frame_count() == 0
+        assert "_frame_stream" not in ns
 
     def test_source_function_on_object(self):
         """Function source is recoverable via inspect.getsource (linecache)."""
@@ -401,31 +397,27 @@ class TestRenderIntegration:
         assert "hello from kernel" in k.L["observation"].stdout
 
     def test_frame_stream_in_state(self):
-        """Frame stream section appears in the rendered output."""
-        from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
+        """State.frame_stream is a FrameStream dataclass (not a rendered string)."""
+        from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION, FrameStream as ProtocolFrameStream
         k = minimal_kernel()
-        # Manually commit a frame dict into _frame_stream to trigger the frame stream section
-        k.L["_frame_stream"].commit_frame({
-            "schema_version": FRAME_SCHEMA_VERSION,
-            "number": 1,
-            "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
-            "pong": {"think": "", "action": {"operation": "x = 1", "expect": ""}},
-            "observation": {"stdout": "", "diff": "+x = 1", "error": None, "verdict": None},
-        })
         ping = k.ping(None, _ns(k))
-        assert "══════ frame stream ══════" in ping.state.frame_stream
+        assert isinstance(ping.state.frame_stream, ProtocolFrameStream)
 
-    def test_context_budget_default_set_by_kernel(self):
-        """Kernel init sets the default _context_budget in ns."""
+    def test_context_budget_removed_from_l(self):
+        """PR 5: _context_budget / _context_pct are no longer seeded in L."""
         k = minimal_kernel()
-        assert "_context_budget" in k.L
-        assert k.L["_context_budget"] == 128000
+        assert "_context_budget" not in k.L
+        assert "_context_pct" not in k.L
 
     def test_auxiliary_section_in_output(self):
-        """Auxiliary section (system variables) appears in render output after ping(None, ...)."""
+        """Signals dict contains system signal key with 'context' payload key."""
         k = minimal_kernel()
         pong = k.ping(None, _ns(k))
-        assert "context" in pong.state.signals
+        assert isinstance(pong.state.signals, dict)
+        assert any(
+            isinstance(payload, dict) and "context" in payload
+            for payload in pong.state.signals.values()
+        )
 
 
 # ─────────────────────────────────────────────
@@ -434,12 +426,13 @@ class TestRenderIntegration:
 
 class TestKernel:
     def test_init_creates_system_vars(self):
-        """After init, ns contains all required system variables (v4 format)."""
+        """After init, ns contains all required system variables (v5 format)."""
         k = minimal_kernel()
         assert k.L.get("_frame") == 0
-        # v4 vars
+        # v5 vars
         assert k.L.get("_system_prompt") == ""
-        assert isinstance(k.L.get("_frame_stream"), FrameStream)
+        # _frame_stream removed from L in PR 5 (reads from SQLite each ping)
+        assert "_frame_stream" not in k.L
         # _history and _history_depth removed in v3
         assert "_history" not in k.L
         assert "_history_depth" not in k.L
@@ -498,11 +491,14 @@ class TestKernel:
         assert k.L["_frame"] == frame_before
 
     def test_ping_none_does_not_append_frame_stream(self):
-        """ping(None, ns) does not commit to the frame stream."""
+        """ping(None, ns) does not commit a frame (no exec/eval/write)."""
         k = minimal_kernel()
+        frame_before = k.L["_frame"]
         k.ping(None, _ns(k))
         k.ping(None, _ns(k))
-        assert k.L["_frame_stream"].hot_frame_count() == 0
+        # _frame_stream removed from L in PR 5; _frame counter must not advance
+        assert "_frame_stream" not in k.L
+        assert k.L["_frame"] == frame_before
 
     def test_kernel_ping_returns_ping(self, tmp_path):
         from vessal.ark.shell.hull.cell.protocol import Ping
@@ -519,12 +515,13 @@ class TestKernel:
         _exec(k, "pass")
         assert k.L["_frame"] == initial + 1
 
-    def test_exec_via_ping_commits_to_frame_stream(self):
-        """ping(pong, ns) commits one frame to _frame_stream."""
+    def test_exec_via_ping_increments_frame_counter(self):
+        """ping(pong, ns) increments _frame for each committed frame."""
         k = minimal_kernel()
+        start = k.L["_frame"]
         _exec(k, "x = 1")
         _exec(k, "y = 2")
-        assert k.L["_frame_stream"].hot_frame_count() == 2
+        assert k.L["_frame"] == start + 2
 
     def test_variable_persists_across_pings(self):
         k = minimal_kernel()
@@ -743,12 +740,10 @@ class TestKernel:
 
         k = minimal_kernel()
         frame_before = k.L["_frame"]
-        count_before = k.L["_frame_stream"].hot_frame_count()
 
         _exec(k, "x = 1")
 
         assert k.L["_frame"] == frame_before + 1
-        assert k.L["_frame_stream"].hot_frame_count() == count_before + 1
 
 
 # ─────────────────────────────────────────────

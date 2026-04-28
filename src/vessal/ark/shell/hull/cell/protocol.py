@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, Union
 
 FRAME_SCHEMA_VERSION = 7
 
@@ -213,41 +213,122 @@ class Action:
 
 
 # ─────────────────────────────────────────────
+# FrameStream (Spec §4.8)
+# ─────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class FrameContent:
+    """Spec §4.8 layer=0 content — flat fields mirroring frame_content table."""
+    think: str
+    operation: str
+    expect: str
+    observation: dict        # {"stdout","stderr","diff","error"}
+    verdict: dict | None     # {"value","error"} or None
+    signals: dict            # {(class_name, var_name, scope): payload}
+
+
+@dataclass(frozen=True, slots=True)
+class SummaryContent:
+    """Spec §4.8 layer>=1 content — opaque YAML body."""
+    schema_version: int
+    body: str
+
+
+@dataclass(frozen=True, slots=True)
+class Entry:
+    """Spec §4.2 — (layer, n_start, n_end, content)."""
+    layer: int
+    n_start: int
+    n_end: int
+    content: Union[FrameContent, SummaryContent]
+
+
+@dataclass(frozen=True, slots=True)
+class FrameStream:
+    """Spec §4.8 — single ordered list, layer DESC + n_start ASC."""
+    entries: list[Entry]
+
+
+# ─────────────────────────────────────────────
 # State
 # ─────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
 class State:
-    """Dynamic observation part of Ping. frame_stream + signals.
+    """Spec §4.8 dynamic perceptual state. Kernel populates with dataclass +
+    dict; Core composer stringifies before LLM call.
 
     Attributes:
-        frame_stream: Historical frame summary text (rendered by Kernel).
-        signals: Current system signal text (e.g. goal, vars, verdict, etc.).
+        frame_stream: FrameStream dataclass (visible Entry list per spec §4.10).
+        signals:      dict[(class_name, var_name, scope), payload_dict] from
+                      L["signals"] (spec §6 + §4.4).
     """
 
-    frame_stream: str
-    signals: str
+    frame_stream: "FrameStream"
+    signals: dict
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to a dict.
-
-        Returns:
-            Dict with keys: frame_stream, signals.
-        """
-        return {"frame_stream": self.frame_stream, "signals": self.signals}
+        return {
+            "frame_stream": _framestream_to_dict(self.frame_stream),
+            "signals": {
+                "::".join(k): v for k, v in self.signals.items()
+            },
+        }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "State":
-        """Deserialize from a dict.
+        fs_data = d.get("frame_stream", {"entries": []})
+        signals_data = d.get("signals", {})
+        return cls(
+            frame_stream=_framestream_from_dict(fs_data),
+            signals={tuple(k.split("::")): v for k, v in signals_data.items()},
+        )
 
-        Args:
-            d: Dict with keys frame_stream and signals (missing keys default to empty string).
 
-        Returns:
-            State instance.
-        """
-        return cls(frame_stream=d.get("frame_stream", ""), signals=d.get("signals", ""))
+def _framestream_to_dict(fs: "FrameStream") -> dict:
+    return {
+        "entries": [
+            {
+                "layer": e.layer,
+                "n_start": e.n_start,
+                "n_end": e.n_end,
+                "content": _content_to_dict(e.content),
+            }
+            for e in fs.entries
+        ],
+    }
+
+
+def _content_to_dict(content) -> dict:
+    if isinstance(content, FrameContent):
+        return {
+            "kind": "frame",
+            "think": content.think,
+            "operation": content.operation,
+            "expect": content.expect,
+            "observation": content.observation,
+            "verdict": content.verdict,
+            "signals": {"::".join(k): v for k, v in content.signals.items()},
+        }
+    return {"kind": "summary", "schema_version": content.schema_version, "body": content.body}
+
+
+def _framestream_from_dict(d: dict) -> "FrameStream":
+    entries = []
+    for e in d.get("entries", []):
+        c = e["content"]
+        if c["kind"] == "frame":
+            content = FrameContent(
+                think=c["think"], operation=c["operation"], expect=c["expect"],
+                observation=c["observation"], verdict=c["verdict"],
+                signals={tuple(k.split("::")): v for k, v in c["signals"].items()},
+            )
+        else:
+            content = SummaryContent(schema_version=c["schema_version"], body=c["body"])
+        entries.append(Entry(layer=e["layer"], n_start=e["n_start"], n_end=e["n_end"], content=content))
+    return FrameStream(entries=entries)
 
 
 # ─────────────────────────────────────────────
@@ -382,7 +463,7 @@ class FrameRecord:
         ping = (
             Ping.from_dict(ping_data)
             if ping_data is not None
-            else Ping(system_prompt="", state=State(frame_stream="", signals=""))
+            else Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={}))
         )
         return cls(
             number=d["number"],
@@ -474,49 +555,6 @@ class StepResult:
     protocol_error: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class CompactionRecord:
-    """Schema v1 compaction record — one summary of k frames or k lower-layer records.
-
-    Fields mirror whitepaper §6.4.2. `layer` is the cold-zone index (0 = L_0).
-    `compacted_at` is the frame number at which this record was produced.
-    """
-
-    range: tuple[int, int]
-    intent: str
-    operations: tuple[str, ...]
-    outcomes: str
-    artifacts: tuple[str, ...]
-    notable: str
-    layer: int
-    compacted_at: int
-
-    def to_dict(self) -> dict:
-        return {
-            "schema_version": FRAME_SCHEMA_VERSION,
-            "range": list(self.range),
-            "intent": self.intent,
-            "operations": list(self.operations),
-            "outcomes": self.outcomes,
-            "artifacts": list(self.artifacts),
-            "notable": self.notable,
-            "layer": self.layer,
-            "compacted_at": self.compacted_at,
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict) -> "CompactionRecord":
-        return cls(
-            range=tuple(d["range"]),
-            intent=d["intent"],
-            operations=tuple(d["operations"]),
-            outcomes=d["outcomes"],
-            artifacts=tuple(d["artifacts"]),
-            notable=d["notable"],
-            layer=d["layer"],
-            compacted_at=d["compacted_at"],
-        )
-
 
 __all__ = [
     "FRAME_SCHEMA_VERSION",
@@ -524,6 +562,6 @@ __all__ = [
     "Ping", "Pong", "Observation", "FrameRecord", "StepResult",
     "Verdict", "VerdictFailure",
     "ErrorRecord",
-    "CompactionRecord",
     "flatten_frame_dict",
+    "FrameContent", "SummaryContent", "Entry", "FrameStream",
 ]

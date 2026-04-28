@@ -18,7 +18,7 @@ from openai import (
 
 from vessal.ark.shell.hull.cell.core.parser import ParseError, parse_response
 from vessal.ark.shell.hull.cell.core import Core
-from vessal.ark.shell.hull.cell.protocol import Ping, Pong, State, Action
+from vessal.ark.shell.hull.cell.protocol import FrameStream, Ping, Pong, State, Action
 
 
 # ============================================================
@@ -148,9 +148,10 @@ def _make_mock_response(content: str, model: str = "test-model") -> MagicMock:
 def _make_ping(**kwargs) -> Ping:
     """Construct a test Ping (system→LLM perceptual input) with default values."""
     system_prompt = kwargs.get("system_prompt", "You are an agent.")
-    frame_stream = kwargs.get("frame_stream", "══════ frame stream ══════")
-    signals = kwargs.get("signals", "goal: test")
-    return Ping(system_prompt=system_prompt, state=State(frame_stream=frame_stream, signals=signals))
+    return Ping(
+        system_prompt=system_prompt,
+        state=State(frame_stream=FrameStream(entries=[]), signals={}),
+    )
 
 
 class TestCore:
@@ -246,10 +247,19 @@ class TestCore:
         )
 
         core = Core()
-        ping = _make_ping(
+        from vessal.ark.shell.hull.cell.protocol import Entry, FrameContent
+        ping = Ping(
             system_prompt="You are an agent.",
-            frame_stream="══════ frame stream ══════",
-            signals="goal: test",
+            state=State(
+                frame_stream=FrameStream(entries=[
+                    Entry(layer=0, n_start=1, n_end=1, content=FrameContent(
+                        think="", operation="x = 1", expect="",
+                        observation={"stdout": "", "stderr": "", "diff": {}, "error": None},
+                        verdict=None, signals={},
+                    )),
+                ]),
+                signals={("GoalSkill", "goal", "L"): {"text": "test"}},
+            ),
         )
         core.step(ping)
 
@@ -259,8 +269,8 @@ class TestCore:
         assert messages[0]["role"] == "system"
         assert messages[0]["content"] == "You are an agent."
         assert messages[1]["role"] == "user"
-        assert "══════ frame stream ══════" in messages[1]["content"]
-        assert "goal: test" in messages[1]["content"]
+        assert "frame stream" in messages[1]["content"]
+        assert "GoalSkill" in messages[1]["content"]
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_messages_sent_every_call(self, mock_openai_cls):
@@ -271,9 +281,26 @@ class TestCore:
             "<action>pass</action>"
         )
 
+        from vessal.ark.shell.hull.cell.protocol import Entry, FrameContent
+
+        def _ping_with_frame(n: int) -> Ping:
+            return Ping(
+                system_prompt="You are an agent.",
+                state=State(
+                    frame_stream=FrameStream(entries=[
+                        Entry(layer=0, n_start=n, n_end=n, content=FrameContent(
+                            think="", operation=f"x = {n}", expect="",
+                            observation={"stdout": "", "stderr": "", "diff": {}, "error": None},
+                            verdict=None, signals={},
+                        )),
+                    ]),
+                    signals={},
+                ),
+            )
+
         core = Core()
-        core.step(_make_ping(frame_stream="state 1"))
-        core.step(_make_ping(frame_stream="state 2"))
+        core.step(_ping_with_frame(1))
+        core.step(_ping_with_frame(2))
 
         for call in mock_client.chat.completions.create.call_args_list:
             messages = call.kwargs["messages"]
@@ -456,7 +483,7 @@ def test_core_step_accepts_ping(mock_openai_cls):
     core = Core()
     ping = Ping(
         system_prompt="You are an agent.",
-        state=State(frame_stream="══════ frame stream ══════", signals="goal: test"),
+        state=State(frame_stream=FrameStream(entries=[]), signals={}),
     )
     pong, _, _ = core.step(ping)
     assert isinstance(pong, Pong)
@@ -472,10 +499,20 @@ def test_core_step_ping_builds_system_and_user_messages(mock_openai_cls):
         "<action>pass</action>"
     )
 
+    from vessal.ark.shell.hull.cell.protocol import Entry, FrameContent
     core = Core()
     ping = Ping(
         system_prompt="You are an agent.",
-        state=State(frame_stream="══════ frame stream ══════", signals="goal: test"),
+        state=State(
+            frame_stream=FrameStream(entries=[
+                Entry(layer=0, n_start=1, n_end=1, content=FrameContent(
+                    think="", operation="x = 1", expect="",
+                    observation={"stdout": "", "stderr": "", "diff": {}, "error": None},
+                    verdict=None, signals={},
+                )),
+            ]),
+            signals={("GoalSkill", "goal", "L"): {"text": "test"}},
+        ),
     )
     core.step(ping)
 
@@ -485,8 +522,8 @@ def test_core_step_ping_builds_system_and_user_messages(mock_openai_cls):
     assert messages[0]["role"] == "system"
     assert messages[0]["content"] == "You are an agent."
     assert messages[1]["role"] == "user"
-    assert "══════ frame stream ══════" in messages[1]["content"]
-    assert "goal: test" in messages[1]["content"]
+    assert "frame stream" in messages[1]["content"]
+    assert "GoalSkill" in messages[1]["content"]
 
 
 @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
@@ -499,7 +536,7 @@ def test_core_step_pong_parsed_correctly(mock_openai_cls):
     )
 
     core = Core()
-    ping = Ping(system_prompt="sys", state=State(frame_stream="frames", signals=""))
+    ping = Ping(system_prompt="sys", state=State(frame_stream=FrameStream(entries=[]), signals={}))
     pong, _, _ = core.step(ping)
     assert pong.action.operation == "x = 42"
     assert pong.think == "analysis"
