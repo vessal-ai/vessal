@@ -241,16 +241,34 @@ class Kernel:
         return self._last_ping
 
     def snapshot(self, path: str) -> None:
-        """Serialize L to file. Excludes 'sleep' (re-injected by restore/init)."""
-        import os, tempfile
+        """Serialise L to disk; per-key fallback to DeadHandle on cloudpickle failure."""
+        import os
+        import tempfile
+
+        from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
+
         path = str(path)
-        snapshot_l = {k: v for k, v in self.L.items() if k != "sleep"}
-        body_bytes = cloudpickle.dumps(snapshot_l)
+        to_dump: dict = {}
+        for key, value in self.L.items():
+            if key == "sleep":
+                continue
+            try:
+                cloudpickle.dumps(value)
+            except Exception as exc:
+                to_dump[key] = DeadHandle(
+                    kind=type(value).__name__,
+                    origin=key,
+                    reason=f"{type(exc).__name__}: {exc}",
+                )
+                continue
+            to_dump[key] = value
+
+        body = cloudpickle.dumps(to_dump)
         dir_name = os.path.dirname(path) or "."
         fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as f:
-                f.write(body_bytes)
+                f.write(body)
             os.replace(tmp_path, path)
         except Exception:
             try:
