@@ -763,7 +763,7 @@ class TestKernel:
         _exec(k, "x = 1")
         ns_keys_before = set(k.L.keys())
         _exec(k, "pass", expect="assert x == 1")
-        allowed_new_keys = {"verdict", "observation", "_frame", "_signal_outputs",
+        allowed_new_keys = {"verdict", "observation", "_frame", "signals",
                             "_context_pct", "_budget_total", "_dropped_frame_count"}
         leaked_extra_keys = set(k.L.keys()) - ns_keys_before - allowed_new_keys
         assert leaked_extra_keys == set(), f"Unexpected new keys after expect: {leaked_extra_keys}"

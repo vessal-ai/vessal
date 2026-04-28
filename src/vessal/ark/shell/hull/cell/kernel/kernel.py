@@ -98,7 +98,7 @@ class Kernel:
           ① archive pong (deferred to _commit inside this call)
           ② exec(pong.operation, G, L) → L["observation"]
           ③ eval(pong.expect, G, copy(L)) → L["verdict"]
-          ④ signal_scan → L["_signal_outputs"]   (PR 3 will rename to L["signals"])
+          ④ signal_scan → L["signals"]
           ⑤ render Ping structure
 
         pong=None (first call after boot/restart) skips ②③ — observation/verdict
@@ -375,6 +375,7 @@ class Kernel:
         signals[(cls_name, var_name, scope)] = dict(payload)  # shallow copy
 
     def _record_signal_error(self, cls_name: str, var_name: str, exc: Exception) -> int:
+        """Stash signal error; return its index (valid only within current ping frame)."""
         bucket = self._signal_errors_this_frame
         bucket.append((cls_name, var_name, exc))
         return len(bucket) - 1

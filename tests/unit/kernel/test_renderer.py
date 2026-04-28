@@ -719,7 +719,7 @@ def test_renderer_output_order_system_stream_signals():
         "_builtin_names": [],
         "_context_pct": 0,
         "_ns_meta": {},
-        "_signal_outputs": [],
+        "signals": {},
         "_dropped_frame_count": 0,
     }
     out = render(ns)
