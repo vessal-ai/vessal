@@ -26,7 +26,8 @@ def _make_stub_cell(responses=None) -> MagicMock:
         def __init__(self):
             self.L = ns
 
-    system_skill = SystemSkill(_FakeKernel())
+    system_skill = SystemSkill()
+    system_skill._bind_kernel(_FakeKernel())
 
     call_count = [0]
     if responses is None:

@@ -95,10 +95,7 @@ class Kernel:
             "_sleeping": False,
             "_next_wake": None,
         }
-        _L = self.L
-        def _sleep_fn():
-            _L["_sleeping"] = True
-        self.L["sleep"] = _sleep_fn
+        self.L["sleep"] = self.sleep
 
         # ② boot script — captures Skill __init__ prints into stdout/stderr
         boot_stdout = io.StringIO()
@@ -253,10 +250,11 @@ class Kernel:
         return self._last_ping
 
     def snapshot(self, path: str) -> None:
-        """Serialize L to file. Pure cloudpickle.dumps(L) — no per-key filtering."""
+        """Serialize L to file. Excludes 'sleep' (re-injected by restore/init)."""
         import os, tempfile
         path = str(path)
-        body_bytes = cloudpickle.dumps(self.L)
+        snapshot_l = {k: v for k, v in self.L.items() if k != "sleep"}
+        body_bytes = cloudpickle.dumps(snapshot_l)
         dir_name = os.path.dirname(path) or "."
         fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
         try:
@@ -275,6 +273,7 @@ class Kernel:
         with open(path, "rb") as f:
             raw = f.read()
         self.L = LenientUnpickler(io.BytesIO(raw)).load()
+        self.L["sleep"] = self.sleep
 
     def sleep(self) -> None:
         """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""

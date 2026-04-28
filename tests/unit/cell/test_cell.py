@@ -102,13 +102,13 @@ class TestConstructor:
         assert cell._core._api_params["max_tokens"] == 4096
 
     def test_snapshot_path_forwarded(self, tmp_path):
-        """snapshot_path is forwarded to Kernel — namespace is consistent when restored from snapshot."""
+        """restore_path is forwarded to Kernel — namespace is consistent when restored from snapshot."""
         cell1 = _make_cell()
         cell1.L["saved_var"] = 999
         snap = str(tmp_path / "snap.pkl")
         cell1.snapshot(snap)
 
-        cell2 = _make_cell(snapshot_path=snap)
+        cell2 = _make_cell(restore_path=snap)
         assert cell2.L["saved_var"] == 999
 
     def test_ns_is_dict(self):
@@ -503,7 +503,7 @@ class TestSnapshotRestore:
         assert cell2.L["data"] == [1, 2, 3]
 
     def test_snapshot_via_snapshot_path(self, tmp_path):
-        """snapshot_path constructor parameter is equivalent to restore() — namespace is recovered."""
+        """restore_path constructor parameter is equivalent to restore() — namespace is recovered."""
         cell1 = _make_cell()
         _set_responses(cell1, [_action("saved_var = 999")])
         cell1.step()
@@ -511,7 +511,7 @@ class TestSnapshotRestore:
         snap = str(tmp_path / "test_snap.pkl")
         cell1.snapshot(snap)
 
-        cell2 = _make_cell(snapshot_path=snap)
+        cell2 = _make_cell(restore_path=snap)
         assert cell2.L["saved_var"] == 999
 
 

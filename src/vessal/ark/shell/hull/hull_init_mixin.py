@@ -43,19 +43,46 @@ class HullInitMixin:
         self._activate_venv()
         return config
 
+    def _init_skills_pre(self, hull_cfg: dict) -> list:
+        """Phase 2.5: build BootSkillEntry list and initialize SkillLoader registry.
+
+        Runs BEFORE _init_cell so the boot script is ready for Cell construction.
+        """
+        from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
+        from vessal.ark.shell.hull.skill_loader import SkillLoader
+
+        skill_paths = hull_cfg.get("skill_paths", [])
+        resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
+        self._skill_manager = SkillLoader(skill_paths=resolved_paths)
+
+        entries = [BootSkillEntry("_system", "vessal.skills.system", "SystemSkill", "")]
+        for skill_name in hull_cfg.get("skills", []):
+            try:
+                skill_cls = self._skill_manager.load(skill_name)
+            except Exception as e:
+                print(f"[error] skill '{skill_name}' failed to register: {e}")
+                continue
+            entries.append(BootSkillEntry(skill_name, skill_cls.__module__, skill_cls.__name__, ""))
+        return entries
+
     def _init_cell(
         self,
         core_cfg: dict,
         cell_cfg: dict,
         agent_cfg: dict,
         cells_cfg: dict | None = None,
+        boot_entries: list | None = None,
     ) -> None:
-        """Phase 2: Create Cell, setup logging/tracer, restore snapshot, inject agent vars.
+        """Phase 2: Create Cell, setup logging/tracer, inject agent vars.
 
         cells_cfg is the [cells] table from hull.toml. The main Cell reads
         [cells.main]; missing entries fall back to defaults (data_dir = "data/main").
+        boot_entries is the BootSkillEntry list from _init_skills_pre; passed through
+        to compose_boot_script so Cell/Kernel can exec skill instantiation on boot.
         """
+        import os
         from vessal.ark.shell.hull.cell import Cell
+        from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script
         from vessal.ark.util.logging import Tracer
 
         cells_cfg = cells_cfg or {}
@@ -70,16 +97,28 @@ class HullInitMixin:
         data_dir_abs = (self._project_dir / data_dir_rel).resolve()
         data_dir_abs.mkdir(parents=True, exist_ok=True)
 
+        os.environ["VESSAL_DATA_DIR"] = str(data_dir_abs)
+        self._snapshots_dir = data_dir_abs / "snapshots"
+
+        restore_path = None
+        if self._snapshots_dir.exists():
+            snaps = sorted(self._snapshots_dir.glob("*.pkl"))
+            restore_path = str(snaps[-1]) if snaps else None
+
+        boot_script = compose_boot_script(boot_entries or [])
+
         api_params = core_cfg.get("api_params", {
             "temperature": cell_cfg.get("temperature", 0.7),
             "max_tokens": cell_cfg.get("max_tokens", 4096),
         })
         self._cell = Cell(
+            boot_script=boot_script,
             timeout=core_cfg.get("timeout", 60.0),
             core_max_retries=core_cfg.get("max_retries", 3),
             api_params=api_params,
             cell_name=cell_name,
             data_dir=str(data_dir_abs),
+            restore_path=restore_path,
         )
 
         self._log_dir = str(self._project_dir / "logs")
@@ -96,8 +135,6 @@ class HullInitMixin:
                 "Recommend setting a value matching the actual context window of OPENAI_MODEL."
             )
 
-        self._snapshots_dir = self._project_dir / "snapshots"
-        self._restore_latest_snapshot()
         self._cell.L["_token_budget"] = self._cell.max_tokens
         self._cell.L["_error_buffer_cap"] = cell_cfg.get("error_buffer_cap", 200)
 
@@ -127,16 +164,13 @@ class HullInitMixin:
         self._cell.L["_compression_prompt"] = self._compression_prompt
 
     def _init_skills(self, hull_cfg: dict) -> None:
-        """Phase 3: SkillLoader, route table, pre-load Skills, start servers."""
-        from vessal.ark.shell.hull.skill_loader import SkillLoader
+        """Phase 3: route table, bind hull to G skills, start servers."""
         from vessal.ark.shell.hull.hull_api import HullApi
 
         skill_paths = hull_cfg.get("skill_paths", [])
         resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
 
-        self._skill_manager = SkillLoader(skill_paths=resolved_paths)
         self._cell.L["_builtin_names"] = []
-
         self._cell.L["skill_paths"] = resolved_paths
         self._cell.L["_data_dir"] = str(self._project_dir / "data")
         compress_threshold = hull_cfg.get("compress_threshold", 50)
@@ -153,18 +187,16 @@ class HullInitMixin:
         }
         self._hull_api = HullApi(routes=self._routes, wake_fn=self.wake)
 
+        # Bind skills that need hull reference
+        for skill_name in list(hull_cfg.get("skills", [])):
+            skill_inst = self._cell.G.get(skill_name)
+            if skill_inst is not None:
+                bind = getattr(skill_inst, "_bind_hull", None)
+                if callable(bind):
+                    bind(self)
+
+        # Start servers
         for skill_name in hull_cfg.get("skills", []):
-            restored = skill_name in self._cell.L
-            try:
-                if restored:
-                    self._skill_manager.load(skill_name)
-                    description = getattr(type(self._cell.L[skill_name]), "description", "")
-                    print(f"{skill_name} loaded — {description}")
-                else:
-                    self._load_and_instantiate_skill(skill_name)
-            except Exception as e:
-                print(f"[error] skill '{skill_name}' failed to load, skipping: {e}", flush=True)
-                continue
             if self._skill_manager.has_server(skill_name):
                 try:
                     self._start_skill_server(skill_name)
@@ -220,7 +252,7 @@ class HullInitMixin:
             hooks=hooks,
         )
 
-        self._cell.L["_inject_wake"] = lambda reason="user_message": self.wake(reason)
+        self._cell.G["_inject_wake"] = lambda reason="user_message": self.wake(reason)
 
     def _ensure_log_readme(self) -> None:
         """Ensure the logs directory has a README.md file."""
