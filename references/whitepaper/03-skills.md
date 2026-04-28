@@ -1,6 +1,6 @@
 # 3. Skill Model
 
-> **TL;DR.** A Skill is not "a capability" but an interface between the agent and the outside world, with two faces: tools and signals for the agent, a server for the world. Kernel-side duck-typed discovery, dual-track methodology, and meta-skills are what let Skills evolve independently of the runtime.
+> **TL;DR.** A Skill is not "a capability" but an interface between the agent and the outside world, with two faces: tools and signals for the agent, a server for the world. Kernel-side BaseSkill-typed discovery, dual-track methodology, and meta-skills are what let Skills evolve independently of the runtime.
 
 The previous chapter established the three-layer architecture: Cell for computation, Hull for orchestration, Shell for boundary. This chapter addresses a question that arises immediately from that layering: where does an Agent's capability extension — the Skill — belong?
 

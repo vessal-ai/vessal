@@ -95,7 +95,7 @@ Skills pass information to the Agent at different granularities through three ch
 - **guide (manual layer)**: a BaseSkill attribute; Agent consults it on demand via `print(name.guide)`. Content includes method signatures, parameter descriptions, and usage examples. If lost, re-print; cost = 1 frame delay.
 - **signal_update() (reminder layer)**: updates the L["signals"] dict with (class_name, var_name, scope) keys; appears in the auxiliary signal section each frame. Displays current status information, ending with a reminder to "print(name.guide) to see methods". Does not include method names.
 
-Creation guidelines: description ≤ 15 characters, write only the function; _signal() does not expose method signatures; SKILL.md is the only place containing method signatures; _prompt() only contains behavioral rules. Changes to _prompt() must go through the file (unload → modify → reload); runtime dynamic modification is not allowed.
+Creation guidelines: description ≤ 15 characters, write only the function; signal_update() does not expose method signatures; SKILL.md is the only place containing method signatures; _prompt() only contains behavioral rules. Changes to _prompt() must go through the file (unload → modify → reload); runtime dynamic modification is not allowed.
 
 Skill modification policy: Agents may modify any Skill (including built-in ones). Built-in Skill modifications are overwritten on vessal package upgrades; for persistent modifications, create a same-named user Skill in skill_paths to override.
 
@@ -106,7 +106,7 @@ None.
 
 ### Known Issues
 - 2026-04-09: hull.py is currently 623 lines, exceeding the 500-line convention; needs splitting — suggest extracting internal utility functions such as `_load_gate_files`, `_activate_venv`, `_restore_latest_snapshot` into `hull_init.py`
-- 2026-04-09: Skill protocol field `summary` has been renamed to `description` (SkillBase class attribute + SKILL.md frontmatter + SkillLoader.list() output); the old name is no longer valid
+- 2026-04-09: Skill protocol field `summary` has been renamed to `description` (BaseSkill class attribute + SKILL.md frontmatter + SkillLoader.list() output); the old name is no longer valid
 - 2026-04-12: SkillsManager rename complete — name changed from `_meta` to `skills`, methods `load_skill/unload_skill` changed to `load/unload`, `query_guide` deleted, namespace injection key changed from `_meta` to `skills`
 
 ### Active
