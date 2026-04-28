@@ -7,7 +7,7 @@ Each test pins one contract from refactor-plan.md PR 2:
   - L["verdict"] is a Verdict (or None) after non-None ping
   - Legacy scattered keys (_stdout/_error/_diff/_verdict/_actual_tokens_*/
     _protected_keys) no longer appear in L after ping
-  - The 7 deleted multi-entry methods do not exist on Kernel
+  - The 8 deleted multi-entry methods do not exist on Kernel
 """
 from __future__ import annotations
 
