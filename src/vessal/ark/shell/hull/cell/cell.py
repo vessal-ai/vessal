@@ -198,18 +198,25 @@ class Cell:
 
         # Real-token bookkeeping (deferred to PR 5; kept for now)
         if prompt_tokens is not None:
+            self._kernel.L["_actual_tokens_in"] = prompt_tokens
             budget_total = self._kernel.L.get("_budget_total", 0)
             if budget_total > 0:
                 self._kernel.L["_context_pct"] = round(
                     prompt_tokens / budget_total * 100
                 )
+        if completion_tokens is not None:
+            self._kernel.L["_actual_tokens_out"] = completion_tokens
 
         if self._check_action_gate(self._pong.action.operation) is None:
             self._pong = None  # do not execute next call
             return StepResult(protocol_error="Action gate blocked")
 
         # Single Kernel primitive: commits frame N, returns Ping for frame N+1
+        if tracer:
+            tracer.start(frame_number, "kernel.ping")
         self._ping = self._kernel.ping(self._pong, ns)
+        if tracer:
+            tracer.end(frame_number, "kernel.ping")
 
         return StepResult()
 
