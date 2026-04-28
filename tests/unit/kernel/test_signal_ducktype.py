@@ -1,15 +1,12 @@
 """Test that Kernel discovers signals via duck-typing, not isinstance."""
 from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+from tests.unit.kernel._ping_helpers import _ns
 
 
 class FakeSignalSource:
     """Not a SkillBase subclass, but has _signal protocol."""
     def _signal(self):
         return ("fake", "test signal active")
-
-
-def _ns(k):
-    return {"globals": k.G, "locals": k.L}
 
 
 def test_kernel_discovers_signal_via_ducktype():

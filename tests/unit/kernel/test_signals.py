@@ -3,6 +3,7 @@ import pytest
 
 from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
 from vessal.ark.shell.hull.skill import SkillBase
+from tests.unit.kernel._ping_helpers import _ns
 
 
 class FakeSkill(SkillBase):
@@ -15,10 +16,6 @@ class FakeSkill(SkillBase):
         if self.data:
             return ("fake", f"fake={self.data}")
         return None
-
-
-def _ns(k):
-    return {"globals": k.G, "locals": k.L}
 
 
 def test_update_signals_collects_base_signals():

@@ -15,15 +15,7 @@ import pytest
 
 from vessal.ark.shell.hull.cell.kernel import Kernel
 from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
-
-
-def _ns(k):
-    return {"globals": k.G, "locals": k.L}
-
-
-def _exec(k, op, expect=""):
-    from vessal.ark.shell.hull.cell.protocol import Action, Pong
-    return k.ping(Pong(think="", action=Action(operation=op, expect=expect)), _ns(k))
+from tests.unit.kernel._ping_helpers import _ns, _exec
 
 
 class TestKernelHasGAndL:

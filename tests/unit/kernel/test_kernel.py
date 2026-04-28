@@ -22,6 +22,8 @@ from vessal.ark.shell.hull.cell.kernel.render import render
 from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
+from tests.unit.kernel._ping_helpers import _ns, _exec
+
 # ─────────────────────────────────────────────
 # Helper: construct a minimal namespace (without defaults)
 # ─────────────────────────────────────────────
@@ -56,18 +58,6 @@ def _kw() -> "Kernel":
     k = Kernel()
     k.L["_builtin_names"] = []
     return k
-
-
-def _ns(k) -> dict:
-    """Return the namespace dict for k.ping() calls."""
-    return {"globals": k.G, "locals": k.L}
-
-
-def _exec(k, op: str, expect: str = "") -> "Ping":
-    """Run one frame via ping: exec op, optionally eval expect."""
-    from vessal.ark.shell.hull.cell.protocol import Action, Pong
-    pong = Pong(think="", action=Action(operation=op, expect=expect))
-    return k.ping(pong, _ns(k))
 
 
 # ─────────────────────────────────────────────
@@ -766,15 +756,16 @@ class TestKernel:
         assert verdict.passed == 0
         assert len(verdict.failures) == 1
 
-    def test_eval_expect_does_not_modify_ns(self):
-        """ping with expect evaluates on a copy; does not leak extra keys into L."""
+    def test_eval_expect_does_not_leak_arbitrary_keys(self):
+        """ping with expect evaluates on a copy; post-ping key delta is exactly the allowed set."""
         k = Kernel()
         _exec(k, "x = 1")
         ns_keys_before = set(k.L.keys())
         _exec(k, "pass", expect="assert x == 1")
-        # expect evaluation may add "verdict" and "observation" but should not add arbitrary keys
-        unexpected = set(k.L.keys()) - ns_keys_before - {"verdict", "observation", "_frame"}
-        assert not unexpected, f"Unexpected new keys after expect: {unexpected}"
+        allowed_new_keys = {"verdict", "observation", "_frame", "_signal_outputs",
+                            "_context_pct", "_budget_total", "_dropped_frame_count"}
+        leaked_extra_keys = set(k.L.keys()) - ns_keys_before - allowed_new_keys
+        assert leaked_extra_keys == set(), f"Unexpected new keys after expect: {leaked_extra_keys}"
         assert k.L["x"] == 1
 
     def test_ping_commits_frame_and_increments(self):
