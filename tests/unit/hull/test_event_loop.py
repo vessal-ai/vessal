@@ -9,23 +9,30 @@ from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 @pytest.fixture
 def mock_cell():
+    from vessal.skills.system import SystemSkill
+
+    class _FakeKernel:
+        def __init__(self):
+            self.L = {
+                "_sleeping": False,
+                "_next_wake": None,
+                "_frame": 0,
+                "_errors": [],
+                "signals": {},
+            }
+
+    fk = _FakeKernel()
     cell = MagicMock()
-    cell.L = {
-        "_sleeping": False,
-        "_wake": "",
-        "_next_wake": None,
-        "_frame": 0,
-        "_signal_outputs": [],
-        "_frame_stream": FrameStream(),
-    }
+    cell.L = fk.L
+    cell.G = {"_system": SystemSkill(fk)}
     return cell
 
 
 def test_inject_wake_sets_namespace(mock_cell):
-    """inject_wake writes the wake reason into namespace."""
+    """inject_wake writes the wake reason onto _system Skill."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "user_message"})
-    assert mock_cell.L["_wake"] == "user_message"
+    assert mock_cell.G["_system"]._wake == "user_message"
 
 
 def test_inject_wake_clears_idle(mock_cell):
@@ -40,7 +47,7 @@ def test_inject_wake_default_reason(mock_cell):
     """Uses heartbeat when the event has no reason field."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({})
-    assert mock_cell.L["_wake"] == "heartbeat"
+    assert mock_cell.G["_system"]._wake == "heartbeat"
 
 
 def test_inject_wake_does_not_touch_skills(mock_cell):
@@ -71,10 +78,10 @@ def test_run_wake_cycle_skips_frame_logger_without_log_dir(mock_cell):
 
 
 def test_inject_wake_alarm_reason(mock_cell):
-    """alarm wake writes _wake = 'alarm'."""
+    """alarm wake writes _system._wake = 'alarm'."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "alarm"})
-    assert mock_cell.L["_wake"] == "alarm"
+    assert mock_cell.G["_system"]._wake == "alarm"
 
 
 def test_frame_loop_calls_before_frame_hook(mock_cell):
