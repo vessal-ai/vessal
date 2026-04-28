@@ -57,8 +57,8 @@ def test_scaffold_module_imports(tmp_path):
 
 def test_hull_loads_scaffolded_skill(hull_from_scaffold):
     hull, skill_name = hull_from_scaffold
-    assert skill_name in hull._cell.ns
-    instance = hull._cell.ns[skill_name]
+    assert skill_name in hull._cell.L
+    instance = hull._cell.L[skill_name]
     assert instance._signal() is None or isinstance(instance._signal(), tuple)
     assert instance._prompt() is None or isinstance(instance._prompt(), tuple)
 

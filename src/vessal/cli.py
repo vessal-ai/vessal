@@ -210,7 +210,7 @@ def _cmd_once(args: argparse.Namespace) -> None:
     hull = Hull(str(project_dir))
 
     # Inject goal into the chat skill inbox (if loaded)
-    chat = hull._cell.ns.get("chat")
+    chat = hull._cell.L.get("chat")
     if chat is not None and hasattr(chat, "receive"):
         chat.receive(args.goal)
     hull.wake("user_message")

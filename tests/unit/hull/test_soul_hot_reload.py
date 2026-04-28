@@ -11,9 +11,7 @@ def soul_env(tmp_path):
     soul_path = tmp_path / "SOUL.md"
     soul_path.write_text("original soul", encoding="utf-8")
     cell = MagicMock()
-    cell.ns = {}
-    cell.get.side_effect = lambda key, default=None: cell.ns.get(key, default)
-    cell.set.side_effect = lambda key, value: cell.ns.__setitem__(key, value)
+    cell.L = {}
     return soul_path, cell
 
 
@@ -65,7 +63,7 @@ class TestSoulHotReload:
         soul_path, cell = soul_env
         hull = _make_hull_stub(soul_path, cell)
         hull._rewrite_runtime_owned()
-        assert cell.ns["_soul"] == "original soul"
+        assert cell.L["_soul"] == "original soul"
 
     def test_modified_soul_detected_next_frame(self, soul_env):
         """After SOUL.md is modified, next _rewrite_runtime_owned picks up the change."""
@@ -73,7 +71,7 @@ class TestSoulHotReload:
         hull = _make_hull_stub(soul_path, cell)
 
         hull._rewrite_runtime_owned()
-        assert cell.ns["_soul"] == "original soul"
+        assert cell.L["_soul"] == "original soul"
 
         # Simulate Agent modifying SOUL.md at runtime
         # Force mtime change by temporarily backdating the cached mtime
@@ -81,7 +79,7 @@ class TestSoulHotReload:
         soul_path.write_text("evolved soul", encoding="utf-8")
 
         hull._rewrite_runtime_owned()
-        assert cell.ns["_soul"] == "evolved soul"
+        assert cell.L["_soul"] == "evolved soul"
         # mtime cache should be updated to the file's actual mtime (to avoid re-reading next frame)
         assert hull._soul_mtime == soul_path.stat().st_mtime
 
@@ -95,7 +93,7 @@ class TestSoulHotReload:
 
         hull._rewrite_runtime_owned()
         assert hull._soul_mtime == original_mtime
-        assert cell.ns["_soul"] == "original soul"
+        assert cell.L["_soul"] == "original soul"
 
     def test_soul_deleted_at_runtime_keeps_last_value(self, soul_env):
         """If SOUL.md is deleted after initial load, ns['_soul'] keeps last known value."""
@@ -103,10 +101,10 @@ class TestSoulHotReload:
         hull = _make_hull_stub(soul_path, cell)
 
         hull._rewrite_runtime_owned()
-        assert cell.ns["_soul"] == "original soul"
+        assert cell.L["_soul"] == "original soul"
 
         soul_path.unlink()
 
         hull._rewrite_runtime_owned()
         # File gone → exists() returns False → skip mtime check → keep cached text
-        assert cell.ns["_soul"] == "original soul"
+        assert cell.L["_soul"] == "original soul"

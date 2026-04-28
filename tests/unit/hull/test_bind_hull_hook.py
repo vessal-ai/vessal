@@ -54,4 +54,4 @@ def test_skill_without_bind_hull_still_loads(hull_factory, monkeypatch):
     hull = hull_factory()
     monkeypatch.setattr(hull._skill_manager, "load", lambda n: PlainSkill)
     hull._load_and_instantiate_skill("plain")  # must not raise
-    assert isinstance(hull._cell.ns["plain"], PlainSkill)
+    assert isinstance(hull._cell.L["plain"], PlainSkill)

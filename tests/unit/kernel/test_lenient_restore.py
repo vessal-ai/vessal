@@ -144,7 +144,7 @@ class TestKernelRestoreLenient:
 
         try:
             k = Kernel()
-            k.ns["my_skill"] = FakeSkill("hi")
+            k.L["my_skill"] = FakeSkill("hi")
             snap = str(tmp_path / "snap.bin")
             k.snapshot(snap)
         finally:
@@ -152,9 +152,9 @@ class TestKernelRestoreLenient:
 
         k2 = Kernel()
         k2.restore(snap)  # must NOT raise
-        assert "my_skill" in k2.ns
+        assert "my_skill" in k2.L
         # By-reference path was forced: placeholder must be UnresolvedRef.
-        assert isinstance(k2.ns["my_skill"], UnresolvedRef)
+        assert isinstance(k2.L["my_skill"], UnresolvedRef)
 
     def test_restored_missing_ref_repr_contains_unresolved(self, tmp_path: Path):
         mod_name = "vessal_test_skill_repr_check_e2e"
@@ -169,7 +169,7 @@ class TestKernelRestoreLenient:
 
         try:
             k = Kernel()
-            k.ns["rs"] = ReprSkill()
+            k.L["rs"] = ReprSkill()
             snap = str(tmp_path / "snap.bin")
             k.snapshot(snap)
         finally:
@@ -177,6 +177,6 @@ class TestKernelRestoreLenient:
 
         k2 = Kernel()
         k2.restore(snap)
-        val = k2.ns["rs"]
+        val = k2.L["rs"]
         assert isinstance(val, UnresolvedRef)
         assert "UnresolvedRef" in repr(val)

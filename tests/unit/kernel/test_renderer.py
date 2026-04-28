@@ -575,13 +575,13 @@ class TestKernelRenderV3:
         k = Kernel()
         k.exec_operation("x = 1", frame_number=1)
         # exec_operation does NOT commit frames to _frame_stream — that is Cell's job
-        fs = k.ns.get("_frame_stream")
+        fs = k.L.get("_frame_stream")
         assert fs is None or fs.hot_frame_count() == 0
 
     def test_system_prompt_key_used(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
-        k.ns["_system_prompt"] = "Test system prompt"
+        k.L["_system_prompt"] = "Test system prompt"
         ping = k.render()
         assert "Test system prompt" in ping.system_prompt
 
@@ -595,8 +595,8 @@ class TestKernelRenderV3:
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.render()
-        assert "_context_pct" in k.ns
-        assert isinstance(k.ns["_context_pct"], int)
+        assert "_context_pct" in k.L
+        assert isinstance(k.L["_context_pct"], int)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

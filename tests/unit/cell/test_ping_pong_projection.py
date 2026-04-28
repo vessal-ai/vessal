@@ -42,7 +42,7 @@ def test_ping_is_frame_stream_projection():
     def _patched_commit(self, pong_arg, observation, frame_number, ping=None):
         original_commit(self, pong_arg, observation, frame_number, ping=ping)
         # After the real commit, overwrite the frame's ping in the stream
-        fs = self.ns.get("_frame_stream")
+        fs = self.L.get("_frame_stream")
         latest = fs.latest_hot_frame() if fs is not None else None
         if latest is not None:
             latest["ping"] = {
@@ -82,7 +82,7 @@ def test_pong_is_frame_stream_projection():
 
     def _patched_commit(self, pong_arg, observation, frame_number, ping=None):
         original_commit(self, pong_arg, observation, frame_number, ping=ping)
-        fs = self.ns.get("_frame_stream")
+        fs = self.L.get("_frame_stream")
         latest = fs.latest_hot_frame() if fs is not None else None
         if latest is not None:
             latest["pong"] = {
@@ -113,7 +113,7 @@ def test_ping_pong_consistent_across_multiple_steps():
         result = cell.step()
         assert result.protocol_error is None
 
-        fs = cell.ns["_frame_stream"]
+        fs = cell.L["_frame_stream"]
         latest = fs.latest_hot_frame()
         assert latest is not None
         assert latest["number"] == i

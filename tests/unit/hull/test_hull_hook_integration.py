@@ -24,7 +24,7 @@ def _make_hull(tmp_path):
 def test_after_frame_submits_on_try_shift(tmp_path):
     """When try_shift returns a task, _thread_pool.submit is called once."""
     hull = _make_hull(tmp_path)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fake_task = {"layer": 0, "payload": []}
     fs.try_shift = MagicMock(return_value=fake_task)
 
@@ -39,7 +39,7 @@ def test_after_frame_submits_on_try_shift(tmp_path):
 def test_after_frame_no_submit_when_try_shift_none(tmp_path):
     """When try_shift returns None, submit is not called."""
     hull = _make_hull(tmp_path)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fs.try_shift = MagicMock(return_value=None)
 
     submitted = []
@@ -52,7 +52,7 @@ def test_after_frame_no_submit_when_try_shift_none(tmp_path):
 def test_before_frame_drains_result_queue_on_success(tmp_path):
     """Successful result in queue triggers apply_results on FrameStream."""
     hull = _make_hull(tmp_path)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fs._in_flight = True
 
     applied = []
@@ -79,7 +79,7 @@ def test_before_frame_drains_result_queue_on_success(tmp_path):
 def test_before_frame_aborts_on_error_sentinel(tmp_path):
     """Error sentinel in queue calls abort_compaction."""
     hull = _make_hull(tmp_path)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fs._in_flight = True
 
     aborted = []
@@ -109,7 +109,7 @@ def test_periodic_snapshot_fires_every_n_frames(tmp_path, monkeypatch):
     monkeypatch.setattr(hull, "snapshot", lambda: snapshots.append(1))
 
     # try_shift always returns None (hot-only path, no compaction)
-    fs = hull._cell.get("_frame_stream")
+    fs = hull._cell.L.get("_frame_stream")
     fs.try_shift = MagicMock(return_value=None)
 
     for _ in range(7):
