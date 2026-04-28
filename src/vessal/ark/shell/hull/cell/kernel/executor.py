@@ -1,12 +1,10 @@
 """executor.py — Code execution engine: safely executes Agent-generated code in a sandboxed namespace."""
 #   ExecResult                  operation execution result dataclass
 #   execute(operation, G, L, frame_number) -> ExecResult
-#       Execute Python code via exec(code, G, L), return ExecResult.
-#       All side effects are written to L system variables:
-#         _operation  the code that was executed
-#         _stdout     captured print output
-#         _error      exception info (None if no exception)
-#         _diff       change summary (added/modified/deleted user variables)
+#       Execute Python code with three-arg exec(code, G, L), return ExecResult.
+#       NO SIDE EFFECTS on L beyond _ns_meta and any user variables the code itself binds.
+#       Caller (Kernel.ping) is responsible for assembling Observation from ExecResult
+#       and writing L["observation"].
 #       Does NOT write ns["_frame"] — that is _commit_frame's responsibility.
 #       Does NOT write _frame_log or construct FrameRecord — that is Cell's responsibility.
 #       Exception tracebacks are intelligently compressed — user code frames and exception
@@ -85,34 +83,21 @@ def execute(
     """Execute operation code in the namespace.
 
     frame_number: passed in by Cell via Kernel; used for ErrorRecord and _ns_meta tracking.
-    execute() is responsible for updating _stdout/_diff/_error/_ns_meta and _operation.
     execute() must NOT write L["_frame"] — that is _commit_frame's responsibility.
     execute() must NOT write _frame_log or construct FrameRecord.
 
     Args:
         operation: Python code string to execute. None or whitespace-only is treated as a no-op.
         G: Preset assets dict (Skills, boot globals); read-only by convention. Globals for exec().
-        L: Agent state dict; side effects are written directly to it. Locals for exec().
+        L: Agent state dict; only _ns_meta and user-bound variables are written.
         frame_number: Current frame number; used for ErrorRecord and _ns_meta, not written to L["_frame"].
 
     Returns:
         ExecResult containing stdout, diff, and error fields.
-
-    Side effects:
-        L["_operation"], L["_stdout"], L["_error"], L["_diff"] are updated after execution.
-        L["_ns_meta"] is updated with variable metadata after execution.
     """
-    # Step 1: return immediately for empty code, reset side-effect variables
-    # Note: _ns_meta and _frame_log are not reset; empty operation produces no new frame data
+    # Step 1: return immediately for empty code
     if not operation or not operation.strip():
-        L["_operation"] = ""
-        L["_stdout"] = ""
-        L["_error"] = None
-        L["_diff"] = ""
         return ExecResult(stdout="", diff="", error=None)
-
-    # Step 2: record the operation source
-    L["_operation"] = operation
 
     # Step 3: before-snapshot — record keys, id()s, and value references before execution
     # id(v) is the object's memory address; unchanged for the same object; changes when value is replaced
@@ -120,10 +105,6 @@ def execute(
     before_keys = set(L.keys())
     before_ids = {k: id(v) for k, v in L.items()}
     before_values = {k: v for k, v in L.items() if is_user_var(k)}
-
-    # Snapshot protected keys before exec (for restoring builtins agent deleted)
-    protected_keys = set(L.get("_protected_keys", []))
-    protected_snapshot = {k: L[k] for k in protected_keys if k in L}
 
     # Step 3.5: check if the last statement is a bare expression; rewrite as assignment if so
     modified_operation = _maybe_capture_last_expr(operation)
@@ -169,37 +150,19 @@ def execute(
             captured_stdout += "\n"
         captured_stdout += result_repr + "\n"
 
-    L["_stdout"] = captured_stdout
-    L["_error"] = error
-
     # Step 6: clean up __builtins__ and __name__ injected by exec into G
     if "__builtins__" in G:
         del G["__builtins__"]
     if "__name__" in G and G.get("__name__") == filename:
         del G["__name__"]
 
-    # Step 6.5: restore protected keys deleted by agent code
-    restored_keys = []
-    for k, v in protected_snapshot.items():
-        if k not in L:
-            L[k] = v
-            restored_keys.append(k)
-    if restored_keys:
-        warning = f"[system] The following variables were deleted by code and have been automatically restored: {', '.join(sorted(restored_keys))}\n"
-        captured_stdout += warning
-        L["_stdout"] = captured_stdout
-        append_error(L, ErrorRecord(
-            "builtin_restored", warning.strip(),
-            frame_number, _time.time(),
-        ))
-
-    # Step 7: compute diff (git-style +/- format), write to _diff
-    _compute_diff(L, before_keys, before_ids, before_values)
+    # Step 7: compute diff (git-style +/- format)
+    diff = _compute_diff(L, before_keys, before_ids, before_values)
 
     # Step 8: update _ns_meta — variable lifecycle tracking
     L["_ns_meta"] = _update_ns_meta(L, before_keys, before_ids, frame_number)
 
-    return ExecResult(stdout=L["_stdout"], diff=L["_diff"], error=L["_error"])
+    return ExecResult(stdout=captured_stdout, diff=diff, error=error)
 
 
 def _maybe_capture_last_expr(action: str) -> str:
@@ -363,8 +326,8 @@ def _update_ns_meta(L: dict[str, Any], before_keys: set, before_ids: dict, frame
 
 def _compute_diff(
     L: dict, before_keys: set, before_ids: dict, before_values: dict
-) -> None:
-    """Compute diff and write to L["_diff"].
+) -> str:
+    """Return git-style diff string. (PR 2: returns instead of writing L["_diff"].)
 
     Format (git-style, only + and - symbols):
     - New variable:      +name = preview
@@ -380,30 +343,20 @@ def _compute_diff(
         before_ids:     id() mapping for each variable before execution
         before_values:  Value references for each user variable before execution
                         (references only, no deep copy)
-
-    Side effects:
-        Writes to L["_diff"].
     """
     after_keys = set(L.keys())
     lines = []
-
-    # New variables (sorted by name)
     for k in sorted(after_keys - before_keys):
         if is_user_var(k):
             lines.append(f"+{k} = {render_value(L[k], 'diff')}")
-
-    # Modified variables (id changed) — consecutive -old / +new
     for k in sorted(after_keys & before_keys):
         if is_user_var(k) and id(L[k]) != before_ids.get(k):
             old_preview = render_value(before_values[k], "diff")
             new_preview = render_value(L[k], "diff")
             lines.append(f"-{k} = {old_preview}")
             lines.append(f"+{k} = {new_preview}")
-
-    # Deleted variables
     for k in sorted(before_keys - after_keys):
         if is_user_var(k):
             old_preview = render_value(before_values[k], "diff")
             lines.append(f"-{k} = {old_preview}")
-
-    L["_diff"] = "\n".join(lines)
+    return "\n".join(lines)
