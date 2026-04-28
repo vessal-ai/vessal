@@ -326,6 +326,7 @@ class Kernel:
         import io as _io
         with open(path, "rb") as f:
             raw = f.read()
+        from .lenient import LenientUnpickler
         buf = _io.BytesIO(raw)
         first = LenientUnpickler(buf).load()
         remaining = len(raw) - buf.tell()
