@@ -191,7 +191,7 @@ class Kernel:
         tracer: TracerLike | None = None,
         frame_number: int | None = None,
     ) -> Verdict:
-        """Evaluate prediction assertions on a shallow copy of the namespace. Does not modify the real namespace.
+        """Evaluate prediction assertions on a shallow copy of L. Does not modify the real L.
 
         Delegates to expect.evaluate_expect().
 
@@ -260,7 +260,7 @@ class Kernel:
         self.L["_signal_outputs"] = outputs
 
     def render(self) -> Ping:
-        """Render current namespace state only, without executing code.
+        """Render current L state only, without executing code.
 
         Returns:
             Ping(system_prompt, state)
@@ -268,20 +268,16 @@ class Kernel:
         return _render(self.L, self.L.get("_render_config"))
 
     def snapshot(self, path: str) -> None:
-        """Serialize namespace to file. Pure bytes — no Skill awareness.
+        """Serialize L to file. Pure bytes — no Skill awareness. G is NOT serialized.
 
         Atomic write: first writes to a temp file; replaces the target only on full
         success; the original file is unaffected on failure.
 
-        Fallback strategy: if full serialization fails (e.g., C-extension objects
-        like PIL Image), unpicklable keys are filtered out and the rest is saved;
-        no exception is raised.
+        Fallback strategy: if full serialization of L fails (e.g., C-extension
+        objects), unpicklable keys are filtered out and the rest is saved.
 
         Args:
             path: Serialization file path.
-
-        Side effects:
-            Writes to file. On full failure, writes a partial namespace.
         """
         import os
         import tempfile
@@ -293,8 +289,7 @@ class Kernel:
             picklable = {k: v for k, v in self.L.items() if _picklable(v)}
             dropped = [k for k in self.L if k not in picklable]
             logger.debug(
-                "full namespace serialization failed (%s), "
-                "dropping %d unpicklable keys: %s",
+                "L serialization failed (%s); dropping %d unpicklable keys: %s",
                 e, len(dropped), dropped[:10],
             )
             partial = picklable
