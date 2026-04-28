@@ -63,7 +63,7 @@ class HullSkillsMixin:
         """Load and instantiate a Skill. Pre-loaded skills are automatically placed into namespace.
 
         After setting the instance into namespace, calls instance._bind_hull(self) if the method
-        exists. This allows Skills that need a Hull handle (e.g. the merged Skills(SkillBase) class)
+        exists. This allows Skills that need a Hull handle (e.g. the merged Skills(BaseSkill) class)
         to receive it without exposing Hull in the user-facing namespace.
         """
         import inspect

@@ -161,15 +161,15 @@ class TestStepBasic:
         assert cell.L.get("step_result") == 42
 
     def test_step_does_not_modify_lifecycle_vars(self):
-        """step() does not modify _sleeping/_wake/_next_wake."""
+        """step() does not modify _sleeping/_next_wake or G['_system']._wake."""
         cell = _make_cell()
         _set_responses(cell, [_action("x = 1")])
         cell.L["_sleeping"] = False
-        cell.L["_wake"] = "test_wake"
+        cell.G["_system"].set_wake("test_wake")
         cell.L["_next_wake"] = None
         cell.step()
         assert cell.L["_sleeping"] is False
-        assert cell.L["_wake"] == "test_wake"
+        assert cell.G["_system"]._wake == "test_wake"
         assert cell.L["_next_wake"] is None
 
     def test_step_accepts_tracer_none(self):

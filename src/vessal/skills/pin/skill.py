@@ -1,6 +1,6 @@
 """pin Skill — variable pinned-observation.
 
-Pin subclasses SkillBase and provides pin/unpin to surface variable values in every frame's signal.
+Pin subclasses BaseSkill and provides pin/unpin to surface variable values in every frame's signal.
 Requires a ns reference to read arbitrary variable values.
 """
 from __future__ import annotations
