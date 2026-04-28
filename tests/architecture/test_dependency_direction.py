@@ -113,13 +113,19 @@ def test_hull_imports_no_shell():
 def test_ark_imports_no_skills():
     """ARK does not import Skills.
 
-    Exception: Kernel imports vessal.skills.system (SystemSkill) and vessal.skills._base
+    Exception 1: Kernel imports vessal.skills.system (SystemSkill) and vessal.skills._base
     (BaseSkill) for the G["_system"] bootstrap and _signal_scan. This is the single
     intentional downward seam defined by spec §6.2: Kernel is the assembly point that
     binds the SystemSkill carrier to the execution engine.
+
+    Exception 2: skill_cmds.py (CLI validator) imports vessal.skills._base to verify that
+    user-provided Skills subclass BaseSkill. This is a validation seam: the CLI tool must
+    know the canonical base class to enforce it.
     """
     _KERNEL_PY = str(_REPO_ROOT / "src/vessal/ark/shell/hull/cell/kernel/kernel.py")
+    _SKILL_CMDS_PY = str(_REPO_ROOT / "src/vessal/ark/shell/cli/skill_cmds.py")
     _ALLOWED_FROM_KERNEL = {"vessal.skills.system", "vessal.skills._base"}
+    _ALLOWED_FROM_CLI = {"vessal.skills._base"}
     violations = _scan_imports(
         str(_REPO_ROOT / "src/vessal/ark"),
         ["vessal.skills"],
@@ -129,6 +135,10 @@ def test_ark_imports_no_skills():
         if not (
             v.startswith(_KERNEL_PY)
             and any(allowed in v for allowed in _ALLOWED_FROM_KERNEL)
+        )
+        and not (
+            v.startswith(_SKILL_CMDS_PY)
+            and any(allowed in v for allowed in _ALLOWED_FROM_CLI)
         )
     ]
     assert filtered == [], "ARK-Skills isolation violations:\n" + "\n".join(filtered)

@@ -17,8 +17,8 @@ def _make_skill_repo(base: Path, name: str = "test_skill") -> Path:
     class_name = "".join(part.capitalize() for part in name.split("_"))
     (repo / "__init__.py").write_text(f"from .skill import {class_name} as Skill\n")
     (repo / "skill.py").write_text(
-        f"from vessal.ark.shell.hull.skill import SkillBase\n\n"
-        f"class {class_name}(SkillBase):\n"
+        f"from vessal.skills._base import BaseSkill\n\n"
+        f"class {class_name}(BaseSkill):\n"
         f"    name = '{name}'\n"
         f"    description = 'test skill'\n"
     )

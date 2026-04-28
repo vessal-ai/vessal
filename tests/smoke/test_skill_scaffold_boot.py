@@ -48,8 +48,8 @@ def test_scaffold_module_imports(tmp_path):
         sys.modules.pop(skill_name, None)
         mod = importlib.import_module(skill_name)
         assert hasattr(mod, "Skill")
-        from vessal.ark.shell.hull.skill import SkillBase
-        assert issubclass(mod.Skill, SkillBase)
+        from vessal.skills._base import BaseSkill
+        assert issubclass(mod.Skill, BaseSkill)
     finally:
         sys.path.remove(str(tmp_path))
         sys.modules.pop(skill_name, None)
@@ -59,7 +59,8 @@ def test_hull_loads_scaffolded_skill(hull_from_scaffold):
     hull, skill_name = hull_from_scaffold
     assert skill_name in hull._cell.L
     instance = hull._cell.L[skill_name]
-    assert instance._signal() is None or isinstance(instance._signal(), tuple)
+    instance.signal_update()
+    assert isinstance(instance.signal, dict)
     assert instance._prompt() is None or isinstance(instance._prompt(), tuple)
 
 

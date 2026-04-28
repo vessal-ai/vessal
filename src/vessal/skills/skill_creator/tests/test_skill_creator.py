@@ -36,7 +36,7 @@ def test_create_generates_shared_scaffold_files(creator, tmp_path):
 def test_create_class_name_camelcase(creator, tmp_path):
     creator.create("my_cool_tool")
     content = (tmp_path / "my_cool_tool" / "skill.py").read_text()
-    assert "class MyCoolTool(SkillBase)" in content
+    assert "class MyCoolTool(BaseSkill)" in content
 
 
 def test_create_init_exports_skill(creator, tmp_path):
