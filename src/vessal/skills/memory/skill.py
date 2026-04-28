@@ -63,40 +63,8 @@ class Memory(BaseSkill):
         self._persist()
 
     def drop(self, n: int) -> None:
-        """Physically delete the oldest n frames from the hot zone. Cold storage is not affected.
-
-        Save key information from old frames with memory.save() before calling this.
-        Keeps at least 1 frame in the hot zone. Prints a confirmation before executing.
-
-        Args:
-            n: Number of frames to delete.
-        """
-        if self._ns is None:
-            raise RuntimeError("drop() requires a namespace reference; Memory must be initialized with ns")
-        if n <= 0:
-            return
-        fs = self._ns.get("_frame_stream")
-        if fs is None:
-            print("⚠ No frame stream in namespace; nothing to delete")
-            return
-        total_hot = fs.hot_frame_count()
-        actual = min(n, max(total_hot - 1, 0))
-        if actual <= 0:
-            print(f"⚠ Hot zone only has {total_hot} frame(s); nothing to delete")
-            return
-        print(
-            f"About to delete the oldest {actual} hot frame(s). Have you saved key information to memory?"
-            f" If not, use memory.save() first."
-        )
-        # Delete from oldest buckets first (B_4..B_0)
-        remaining = actual
-        for bucket in reversed(fs._hot):
-            while bucket and remaining > 0:
-                bucket.pop(0)
-                remaining -= 1
-            if remaining == 0:
-                break
-        print(f"Deleted {actual} frame(s) ({fs.hot_frame_count()} hot remaining). Cold storage unaffected.")
+        """Not implemented: frame storage moved to SQLite in PR 5. Will be re-implemented in PR-Compaction-Cell."""
+        print("⚠ memory.drop() is not available: frame storage has moved to SQLite. Use memory.save() to preserve key information.")
 
     def signal_update(self) -> None:
         """Per-frame: memory entries + context pressure warning."""

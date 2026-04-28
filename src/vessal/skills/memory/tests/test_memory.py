@@ -103,58 +103,14 @@ def test_persistence_corrupted_file(tmp_path, monkeypatch):
 
 
 class TestDrop:
-    """memory.drop(n) physically deletes the oldest n frames from the hot zone."""
+    """memory.drop() is a no-op stub until PR-Compaction-Cell re-implements it for SQLite."""
 
-    def _make_ns_with_frames(self, n_frames: int, tmp_path=None) -> dict:
-        from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
-        fs = FrameStream(k=16, n=8)
-        for i in range(n_frames):
-            fs.commit_frame({
-                "schema_version": 7,
-                "number": i,
-                "ping": {"system_prompt": "", "state": {"frame_stream": "", "signals": ""}},
-                "pong": {"think": "", "action": {"operation": "", "expect": ""}},
-                "observation": {"stdout": "", "diff": "", "error": None, "verdict": None},
-            })
-        ns = {"_frame_stream": fs}
-        if tmp_path:
-            ns["_data_dir"] = str(tmp_path)
-        return ns
-
-    def test_drop_removes_oldest_frames(self):
-        ns = self._make_ns_with_frames(5)
+    def test_drop_prints_not_available_warning(self, capsys):
         m = Memory()
-        m._ns = ns
-        m.drop(2)
-        assert ns["_frame_stream"].hot_frame_count() == 3
-
-    def test_drop_zero_is_noop(self):
-        ns = self._make_ns_with_frames(3)
-        m = Memory()
-        m._ns = ns
-        m.drop(0)
-        assert ns["_frame_stream"].hot_frame_count() == 3
-
-    def test_drop_more_than_available_keeps_one(self):
-        ns = self._make_ns_with_frames(3)
-        m = Memory()
-        m._ns = ns
-        m.drop(100)
-        assert ns["_frame_stream"].hot_frame_count() >= 1
-
-    def test_drop_without_ns_raises(self):
-        m = Memory()
-        with pytest.raises(RuntimeError):
-            m.drop(1)
-
-    def test_drop_prints_pre_deletion_prompt(self, capsys):
-        ns = self._make_ns_with_frames(5)
-        m = Memory()
-        m._ns = ns
+        m._ns = {}
         m.drop(2)
         output = capsys.readouterr().out
-        assert "Have you saved key information to memory" in output
-        assert "Deleted" in output
+        assert "not available" in output or "SQLite" in output
 
 
 class TestContextPressureSignal:
