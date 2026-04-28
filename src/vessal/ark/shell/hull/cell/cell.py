@@ -4,14 +4,15 @@
 #   prepare (each frame) → state_gate → core.step → action_gate → kernel.step → return StepResult
 #
 # Public interface:
-#   ns              namespace dict (property, proxied from Kernel)
+#   G               preset assets dict (property, proxied from Kernel)
+#   L               agent state dict (property, proxied from Kernel)
 #   ping            Ping from the most recently committed frame record (property, read-only)
 #   pong            Pong from the previous step (property, read-only)
 #   action_gate     str property (reads and writes go through an ActionGate instance)
 #   state_gate      str property (reads and writes go through a StateGate instance)
 #   step(tracer)    single-frame ping-pong, returns StepResult
-#   snapshot(path)  serialize namespace to file
-#   restore(path)   deserialize namespace from file
+#   snapshot(path)  serialize L to file
+#   restore(path)   deserialize L from file
 
 from __future__ import annotations
 
@@ -33,8 +34,8 @@ class Cell:
     Encapsulates Kernel (execution) and Core (reasoning), providing a single-frame step() interface.
     Does not auto-loop, does not hold logs, and does not manage the Tracer lifecycle — these are Hull's responsibility.
 
-    Hull injects system variables (_system_prompt, _memories, etc.) via cell.ns;
-    the namespace itself is the injection interface, no dedicated channel is needed.
+    Hull injects system variables (_system_prompt, _memories, etc.) via cell.L;
+    the L dict itself is the injection interface, no dedicated channel is needed.
 
     gate attributes take values "auto" | "safe" | "human"; reads and writes go through ActionGate/StateGate instances.
     Hull can switch modes via cell.action_gate = "safe" without knowing about internal Gate objects.
@@ -128,41 +129,17 @@ class Cell:
         return self._pong
 
     @property
-    def ns(self) -> dict[str, Any]:
-        """Agent's namespace dict. Proxied from Kernel.ns."""
-        return self._kernel.ns
+    def G(self) -> dict[str, Any]:
+        """Preset assets dict (boot script populates in PR 4)."""
+        return self._kernel.G
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """Read a value from the namespace. External callers use this instead of accessing ns[] directly.
-
-        Args:
-            key: Key name in the namespace.
-            default: Default return value when the key is absent; defaults to None.
-
-        Returns:
-            The value for the key, or default if the key is absent.
-        """
-        return self._kernel.ns.get(key, default)
-
-    def set(self, key: str, value: Any) -> None:
-        """Write a value into the namespace. External callers use this instead of accessing ns[] directly.
-
-        Args:
-            key: Key name in the namespace.
-            value: Value to write.
-        """
-        self._kernel.ns[key] = value
-
-    def keys(self) -> list[str]:
-        """List all keys in the namespace. External callers use this instead of accessing ns.keys() directly.
-
-        Returns:
-            List of all keys in the namespace.
-        """
-        return list(self._kernel.ns.keys())
+    @property
+    def L(self) -> dict[str, Any]:
+        """Agent state dict. Direct read/write."""
+        return self._kernel.L
 
     def snapshot(self, path: str) -> None:
-        """Serialize namespace to file. Proxied to Kernel.snapshot().
+        """Serialize L to file. Proxied to Kernel.snapshot().
 
         Args:
             path: Path to save the snapshot file.
@@ -170,7 +147,7 @@ class Cell:
         self._kernel.snapshot(path)
 
     def restore(self, path: str) -> None:
-        """Restore namespace from file. Proxied to Kernel.restore().
+        """Restore L from file. Proxied to Kernel.restore().
 
         Args:
             path: Path to the snapshot file.
@@ -201,27 +178,27 @@ class Cell:
 
         self._check_state_gate(self._ping)
 
-        frame_number = self._kernel.ns["_frame"] + 1
+        frame_number = self._kernel.L["_frame"] + 1
 
         try:
             self._pong, prompt_tokens, completion_tokens = self._core.step(
                 self._ping, tracer, frame_number,
             )
         except Exception as e:
-            self._kernel.ns["_error"] = f"Core error: {type(e).__name__}: {e}"
-            append_error(self._kernel.ns, ErrorRecord(
+            self._kernel.L["_error"] = f"Core error: {type(e).__name__}: {e}"
+            append_error(self._kernel.L, ErrorRecord(
                 "protocol", str(e),
-                self._kernel.ns.get("_frame", 0), _time.time(),
+                self._kernel.L.get("_frame", 0), _time.time(),
             ))
             return StepResult(protocol_error=str(e))
 
         # Overwrite renderer's estimated _context_pct with real token data from the API response
         if prompt_tokens is not None:
-            budget_total = self._kernel.ns.get("_budget_total", 0)
-            self._kernel.ns["_actual_tokens_in"] = prompt_tokens
-            self._kernel.ns["_actual_tokens_out"] = completion_tokens or 0
+            budget_total = self._kernel.L.get("_budget_total", 0)
+            self._kernel.L["_actual_tokens_in"] = prompt_tokens
+            self._kernel.L["_actual_tokens_out"] = completion_tokens or 0
             if budget_total > 0:
-                self._kernel.ns["_context_pct"] = round(
+                self._kernel.L["_context_pct"] = round(
                     prompt_tokens / budget_total * 100
                 )
 
@@ -230,7 +207,7 @@ class Cell:
 
         self._kernel.step(self._pong, tracer, ping=self._ping, frame_number=frame_number)
 
-        fs = self._kernel.ns.get("_frame_stream")
+        fs = self._kernel.L.get("_frame_stream")
         latest = fs.latest_hot_frame() if fs is not None else None
         if latest is not None:
             # Derive ping/pong from committed frame record (canonical post-step state).
@@ -276,12 +253,12 @@ class Cell:
         """Gate applied before Ping is sent to LLM. On block, injects _error (does not abort the current frame)."""
         result = self._state_gate.check(ping.state.frame_stream)
         if not result.allowed:
-            self._kernel.ns["_error"] = f"State gate blocked: {result.reason}"
+            self._kernel.L["_error"] = f"State gate blocked: {result.reason}"
 
     def _check_action_gate(self, action: str) -> str | None:
         """Gate applied before action is sent to Kernel. On block, injects _error and returns None."""
         result = self._action_gate.check(action)
         if not result.allowed:
-            self._kernel.ns["_error"] = f"Action gate blocked: {result.reason}"
+            self._kernel.L["_error"] = f"Action gate blocked: {result.reason}"
             return None
         return action
