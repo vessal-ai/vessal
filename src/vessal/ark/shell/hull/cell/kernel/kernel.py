@@ -380,15 +380,14 @@ class Kernel:
         from vessal.ark.shell.hull.cell.kernel.frame_log.types import ErrorOnSource, FrameWriteSpec, SignalRow
 
         obs = record.observation
-        operation_error = (
-            ErrorOnSource(
-                "operation",
-                None,
-                "".join(_tb.TracebackException.from_exception(obs.error).format()),
+        operation_error_text: str | None
+        if obs.error is not None:
+            operation_error_text = "".join(
+                _tb.TracebackException.from_exception(obs.error, capture_locals=True).format()
             )
-            if obs.error is not None
-            else None
-        )
+            operation_error = ErrorOnSource("operation", None, operation_error_text)
+        else:
+            operation_error = None
         verdict_value: str | None = None
         verdict = self.L.get("verdict")
         if verdict is not None:
