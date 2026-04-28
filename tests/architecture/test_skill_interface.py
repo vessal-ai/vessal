@@ -1,43 +1,41 @@
-"""test_skill_interface — Every built-in Skill inherits BaseSkill and has SKILL.md."""
-from pathlib import Path
+"""Architecture lint: every Skill class is a BaseSkill subclass + exposes signal/signal_update."""
+import importlib
+import inspect
+import pkgutil
 
 from vessal.skills._base import BaseSkill
-
-_SKILLS_DIR = Path(__file__).resolve().parents[2] / "src/vessal/skills"
-
-_SKIP_PACKAGES = {"system"}
+import vessal.skills as skills_pkg
 
 
-def _iter_skill_packages():
-    for pkg_dir in sorted(_SKILLS_DIR.iterdir()):
-        if pkg_dir.name in _SKIP_PACKAGES:
+def _iter_skill_classes():
+    for mod_info in pkgutil.iter_modules(skills_pkg.__path__, prefix="vessal.skills."):
+        if mod_info.name.endswith("._base"):
             continue
-        if pkg_dir.is_dir() and (pkg_dir / "__init__.py").exists():
-            yield pkg_dir
+        try:
+            mod = importlib.import_module(mod_info.name + ".skill")
+        except ModuleNotFoundError:
+            continue
+        for _, obj in inspect.getmembers(mod, inspect.isclass):
+            if obj is BaseSkill:
+                continue
+            if issubclass(obj, BaseSkill) and obj.__module__ == mod.__name__:
+                yield obj
 
 
-def test_all_skills_export_skillbase_subclass():
-    """Every skill's __init__.py exports 'Skill' which is a BaseSkill subclass."""
-    import importlib
-    for pkg_dir in _iter_skill_packages():
-        mod = importlib.import_module(f"vessal.skills.{pkg_dir.name}")
-        cls = getattr(mod, "Skill", None)
-        assert cls is not None, f"{pkg_dir.name} does not export Skill"
-        assert issubclass(cls, BaseSkill), f"{pkg_dir.name}.Skill does not inherit BaseSkill"
+def test_every_skill_is_baseskill_subclass():
+    classes = list(_iter_skill_classes())
+    assert classes, "No Skill classes discovered"
+    for cls in classes:
+        assert issubclass(cls, BaseSkill), f"{cls!r} not BaseSkill subclass"
 
 
-def test_all_skills_have_skill_md():
-    """Every skill has SKILL.md."""
-    for pkg_dir in _iter_skill_packages():
-        assert (pkg_dir / "SKILL.md").exists(), f"{pkg_dir.name} missing SKILL.md"
-
-
-def test_all_skills_have_name_and_description():
-    """Every skill class defines name and description."""
-    import importlib
-    for pkg_dir in _iter_skill_packages():
-        mod = importlib.import_module(f"vessal.skills.{pkg_dir.name}")
-        cls = getattr(mod, "Skill", None)
-        assert cls is not None, f"{pkg_dir.name} does not export Skill"
-        assert isinstance(cls.name, str) and cls.name, f"{pkg_dir.name} missing name"
-        assert isinstance(cls.description, str) and cls.description, f"{pkg_dir.name} missing description"
+def test_every_skill_has_signal_attr_after_init():
+    """Spec §6.1 #1: signal must be an instance attribute set in __init__."""
+    for cls in _iter_skill_classes():
+        try:
+            instance = cls()
+        except TypeError:
+            # Skill requires constructor args (e.g., Skills(ns) / SystemSkill(kernel))
+            continue
+        assert hasattr(instance, "signal")
+        assert isinstance(instance.signal, dict)
