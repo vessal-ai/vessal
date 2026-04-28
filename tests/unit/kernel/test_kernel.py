@@ -15,10 +15,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, execute, _compress_traceback, _maybe_capture_last_expr
-from vessal.ark.shell.hull.cell.kernel.render import render
 from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
@@ -48,7 +46,6 @@ def bare_ns() -> dict:
         "_log_path": "",
         "_context_pct": 0,
         "_ns_meta": {},
-        "_frame_stream": FrameStream(k=16, n=8),
         "_progress": "",
     }
 
@@ -207,12 +204,11 @@ class TestExecute:
         assert result.diff == ""
 
     def test_history_not_managed_by_execute(self):
-        """executor does not commit to _frame_stream; frame logging is managed by Cell (Phase 3)."""
+        """executor does not write _frame_stream; frame logging is managed by Cell via SQLite."""
         ns = bare_ns()
         execute("x = 1", {}, ns, frame_number=1)
         execute("y = 2", {}, ns, frame_number=2)
-        # execute should not commit to _frame_stream
-        assert ns["_frame_stream"].hot_frame_count() == 0
+        assert "_frame_stream" not in ns
 
     def test_source_function_on_object(self):
         """Function source is recoverable via inspect.getsource (linecache)."""
