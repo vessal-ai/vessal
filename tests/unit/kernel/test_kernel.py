@@ -354,13 +354,6 @@ class TestKernel:
         assert "_history" not in k.L
         assert "_history_depth" not in k.L
 
-    def test_init_creates_lifecycle_vars(self):
-        """After init, ns contains _sleeping/_next_wake lifecycle variables."""
-        k = minimal_kernel()
-        assert k.L["_sleeping"] is False
-        assert k.L["_next_wake"] is None
-        assert "_wake" not in k.L
-
     def test_init_from_snapshot(self):
         """snapshot_path parameter: restore namespace from file to continue a previous session."""
         k = minimal_kernel()
@@ -592,22 +585,6 @@ class TestKernel:
         k.L["injected"] = 42
         _exec(k, "answer = injected + 1")
         assert k.L["answer"] == 43
-
-    def test_sleeping_lifecycle_var(self):
-        """_sleeping is a lifecycle variable in namespace; Agent can set it via sleep()."""
-        k = minimal_kernel()
-        assert k.L["_sleeping"] is False
-        _exec(k, "sleep()")
-        assert k.L["_sleeping"] is True
-
-    def test_wake_driven_exec(self):
-        """Simulate event-driven execution: write _wake, execute, then call sleep()."""
-        k = minimal_kernel()
-        k.L["_wake"] = "user_message: compute 1+2+3"
-        _exec(k, "total = 1 + 2 + 3")
-        _exec(k, "sleep()")
-        assert k.L["total"] == 6
-        assert k.L["_sleeping"] is True
 
     def test_eval_expect_returns_verdict(self):
         """ping with expect returns Verdict in L['verdict']."""

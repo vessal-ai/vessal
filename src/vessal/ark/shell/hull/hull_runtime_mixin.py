@@ -47,7 +47,8 @@ class HullRuntimeMixin:
             - frame (int): Current frame number
             - wake (str): Most recent wake reason
         """
-        sleeping = self._cell.L.get("_sleeping", False)
+        system = self._cell.G.get("_system")
+        sleeping = system._sleeping if system is not None else False
         return {
             "idle": sleeping,
             "sleeping": sleeping,
@@ -123,17 +124,6 @@ class HullRuntimeMixin:
         return flat
 
     def next_alarm(self) -> float | None:
-        """Return the absolute timestamp of the Agent's next scheduled wake-up.
-
-        The Agent sets an alarm via the _next_wake namespace variable.
-        Shell uses this method to schedule the next wake.
-
-        Returns:
-            Alarm timestamp (float), or None if no alarm is set.
-        """
-        next_wake = self._cell.L.get("_next_wake")
-        if isinstance(next_wake, (int, float)) and next_wake > 0:
-            return float(next_wake)
         return None
 
     async def run(self) -> None:

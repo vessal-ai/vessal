@@ -34,7 +34,6 @@ def test_no_source_file_references_dead_l_keys() -> None:
         )
 
 
-@pytest.mark.xfail(strict=False, reason="removed in Tasks 9/10")
 def test_no_source_file_references_task9_10_dead_keys() -> None:
     """_errors / _error_buffer_cap / _sleeping / _next_wake removed in Tasks 9/10."""
     task_9_10_keys = [
@@ -53,6 +52,13 @@ def test_no_source_file_references_task9_10_dead_keys() -> None:
         assert not offenders, (
             f"Dead L key {key!r} still referenced in: {offenders}."
         )
+
+
+def test_kernel_has_no_sleep_method() -> None:
+    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+    k = Kernel(boot_script="")
+    assert not hasattr(k, "sleep")
+    assert "sleep" not in k.L
 
 
 def test_kernel_l_init_seeds_minimal_keys() -> None:

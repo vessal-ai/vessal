@@ -13,8 +13,6 @@ def mock_cell():
     class _FakeKernel:
         def __init__(self):
             self.L = {
-                "_sleeping": False,
-                "_next_wake": None,
                 "_frame": 0,
                 "signals": {},
             }
@@ -36,11 +34,11 @@ def test_inject_wake_sets_namespace(mock_cell):
 
 
 def test_inject_wake_clears_idle(mock_cell):
-    """inject_wake clears the _sleeping flag."""
-    mock_cell.L["_sleeping"] = True
+    """inject_wake clears the _sleeping flag on the _system Skill."""
+    mock_cell.G["_system"]._sleeping = True
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "heartbeat"})
-    assert mock_cell.L["_sleeping"] is False
+    assert mock_cell.G["_system"]._sleeping is False
 
 
 def test_inject_wake_default_reason(mock_cell):
@@ -66,8 +64,7 @@ def test_run_wake_cycle_skips_frame_logger_without_log_dir(mock_cell):
     from vessal.ark.shell.hull.event_loop import FrameHooks
     from vessal.ark.util.logging import Tracer
 
-    after_step_calls = []
-    mock_cell.L["_sleeping"] = True  # sleep immediately, zero frame loop
+    mock_cell.G["_system"]._sleeping = True  # sleep immediately, zero frame loop
 
     loop = EventLoop(
         cell=mock_cell,
@@ -97,12 +94,12 @@ def test_frame_loop_calls_before_frame_hook(mock_cell):
 
     # Agent sleeps immediately after one frame
     def step_then_idle(tracer=None):
-        mock_cell.L["_sleeping"] = True
+        mock_cell.G["_system"]._sleeping = True
         r = MagicMock()
         r.protocol_error = None
         return r
 
-    mock_cell.L["_sleeping"] = False
+    mock_cell.G["_system"]._sleeping = False
     mock_cell.step = step_then_idle
 
     loop = EventLoop(cell=mock_cell, hooks=hooks)
@@ -146,12 +143,12 @@ def test_after_frame_hook_fires(mock_cell):
     hooks = FrameHooks(after_frame=after)
 
     def step_then_idle(tracer=None):
-        mock_cell.L["_sleeping"] = True
+        mock_cell.G["_system"]._sleeping = True
         r = MagicMock()
         r.protocol_error = None
         return r
 
-    mock_cell.L["_sleeping"] = False
+    mock_cell.G["_system"]._sleeping = False
     mock_cell.step = step_then_idle
 
     loop = EventLoop(cell=mock_cell, hooks=hooks)
@@ -176,4 +173,4 @@ def test_frame_loop_breaks_on_protocol_error(mock_cell):
     loop._frame_loop()
 
     assert call_count == 1, f"expected 1 call, got {call_count}"
-    assert mock_cell.L["_sleeping"] is True
+    assert mock_cell.G["_system"]._sleeping is True

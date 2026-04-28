@@ -15,8 +15,6 @@ _HULL_RESERVED = {
     "_compaction_n",
     "_builtin_names",
     "_frame",
-    "_wake",
-    "_sleeping",
     "_frame_stream",
     "_system_prompt",
     "_render_config",
@@ -24,7 +22,6 @@ _HULL_RESERVED = {
     "_soul",
     "_context_budget",
     "_compression_prompt",
-    "_next_wake",
     "_inject_wake",
     "language",
 }

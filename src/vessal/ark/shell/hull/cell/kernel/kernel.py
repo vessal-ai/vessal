@@ -82,10 +82,7 @@ class Kernel:
         self.L: dict = {
             "_frame": 0,
             "signals": {},
-            "_sleeping": False,
-            "_next_wake": None,
         }
-        self.L["sleep"] = self.sleep
 
         # ② boot script — captures Skill __init__ prints into stdout/stderr
         boot_stdout = io.StringIO()
@@ -252,8 +249,6 @@ class Kernel:
         path = str(path)
         to_dump: dict = {}
         for key, value in self.L.items():
-            if key == "sleep":
-                continue
             if key in self._transient_names:
                 continue
             if is_transient_value(value):
@@ -288,11 +283,6 @@ class Kernel:
         with open(path, "rb") as f:
             raw = f.read()
         self.L = LenientUnpickler(io.BytesIO(raw)).load()
-        self.L["sleep"] = self.sleep
-
-    def sleep(self) -> None:
-        """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
-        self.L["_sleeping"] = True
 
     # ------------------------------------------------------------------ Private helpers
 

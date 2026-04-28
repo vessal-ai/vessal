@@ -89,7 +89,6 @@ class EventLoop:
         system_skill = self._cell.G.get("_system")
         if system_skill is not None:
             system_skill.wake(reason)
-        self._cell.L["_sleeping"] = False
 
     async def run_forever(self) -> None:
         """Main event loop. Runs inside asyncio; frame execution happens in a thread."""
@@ -147,7 +146,8 @@ class EventLoop:
         hooks = self._hooks
         frame_count = 0
 
-        while not self._cell.L.get("_sleeping", False):
+        system = self._cell.G.get("_system")
+        while not (system._sleeping if system is not None else False):
             if self._max_frames > 0 and frame_count >= self._max_frames:
                 logger.warning("max frames per wake reached (%d)", self._max_frames)
                 break
@@ -174,7 +174,8 @@ class EventLoop:
                     self._cell.L.get("_frame", -1),
                     result.protocol_error,
                 )
-                self._cell.L["_sleeping"] = True
+                if system is not None:
+                    system.sleep()
                 break
 
     def stop(self) -> None:

@@ -17,8 +17,6 @@ def _make_stub_cell(responses=None) -> MagicMock:
     cell = MagicMock()
     ns: dict = {
         "_frame": 0,
-        "_sleeping": False,
-        "_next_wake": None,
     }
 
     class _FakeKernel:
@@ -30,14 +28,14 @@ def _make_stub_cell(responses=None) -> MagicMock:
 
     call_count = [0]
     if responses is None:
-        responses = [True]  # default: set _sleeping=True on the first frame
+        responses = [True]  # default: call system_skill.sleep() on the first frame
 
     def fake_step(tracer=None):
         idx = call_count[0]
         call_count[0] += 1
         ns["_frame"] = ns.get("_frame", 0) + 1
         if idx < len(responses) and responses[idx]:
-            ns["_sleeping"] = True
+            system_skill.sleep()
         result = MagicMock()
         result.protocol_error = "stub"
         return result
@@ -78,12 +76,12 @@ class TestWakeInjection:
         assert wake_values[0] == "user_request"
 
     def test_inject_wake_clears_idle(self):
-        """inject_wake() clears the _sleeping flag."""
+        """inject_wake() clears the _sleeping flag on the _system Skill."""
         cell = _make_stub_cell()
-        cell.L["_sleeping"] = True
+        cell.G["_system"]._sleeping = True
         loop = EventLoop(cell=cell)
         loop.inject_wake({"reason": "heartbeat"})
-        assert cell.L["_sleeping"] is False
+        assert cell.G["_system"]._sleeping is False
 
     def test_inject_wake_default_reason(self):
         """Uses heartbeat when the event has no reason field."""

@@ -160,16 +160,14 @@ class TestStepBasic:
         assert cell.L.get("step_result") == 42
 
     def test_step_does_not_modify_lifecycle_vars(self):
-        """step() does not modify _sleeping/_next_wake or G['_system']._wake_reason."""
+        """step() does not modify G['_system']._sleeping or G['_system']._wake_reason."""
         cell = _make_cell()
         _set_responses(cell, [_action("x = 1")])
-        cell.L["_sleeping"] = False
+        cell.G["_system"]._sleeping = False
         cell.G["_system"].wake("test_wake")
-        cell.L["_next_wake"] = None
         cell.step()
-        assert cell.L["_sleeping"] is False
+        assert cell.G["_system"]._sleeping is False
         assert cell.G["_system"]._wake_reason == "test_wake"
-        assert cell.L["_next_wake"] is None
 
     def test_step_accepts_tracer_none(self):
         """step(tracer=None) runs normally without error."""
@@ -341,18 +339,18 @@ class TestGates:
     def test_step_applies_state_gate(self):
         """step() passes through state_gate internally (auto mode allows all)."""
         cell = _make_cell()
-        _set_responses(cell, [_action('sleep()')])
+        _set_responses(cell, [_action('_system.sleep()')])
         cell.state_gate = "auto"
         cell.step()
-        assert cell.L["_sleeping"] is True
+        assert cell.G["_system"]._sleeping is True
 
     def test_step_applies_action_gate(self):
         """step() passes through action_gate internally (auto mode allows all)."""
         cell = _make_cell()
-        _set_responses(cell, [_action('sleep()')])
+        _set_responses(cell, [_action('_system.sleep()')])
         cell.action_gate = "auto"
         cell.step()
-        assert cell.L["_sleeping"] is True
+        assert cell.G["_system"]._sleeping is True
 
 
 # ============================================================
