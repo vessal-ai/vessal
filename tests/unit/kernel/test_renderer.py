@@ -387,9 +387,9 @@ class TestRenderAuxiliary:
             }
         }
         result = _render_auxiliary(ns)
-        assert "══════ tasks ══════" in result
+        assert "══════ tasks (TaskSkill) ══════" in result
         assert "do something" in result
-        assert "══════ system ══════" in result
+        assert "══════ system (SysSkill) ══════" in result
 
     def test_render_auxiliary_empty_signals_returns_empty(self):
         """_render_auxiliary returns empty string when signals is empty."""
@@ -403,7 +403,7 @@ class TestRenderAuxiliary:
         assert result == ""
 
     def test_render_auxiliary_skips_error_payloads(self):
-        """_render_auxiliary skips signal entries with _error_id (failed signal_update)."""
+        """_render_auxiliary displays error payloads with error indicator."""
         ns = {
             "signals": {
                 ("BadSkill", "bad", "L"): {"_error_id": 0},
@@ -411,14 +411,15 @@ class TestRenderAuxiliary:
             }
         }
         result = _render_auxiliary(ns)
-        assert "bad" not in result
-        assert "══════ ok ══════" in result
+        assert "══════ bad (BadSkill) ══════" in result
+        assert "error: id=0" in result
+        assert "══════ ok (OkSkill) ══════" in result
 
     def test_render_auxiliary_header_present_when_has_content(self):
         """Auxiliary section includes a header when there is content."""
         ns = {"signals": {("FooSkill", "foo", "L"): {"key": "signal content"}}}
         result = _render_auxiliary(ns)
-        assert "══════ foo ══════" in result
+        assert "══════ foo (FooSkill) ══════" in result
         assert "signal content" in result
 
 

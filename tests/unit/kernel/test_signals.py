@@ -102,3 +102,33 @@ def test_init_namespace_no_signal_fns_key():
     """New namespace should NOT have _signal_fns (old mechanism removed)."""
     k = Kernel()
     assert "_signal_fns" not in k.L
+
+
+def test_render_signals_dict_format():
+    from vessal.ark.shell.hull.cell.kernel.render._signal_render import render_signals
+
+    L = {
+        "signals": {
+            ("FooSkill", "foo", "L"): {"k1": "v1", "k2": "v2"},
+            ("BarSkill", "bar", "G"): {"only": "one"},
+        }
+    }
+    text = render_signals(L)
+    assert "══════ foo (FooSkill) ══════" in text
+    assert "k1: v1" in text
+    assert "k2: v2" in text
+    assert "══════ bar (BarSkill) ══════" in text
+    assert "only: one" in text
+
+
+def test_render_signals_empty():
+    from vessal.ark.shell.hull.cell.kernel.render._signal_render import render_signals
+    assert render_signals({"signals": {}}) == ""
+    assert render_signals({}) == ""
+
+
+def test_render_signals_error_payload():
+    from vessal.ark.shell.hull.cell.kernel.render._signal_render import render_signals
+    L = {"signals": {("Boom", "boom", "L"): {"_error_id": 0}}}
+    text = render_signals(L)
+    assert "boom" in text and "error" in text.lower()
