@@ -24,7 +24,7 @@ def has_hibernate(obj: object) -> bool:
 
 
 def call_hibernate(obj: object) -> tuple[str, type, Any]:
-    """Returns the marker tuple. Raises whatever __vessal_hibernate__ raises."""
+    """Raises whatever __vessal_hibernate__ raises — callers must handle."""
     state = obj.__vessal_hibernate__()
     return (HIBERNATED_MARKER, type(obj), state)
 
@@ -38,7 +38,7 @@ def is_hibernated_tuple(value: object) -> bool:
 
 
 def call_wake(value: tuple) -> object:
-    """Reconstruct the object via __vessal_wake__. Raises on wake failure."""
+    """Raises on wake failure — callers degrade to UnresolvedRef."""
     _, cls, state = value
     obj = cls.__new__(cls)
     obj.__vessal_wake__(state)

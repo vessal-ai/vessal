@@ -48,6 +48,7 @@ class HullRuntimeMixin:
             - wake (str): Most recent wake reason
         """
         system = self._cell.G.get("_system")
+        # Hull is _system's only external consumer of _sleeping — direct access is intentional.
         sleeping = system._sleeping if system is not None else False
         return {
             "idle": sleeping,

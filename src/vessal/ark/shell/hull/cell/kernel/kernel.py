@@ -14,8 +14,6 @@
 #   ② exec(boot_script, G, G) — capture stdout/stderr
 #   ③ (restart only) LenientUnpickler.load(restore_path) → self.L
 #   ④ write boot frame at n = n_prev + 1
-# Kernel has no state outside of G and L — no Gate, no counters, no config attributes.
-
 from __future__ import annotations
 
 import cloudpickle

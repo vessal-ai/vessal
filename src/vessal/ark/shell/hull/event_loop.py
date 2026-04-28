@@ -147,6 +147,7 @@ class EventLoop:
         frame_count = 0
 
         system = self._cell.G.get("_system")
+        # Hull is _system's only external consumer of _sleeping — direct access is intentional.
         while not (system._sleeping if system is not None else False):
             if self._max_frames > 0 and frame_count >= self._max_frames:
                 logger.warning("max frames per wake reached (%d)", self._max_frames)
