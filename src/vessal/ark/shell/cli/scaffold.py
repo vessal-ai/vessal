@@ -470,12 +470,24 @@ def write_skill_scaffold(
             f'\n'
             f'\n'
             f'# ── Route table ────────────────────────────────────────────────────────────\n'
-            f'# Hull reads `routes` and registers each entry with the HTTP server.\n'
             f'# Format: (HTTP method, path suffix, handler function)\n'
-            f'# Hull prefixes every path with /skills/{skill_name}/.\n'
-            f'routes = [\n'
+            f'# start() registers each entry with Hull; paths are auto-prefixed with\n'
+            f'# /skills/{skill_name}/ by the ScopedHullApi.\n'
+            f'_routes = [\n'
             f'    ("GET", "/hello", hello),\n'
             f'    # ("POST", "/inbox", post_inbox),   # uncomment after defining post_inbox\n'
-            f']\n',
+            f']\n'
+            f'\n'
+            f'\n'
+            f'def start(hull_api, skill=None) -> None:\n'
+            f'    """Hull entry point — called once when the Skill is loaded.\n'
+            f'\n'
+            f'    hull_api: ScopedHullApi — use hull_api.register_route(method, path, handler)\n'
+            f'              to expose routes. All paths are automatically prefixed with\n'
+            f'              /skills/{skill_name}/.\n'
+            f'    skill: the Skill instance if you need to share state with skill.py.\n'
+            f'    """\n'
+            f'    for method, path, handler in _routes:\n'
+            f'        hull_api.register_route(method, path, handler)\n',
             encoding="utf-8",
         )
