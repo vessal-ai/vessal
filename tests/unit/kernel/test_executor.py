@@ -212,21 +212,6 @@ class TestNsMetaUpdate:
 # ────────────────────────────────────────────── builtins protection
 
 
-# ────────────────────────────────────────────── ErrorRecord writing
-
-
-class TestErrorRecording:
-    """executor returns errors as raw exceptions; does not write to _errors ring buffer."""
-
-    def test_runtime_error_returned_as_exception(self):
-        ns = _ns()
-        ns["_errors"] = []
-        result = execute("raise ValueError('boom')", {}, ns, frame_number=1)
-        assert isinstance(result.error, ValueError)
-        assert str(result.error) == "boom"
-        # executor no longer writes to _errors; ring buffer is untouched
-        assert ns["_errors"] == []
-
 
 class TestLinecacheRegistration:
     """executor registers operation source into linecache under '<frame-N>' so

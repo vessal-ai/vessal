@@ -487,43 +487,6 @@ def flatten_frame_dict(d: dict) -> dict:
 
 
 # ─────────────────────────────────────────────
-# ErrorRecord
-# ─────────────────────────────────────────────
-
-
-@dataclass(frozen=True, slots=True)
-class ErrorRecord:
-    """System error record. An element of the namespace `_errors` list.
-
-    Attributes:
-        type: Error type — "protocol" (API/parse failure), "runtime" (agent code exception),
-              "builtin_restored" (protected key deleted then restored).
-        message: Full error message.
-        frame: Frame number when the error occurred.
-        timestamp: time.time() when the error occurred.
-    """
-
-    type: str
-    message: str
-    frame: int
-    timestamp: float
-
-    def summary(self, max_len: int = 200) -> str:
-        """Generate an error summary.
-
-        Args:
-            max_len: Truncation length for message.
-
-        Returns:
-            Formatted single-line summary.
-        """
-        msg = self.message[:max_len]
-        if len(self.message) > max_len:
-            msg += "..."
-        return f"[F{self.frame}|{self.type}] {msg}"
-
-
-# ─────────────────────────────────────────────
 # StepResult
 # ─────────────────────────────────────────────
 
@@ -545,7 +508,6 @@ __all__ = [
     "Action", "State",
     "Ping", "Pong", "Observation", "FrameRecord", "StepResult",
     "Verdict", "VerdictFailure",
-    "ErrorRecord",
     "flatten_frame_dict",
     "FrameContent", "SummaryContent", "Entry", "FrameStream",
 ]

@@ -16,7 +16,6 @@ def mock_cell():
                 "_sleeping": False,
                 "_next_wake": None,
                 "_frame": 0,
-                "_errors": [],
                 "signals": {},
             }
 
@@ -178,7 +177,3 @@ def test_frame_loop_breaks_on_protocol_error(mock_cell):
 
     assert call_count == 1, f"expected 1 call, got {call_count}"
     assert mock_cell.L["_sleeping"] is True
-    errors = mock_cell.L.get("_errors", [])
-    assert len(errors) == 1
-    assert errors[0].type == "protocol"
-    assert "protocol error" in errors[0].message

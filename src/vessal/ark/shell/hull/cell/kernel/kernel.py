@@ -82,8 +82,6 @@ class Kernel:
         self.L: dict = {
             "_frame": 0,
             "signals": {},
-            "_errors": [],
-            "_error_buffer_cap": 50,
             "_sleeping": False,
             "_next_wake": None,
         }

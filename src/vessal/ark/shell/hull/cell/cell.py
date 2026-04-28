@@ -16,16 +16,17 @@
 
 from __future__ import annotations
 
-import time as _time
+import logging
 from pathlib import Path
 from typing import Any
 
-from vessal.ark.shell.hull.cell._errors_helper import append_error
 from vessal.ark.shell.hull.cell.core import Core
 from vessal.ark.shell.hull.cell.gate import ActionGate, StateGate
 from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import ErrorRecord, Ping, Pong, StepResult
+from vessal.ark.shell.hull.cell.protocol import Ping, Pong, StepResult
 from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
+
+logger = logging.getLogger(__name__)
 
 
 class Cell:
@@ -200,10 +201,6 @@ class Cell:
                 self._ping, tracer, frame_number,
             )
         except Exception as e:
-            append_error(self._kernel.L, ErrorRecord(
-                "protocol", str(e),
-                self._kernel.L.get("_frame", 0), _time.time(),
-            ))
             return StepResult(protocol_error=str(e))
 
         if prompt_tokens is not None:
@@ -261,21 +258,13 @@ class Cell:
     # ------------------------------------------------------------------ Gates
 
     def _check_state_gate(self, ping: Ping) -> None:
-        """State gating before the LLM sees Ping. Blocks logged to _errors ring."""
         result = self._state_gate.check(ping.state.frame_stream)
         if not result.allowed:
-            append_error(self._kernel.L, ErrorRecord(
-                "protocol", f"State gate blocked: {result.reason}",
-                self._kernel.L.get("_frame", 0), _time.time(),
-            ))
+            logger.warning("state gate blocked: %s", result.reason)
 
     def _check_action_gate(self, action: str) -> str | None:
-        """Action gating before exec. Returns None when blocked."""
         result = self._action_gate.check(action)
         if not result.allowed:
-            append_error(self._kernel.L, ErrorRecord(
-                "protocol", f"Action gate blocked: {result.reason}",
-                self._kernel.L.get("_frame", 0), _time.time(),
-            ))
+            logger.warning("action gate blocked: %s", result.reason)
             return None
         return action

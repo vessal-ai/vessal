@@ -10,8 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
-from vessal.ark.shell.hull.cell._errors_helper import append_error
-from vessal.ark.shell.hull.cell.protocol import ErrorRecord
 from vessal.ark.util.logging import Tracer
 
 if TYPE_CHECKING:
@@ -176,10 +174,6 @@ class EventLoop:
                     self._cell.L.get("_frame", -1),
                     result.protocol_error,
                 )
-                append_error(self._cell.L, ErrorRecord(
-                    "protocol", f"protocol error: {result.protocol_error}",
-                    self._cell.L.get("_frame", 0), _time.time(),
-                ))
                 self._cell.L["_sleeping"] = True
                 break
 

@@ -44,15 +44,6 @@ class StateGate(_GateBase):
     - "auto":  no checking, pass through directly (for development/debugging)
     - "safe":  run built-in + custom rules, block abnormal states
     - "human": reserved for future human confirmation (currently equivalent to safe)
-
-    Usage:
-        gate = StateGate(mode="safe")
-        result = gate.check(frame_stream)
-        if not result.allowed:
-            append_error(ns, ErrorRecord(
-                "protocol", f"State gate blocked: {result.reason}",
-                ns.get("_frame", 0), _time.time(),
-            ))
     """
 
     def __init__(self, mode: str = "auto") -> None:

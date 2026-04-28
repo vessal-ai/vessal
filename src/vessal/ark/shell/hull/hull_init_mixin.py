@@ -179,8 +179,6 @@ class HullInitMixin:
         self._tracer = Tracer(self._log_dir, enabled=trace_enabled)
         self._ensure_log_readme()
 
-        self._cell.L["_error_buffer_cap"] = cell_cfg.get("error_buffer_cap", 200)
-
         if "language" in agent_cfg:
             self._cell.L["language"] = agent_cfg["language"]
 

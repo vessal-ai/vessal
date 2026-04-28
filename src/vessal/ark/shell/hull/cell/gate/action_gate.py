@@ -14,12 +14,9 @@ Design principles:
 from __future__ import annotations
 
 import logging
-import time as _time
 from collections.abc import Callable
 
-from vessal.ark.shell.hull.cell._errors_helper import append_error
 from vessal.ark.shell.hull.cell.gate.gate_base import _GateBase
-from vessal.ark.shell.hull.cell.protocol import ErrorRecord
 
 logger = logging.getLogger(__name__)
 
@@ -48,15 +45,6 @@ class ActionGate(_GateBase):
     - "auto":  no checking, pass through directly (for development/debugging)
     - "safe":  run built-in + custom rules, block high-risk operations
     - "human": reserved for future human confirmation (currently equivalent to safe)
-
-    Usage:
-        gate = ActionGate(mode="safe")
-        result = gate.check(action)
-        if not result.allowed:
-            append_error(ns, ErrorRecord(
-                "protocol", f"Gate blocked: {result.reason}",
-                ns.get("_frame", 0), _time.time(),
-            ))
     """
 
     def __init__(self, mode: str = "auto") -> None:

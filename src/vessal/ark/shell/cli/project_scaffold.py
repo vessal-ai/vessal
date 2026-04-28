@@ -61,7 +61,6 @@ def _write_hull_toml(project_dir: Path, project_name: str) -> None:
         f'max_frames = 100\n'
         f'# Context budget (token count), should match the model\'s actual window size\n'
         f'# context_budget = 128000\n'
-        f'# error_buffer_cap = 200     # Maximum error records in ns["_errors"] (ring buffer)\n'
         f'\n'
         f'[core]\n'
         f'timeout = 60\n'
