@@ -58,7 +58,6 @@ class SystemSkill(BaseSkill):
             sig["wake_reason"] = self._wake_reason
 
         if self._kernel.frame_log is not None:
-            # avoid circular import at module load time
             from vessal.ark.shell.hull.cell.kernel.frame_log.reader import recent_errors
             entries = recent_errors(self._kernel.frame_log.conn, limit=3)
             if entries:

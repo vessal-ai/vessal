@@ -1,4 +1,4 @@
-"""Spec §5.5.2 档 2: @transient + kernel.mark_transient skip keys at snapshot."""
+"""Spec §5.5.2 part 2: @transient + kernel.mark_transient skip keys at snapshot."""
 from __future__ import annotations
 
 from vessal.ark.shell.hull.cell.kernel.kernel import Kernel

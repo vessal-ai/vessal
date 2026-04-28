@@ -244,7 +244,6 @@ class Kernel:
         return self._last_ping
 
     def mark_transient(self, name: str) -> None:
-        """Register a specific L key to be skipped at snapshot time."""
         self._transient_names.add(name)
 
     def snapshot(self, path: str) -> None:

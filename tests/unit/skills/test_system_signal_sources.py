@@ -1,5 +1,4 @@
-"""_system Skill sources its signal from authoritative places, not from
-L keys that PR 5/6 deleted."""
+"""_system Skill: signal values come from SQLite and Skill slots, not from L keys."""
 from __future__ import annotations
 
 from vessal.ark.shell.hull.cell.kernel.kernel import Kernel

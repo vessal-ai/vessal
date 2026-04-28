@@ -135,7 +135,6 @@ def _fetch_signals(
 
 
 def recent_errors(conn: sqlite3.Connection, limit: int = 3) -> list[dict]:
-    """Most-recent rows from the errors table, newest first."""
     rows = conn.execute(
         "SELECT n_start, source, source_detail, format_text "
         "FROM errors ORDER BY id DESC LIMIT ?",
