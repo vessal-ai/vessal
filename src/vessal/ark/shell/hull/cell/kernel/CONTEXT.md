@@ -26,11 +26,11 @@ Not responsible for:
 6. executor.py does not write _frame_log or construct FrameRecord (that is ping()'s responsibility via _commit)
 7. All public interfaces must have complete docstrings and type annotations
 8. describe/ and render/ are internal implementation sub-packages of Kernel and should not be directly imported from outside Kernel
-9. On snapshot degradation (full serialization failure), lost keys must be recorded in _dropped_keys (list) and _dropped_keys_context (dict); silent discard is not allowed
+9. On every cold start AND restart, Kernel writes a `layer=0` boot frame at `n = n_prev + 1`. `pong_operation` carries the actual boot script; `obs_stdout` captures Skill `__init__` prints; `obs_diff_json` is `json.dumps({k: repr(v) for k,v in L.items()})` over the restored L. Cold start produces `obs_diff_json = "{}"`. Spec §7.6.
 
 ## Design
 
-Kernel runs in a Hull subprocess. The namespace dict lives in subprocess memory; exec(code, ns) executes in a thread pool thread (asyncio.to_thread), directly operating on the namespace dict in the same process. Skill instances (chat, tasks, etc.) are also in the same process; when LLM code calls chat.read(), it is a direct in-memory call, not cross-process. Database connections, file handles, and other non-serializable objects persist normally across frames. On subprocess crash, namespace is restored from snapshot; non-serializable objects are lost and recorded in _dropped_keys.
+Kernel runs in a Hull subprocess. The namespace dict lives in subprocess memory; exec(code, ns) executes in a thread pool thread (asyncio.to_thread), directly operating on the namespace dict in the same process. Skill instances (chat, tasks, etc.) are also in the same process; when LLM code calls chat.read(), it is a direct in-memory call, not cross-process. Database connections, file handles, and other non-serializable objects persist normally across frames. On subprocess crash, namespace is restored from snapshot via the four-step boot flow.
 
 Kernel exists to encapsulate the Agent's "brain" as a snapshot-able, restorable unit. Its core equation is: `namespace dict = Agent's complete state`. All variables, functions, classes, historical frames, and configuration live in this dict. This means Kernel itself is stateless — it is merely the executor and renderer of the namespace, which can be serialized and restored at any time.
 
@@ -53,32 +53,27 @@ graph TD
 
 The describe/ sub-package is responsible for rendering Python objects to text, supporting three detail levels: directory (summary line), diff (truncated display), pin (detailed observation). It is a shared dependency for executor's diff computation and renderer's namespace display. The render/ sub-package is responsible for assembling namespace into Ping (system_prompt + frame stream + signals); `prompt.py` maintains the SystemPromptBuilder's three-part concatenation (kernel protocol + SOUL + skill protocols); `_signal_render.py` reads L["signals"] (dict[(class_name, var_name, scope), payload]) and concatenates into Ping.state.signals; `_prompt_render.py` handles skill cognitive protocol collection and rendering (scanning _prompt() methods); this is the implementation of Kernel.render(). These two sub-packages are Kernel implementation details and should not be directly imported from outside.
 
-snapshot/restore uses cloudpickle, supporting functions, classes, lambdas, and closures. Before restore, sys.path is fixed first (reading parent_path from _loaded_skills), ensuring cloudpickle can find modules during deserialization. Atomic writes (write temp file then os.replace) prevent file corruption from interrupted writes. On full serialization failure, it degrades to filtering out non-serializable keys and saving, while writing the dropped key list to _dropped_keys and the original creation code (reverse-searched from _frame_log) to _dropped_keys_context. After restore, update_signals() calls the dropped_keys signal; if _dropped_keys is non-empty it outputs reconstruction hints to Agent.
+snapshot/restore uses cloudpickle, supporting functions, classes, lambdas, and closures. The boot script (exec'd in step ②) loads all Skill modules into G before restore runs (step ③), so cloudpickle deserialization can resolve all module references without manual sys.path manipulation. Atomic writes (write temp file then os.replace) prevent file corruption from interrupted writes. On restart, `obs_diff_json` in the boot frame records every key in L that was loaded from the snapshot and differs from the pre-restore defaults; this is the recovery audit trail.
 
 ```mermaid
 flowchart TD
+    subgraph boot["Kernel.__init__ — four-step boot (spec §7.2)"]
+        S1["① self.L = {}"]
+        S2["② exec(boot_script, G, G)\ncapture stdout/stderr"]
+        S3{"restore_path\nsupplied?"}
+        S3a["③ LenientUnpickler.load(restore_path)\n→ self.L  (restart)"]
+        S3b["(cold start — skip)"]
+        S4["④ _write_boot_frame\nn = n_prev + 1, layer=0\nobs_diff_json = diff(L_before, L_after)"]
+    end
+
     Snapshot["snapshot(path)"]
-    TryFull["Attempt full cloudpickle serialization"]
-    FullOK{Success?}
-    AtomicWrite["Atomic write\n(write temp file → os.replace)"]
-    Filter["Filter non-serializable keys"]
-    PartialWrite["Write partial snapshot\nrecord _dropped_keys"]
+    AtomicWrite["cloudpickle.dumps(L)\natomic write (tmp → os.replace)"]
 
-    Restore["restore(path)"]
-    FixPath["Fix sys.path\n(read from _loaded_skills)"]
-    Unpickle["cloudpickle deserialization"]
-    CheckDropped{_dropped_keys non-empty?}
-    Signal["Output reconstruction hints to Agent"]
-    Done["Restore complete"]
+    S1 --> S2 --> S3
+    S3 -->|yes| S3a --> S4
+    S3 -->|no| S3b --> S4
 
-    Snapshot --> TryFull
-    TryFull --> FullOK
-    FullOK -->|yes| AtomicWrite
-    FullOK -->|no| Filter --> PartialWrite
-
-    Restore --> FixPath --> Unpickle --> CheckDropped
-    CheckDropped -->|yes| Signal --> Done
-    CheckDropped -->|no| Done
+    Snapshot --> AtomicWrite
 ```
 
 _frame_log invariants: frame records are constructed inside ping() via _commit(); max capacity _FRAME_LOG_MAX=200 frames. On schema version mismatch after restore, _frame_log is cleared to prevent old format frames from polluting new logic.
@@ -97,5 +92,6 @@ Known scale issue: kernel.py is close to the 400-line limit; describe/ + render/
 - ~~2026-04-09: Constraint #8 violation — hull.py directly imports kernel.render.RenderConfig; pin/skill.py directly imports kernel.describe.render_value~~ [Fixed 2026-04-09: RenderConfig and render_value are now re-exported from kernel/__init__.py; external code updated to import from kernel package top level]
 
 ### Active
-- 2026-04-13: _init_namespace() adds _errors (list[ErrorRecord], executor and Cell append at runtime/protocol errors). Frame outputs land in L["observation"] (Observation dataclass) and L["verdict"] (Verdict | None). _actual_tokens_in/_actual_tokens_out initialized to None, written by Cell with real values when API returns usage.
+- 2026-04-13: L["_errors"] (list[ErrorRecord]) is initialized at boot; executor and Cell append at runtime/protocol errors. Frame outputs land in L["observation"] (Observation dataclass) and L["verdict"] (Verdict | None). _actual_tokens_in/_actual_tokens_out initialized to None, written by Cell with real values when API returns usage.
 - 2026-04-28: Replaced multi-entry surface (prepare/step/exec_operation/eval_expect/update_signals/render/_commit_frame) with single primitive `ping(pong, namespace) -> Ping` (spec §1.2). Deleted _protected_keys, _stdout, _error, _diff, _verdict, _operation init keys.
+- 2026-04-28 (PR4 complete): Kernel.__init__ takes `boot_script: str` as first positional arg. Hull synthesizes boot_script via compose_boot_script(). Removed _init_namespace/_init_L/_dropped_keys/_dropped_keys_context surface. Boot frame (spec §7.6) is now written on every cold start and restart.
