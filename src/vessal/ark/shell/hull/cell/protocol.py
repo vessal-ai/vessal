@@ -477,10 +477,10 @@ def flatten_frame_dict(d: dict) -> dict:
         "pong_operation": action.get("operation", ""),
         "pong_expect": action.get("expect", ""),
         "obs_stdout": obs.get("stdout", ""),
-        "obs_stderr": "",
+        "obs_stderr": obs.get("stderr", ""),
         "obs_diff_json": obs.get("diff", ""),
         "obs_error": obs.get("error"),
-        "verdict_value": obs.get("verdict"),
+        "verdict_value": None,
         "verdict_error": None,
         "signals": [],
     }
