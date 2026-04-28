@@ -7,8 +7,6 @@
 #       and writing L["observation"].
 #       Does NOT write ns["_frame"] — that is Kernel._commit()'s responsibility.
 #       Does NOT write _frame_log or construct FrameRecord — that is Cell's responsibility.
-#       Exception tracebacks are intelligently compressed — user code frames and exception
-#       info are retained while library-internal frames are folded.
 #       Bare expressions (e.g. x, data.head()) have their value appended to captured stdout
 #       (Jupyter-style).
 #   is_user_var(name) -> bool
@@ -25,7 +23,6 @@ from __future__ import annotations
 import ast
 import io
 import sys
-import traceback
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from typing import Any
@@ -36,10 +33,6 @@ from vessal.ark.shell.hull.cell.kernel.describe import render_value
 
 # Maximum length for bare expression repr. Truncated with "..." when exceeded.
 _EXPR_REPR_MAX_LEN = 2000
-
-# Traceback line count threshold. Returned as-is when <= this value; longer
-# tracebacks have library-internal frames folded.
-_TRACEBACK_COMPRESS_THRESHOLD = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,57 +203,6 @@ def _maybe_capture_last_expr(action: str) -> str:
 
     replacement = f"_expr_result = ({expr_text})\n"
     return before + replacement + after_same + after_rest
-
-
-def _compress_traceback(tb_text: str) -> str:
-    """Compress traceback: retain user code frames and exception info, fold library-internal frames.
-
-    Returns unchanged when <= _TRACEBACK_COMPRESS_THRESHOLD lines — shallow call
-    stacks need no compression. For longer tracebacks, retains:
-      1. First line "Traceback (most recent call last):"
-      2. Last File "<frame-*>" frame (user code error location) and its code line
-      3. Last line (exception type and message)
-    Intermediate library-internal frames are folded as "... (N lines omitted)".
-
-    Args:
-        tb_text: Output string from traceback.format_exc().
-
-    Returns:
-        Compressed traceback string.
-    """
-    lines = tb_text.splitlines()
-    if len(lines) <= _TRACEBACK_COMPRESS_THRESHOLD:
-        return tb_text
-
-    # Last user code frame (LLM's code executes under "<frame-N>" filenames
-    # registered into linecache by source_cache.register).
-    user_frame_idx = -1
-    for i, line in enumerate(lines):
-        if 'File "<frame-' in line:
-            user_frame_idx = i
-
-    # Last line is the exception type and message (skip trailing blank lines)
-    exc_idx = len(lines) - 1
-    while exc_idx > 0 and not lines[exc_idx].strip():
-        exc_idx -= 1
-
-    # Set of lines to keep (excluding the first line)
-    kept = set()
-    if user_frame_idx >= 0:
-        kept.add(user_frame_idx)
-        # The code line immediately following the frame header (if not the exception line itself)
-        if user_frame_idx + 1 < len(lines) and user_frame_idx + 1 != exc_idx:
-            kept.add(user_frame_idx + 1)
-    kept.add(exc_idx)
-
-    omitted = len(lines) - 1 - len(kept)  # -1 for the first line
-
-    result = [lines[0]]
-    if omitted > 0:
-        result.append(f"  ... ({omitted} lines omitted)")
-    for i in sorted(kept):
-        result.append(lines[i])
-    return "\n".join(result)
 
 
 def _update_ns_meta(L: dict[str, Any], before_keys: set, before_ids: dict, frame: int) -> dict[str, Any]:
