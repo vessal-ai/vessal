@@ -30,7 +30,7 @@ block-beta
         block:state["state (dynamic)"]:2
             columns 2
             fs["frame_stream\nframe history (append)"]
-            sig["signals\n_signal() (overwrite)"]
+            sig["signals\nsignal_update() (overwrite)"]
         end
     end
 ```
@@ -68,7 +68,7 @@ A frame begins at the moment the namespace is at rest — all side effects from 
 
 **Phase 1: Wake.** Hull dequeues an event, records the reason via `cell.set("_wake", reason)`, and sets `_sleeping = False`. Hull also refreshes runtime-owned variables — `_system_prompt`, `_soul`, and `_render_config` — ensuring any changes to `SOUL.md` on disk are picked up before the frame begins.
 
-**Phase 2: Signal Update + Render (Ping generation).** The Kernel scans all namespace objects that have a `_signal` method and calls them to update. The rendering pipeline then projects the namespace into a Ping: assembling the system prompt, replaying the frame history (frame_stream), embedding signal text, and trimming to fit the context budget. Signals reflect the state at frame start.
+**Phase 2: Signal Update + Render (Ping generation).** The Kernel scans G ∪ L for BaseSkill instances and calls their `signal_update()` method to update L["signals"]. The rendering pipeline then projects the namespace into a Ping: assembling the system prompt, replaying the frame history (frame_stream), embedding signal text, and trimming to fit the context budget. Signals reflect the state at frame start.
 
 **Phase 3: state_gate + LLM (Pong generation).** The state gate validates the Ping contents. Once it passes, Core sends the Ping to the LLM and receives the Pong.
 
@@ -87,7 +87,7 @@ sequenceDiagram
     H->>K: _wake = reason
 
     Note over H,C: ② Signal + Render
-    K->>K: scan _signal()
+    K->>K: scan BaseSkill + signal_update()
     K->>K: render → Ping
 
     Note over H,C: ③ Gate + LLM
@@ -110,14 +110,14 @@ A signal is perception data that namespace objects inject into the Ping. Before 
 
 Signals solve a specific problem: a Skill's server runs outside the frame loop and may receive new messages between frames. Signals provide an explicit channel for that information to appear in the next frame's Ping — the LLM doesn't have to go hunting for namespace changes.
 
-`_signal()` takes no arguments, reads instance attributes through `self`, and returns a `(title, body)` tuple or `None`. External data — such as a message queue written by the server — is accessed via a mutable reference passed in at construction time.
+`signal_update()` takes no arguments, reads instance attributes through `self`, and updates the signals dict (spec §6). It accesses external data via mutable references — such as a message queue written by the server — passed in at construction time.
 
 ```mermaid
 graph LR
     SV["Server\nruns continuously between frames"] -->|writes| Q["shared data"]
-    Q -->|"_signal() reads"| SK["Skill Instance"]
-    SK -->|"(title, body)"| K["Kernel"]
-    K -->|embed| Ping
+    Q -->|"signal_update() reads"| SK["Skill Instance (BaseSkill)"]
+    SK -->|"update L['signals']"| K["Kernel"]
+    K -->|embed in Ping| Ping
 ```
 
 

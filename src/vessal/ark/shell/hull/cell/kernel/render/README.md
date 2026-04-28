@@ -7,7 +7,7 @@ Responsible for:
 - RenderConfig: render configuration (system_prompt_key, frame_budget_ratio)
 - SystemPromptBuilder + Section: modular system_prompt assembly
 - Frame stream trimming: trims frame history by token budget (_frame_render.py)
-- Signal rendering: concatenates _signal_outputs (_signal_render.py)
+- Signal rendering: reads L["signals"] dict and concatenates into Ping.state.signals (_signal_render.py)
 
 Not responsible for:
 - Holding namespace (handled by Kernel)
@@ -32,7 +32,7 @@ Renderer configuration.
 
 ### render(ns: dict, config: RenderConfig) -> Ping
 
-Renderer main entry point. Assembles a Ping from the namespace: `system_prompt` (stripped from `ns["_system_prompt"]`), `frame_stream` (recent frame history trimmed to token budget), and `signals` (concatenated `_signal_outputs`). Writes `_context_pct`, `_budget_total`, `_dropped_frame_count` back into `ns` as side effects.
+Renderer main entry point. Assembles a Ping from the namespace: `system_prompt` (stripped from `ns["_system_prompt"]`), `frame_stream` (recent frame history trimmed to token budget), and `signals` (read from `ns["signals"]`, a dict[(class_name, var_name, scope), payload] that was populated by Kernel._signal_scan). Writes `_context_pct`, `_budget_total`, `_dropped_frame_count` back into `ns` as side effects.
 
 
 ## Tests
