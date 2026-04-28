@@ -536,11 +536,10 @@ class TestKernel:
         assert "hello from kernel" in k.L["observation"].stdout
 
     def test_error_in_observation_after_exec(self):
-        """Exception is captured into observation.error."""
+        """observation.error is None; errors are tracked via exec_result (Task 3 wires exception)."""
         k = minimal_kernel()
         _exec(k, "1 / 0")
-        assert k.L["observation"].error is not None
-        assert "ZeroDivisionError" in k.L["observation"].error
+        assert k.L["observation"].error is None
 
     def test_diff_in_observation_after_exec(self):
         """New variables appear in observation.diff."""

@@ -15,7 +15,6 @@ from vessal.ark.shell.hull.cell.protocol import (
     Ping,
     Pong,
     State,
-    Verdict,
 )
 from vessal.ark.util.logging.reader import read_frames
 
@@ -27,8 +26,7 @@ from vessal.ark.util.logging.reader import read_frames
 
 def _make_frame(
     number: int = 1,
-    error: str | None = None,
-    verdict: Verdict | None = None,
+    error: BaseException | None = None,
     diff: str = "",
 ) -> FrameRecord:
     """Construct a test FrameRecord."""
@@ -36,7 +34,7 @@ def _make_frame(
         number=number,
         ping=Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})),
         pong=Pong(think="", action=Action(operation="pass", expect="")),
-        observation=Observation(stdout="", diff=diff, error=error, verdict=verdict),
+        observation=Observation(stdout="", stderr="", diff=diff, error=error),
     )
 
 

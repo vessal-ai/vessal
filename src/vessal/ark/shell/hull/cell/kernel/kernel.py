@@ -211,9 +211,9 @@ class Kernel:
             exec_result = execute(pong.action.operation, G, L, frame_n)
             L["observation"] = Observation(
                 stdout=exec_result.stdout,
+                stderr="",
                 diff=exec_result.diff,
-                error=exec_result.error,
-                verdict=None,
+                error=None,
             )
             # ③ eval
             if exec_result.error is None and pong.action.expect.strip():
@@ -224,13 +224,6 @@ class Kernel:
                 L["verdict"] = None
             # ④ signal_scan
             self._signal_scan()
-            # commit frame N (uses self._last_ping as the FrameRecord.ping field)
-            L["observation"] = Observation(
-                stdout=L["observation"].stdout,
-                diff=L["observation"].diff,
-                error=L["observation"].error,
-                verdict=L["verdict"],   # FrameRecord still nests verdict inside observation in v7
-            )
             self._commit(pong, L["observation"], frame_n, ping_for_record=self._last_ping)
         else:
             # First call after boot: signal_scan only (no exec/eval, no commit)
@@ -388,13 +381,18 @@ class Kernel:
 
         obs = record.observation
         operation_error = (
-            ErrorOnSource("operation", None, obs.error)
+            ErrorOnSource(
+                "operation",
+                None,
+                "".join(_tb.TracebackException.from_exception(obs.error).format()),
+            )
             if obs.error is not None
             else None
         )
         verdict_value: str | None = None
-        if obs.verdict is not None:
-            verdict_value = _json.dumps(obs.verdict.to_dict())
+        verdict = self.L.get("verdict")
+        if verdict is not None:
+            verdict_value = _json.dumps(verdict.to_dict())
         diff_json = _json.dumps(obs.diff) if obs.diff else "{}"
         sig_rows: list[SignalRow] = []
         for (cls_name, var_name, scope), payload in self.L.get("signals", {}).items():

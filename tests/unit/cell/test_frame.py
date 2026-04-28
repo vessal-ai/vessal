@@ -70,10 +70,9 @@ def make_pong(
 def make_observation(
     stdout: str = "hello\n",
     diff: str = "+x = 1",
-    error: str | None = None,
-    verdict: Verdict | None = None,
+    error: BaseException | None = None,
 ) -> Observation:
-    return Observation(stdout=stdout, diff=diff, error=error, verdict=verdict)
+    return Observation(stdout=stdout, stderr="", diff=diff, error=error)
 
 
 def make_frame_record(**overrides) -> FrameRecord:
@@ -252,53 +251,48 @@ class TestObservation:
     """Observation data structure tests."""
 
     def test_fields_complete(self):
-        """Observation stores four fields: stdout, diff, error, verdict."""
+        """Observation stores four fields: stdout, stderr, diff, error."""
         obs = Observation(
             stdout="hello\n",
+            stderr="",
             diff="+x = 1",
             error=None,
-            verdict=None,
         )
         assert obs.stdout == "hello\n"
+        assert obs.stderr == ""
         assert obs.diff == "+x = 1"
         assert obs.error is None
-        assert obs.verdict is None
 
-    def test_with_error_string(self):
-        """error can be a string."""
-        obs = Observation(stdout="", diff="", error="Traceback: ZeroDivisionError", verdict=None)
-        assert obs.error == "Traceback: ZeroDivisionError"
+    def test_with_error_exception(self):
+        """error can be a BaseException instance."""
+        exc = ZeroDivisionError("division by zero")
+        obs = Observation(stdout="", stderr="", diff="", error=exc)
+        assert obs.error is exc
 
-    def test_with_verdict(self):
-        """verdict can be a Verdict instance."""
-        v = Verdict(total=1, passed=1, failures=())
-        obs = Observation(stdout="", diff="", error=None, verdict=v)
-        assert obs.verdict is v
-
-    def test_to_dict_verdict_none(self):
-        """When verdict=None, to_dict has verdict as None."""
-        obs = Observation(stdout="", diff="", error=None, verdict=None)
+    def test_to_dict_no_verdict_key(self):
+        """to_dict does not include a verdict key."""
+        obs = Observation(stdout="", stderr="", diff="", error=None)
         d = obs.to_dict()
-        assert d["verdict"] is None
+        assert "verdict" not in d
 
-    def test_to_dict_roundtrip_no_verdict(self):
-        """Roundtrip is correct when verdict=None."""
-        original = Observation(stdout="out", diff="+x=1", error=None, verdict=None)
+    def test_to_dict_roundtrip(self):
+        """Roundtrip is correct (error loses exception object on deserialise)."""
+        original = Observation(stdout="out", stderr="", diff="+x=1", error=None)
         restored = Observation.from_dict(original.to_dict())
         assert restored == original
 
-    def test_to_dict_roundtrip_with_verdict(self):
-        """Roundtrip is correct when verdict is not None."""
-        vf = make_verdict_failure()
-        v = Verdict(total=2, passed=1, failures=(vf,))
-        original = Observation(stdout="", diff="", error="err", verdict=v)
-        restored = Observation.from_dict(original.to_dict())
-        assert restored == original
+    def test_to_dict_error_serialised_as_repr(self):
+        """error is serialised via repr() in to_dict."""
+        exc = ValueError("bad input")
+        obs = Observation(stdout="", stderr="", diff="", error=exc)
+        d = obs.to_dict()
+        assert "ValueError" in d["error"]
+        assert "bad input" in d["error"]
 
     def test_to_dict_keys(self):
         """to_dict contains exactly the four expected keys."""
         obs = make_observation()
-        assert set(obs.to_dict().keys()) == {"stdout", "diff", "error", "verdict"}
+        assert set(obs.to_dict().keys()) == {"stdout", "stderr", "diff", "error"}
 
 
 # ─────────────────────────────────────────────
@@ -320,33 +314,18 @@ class TestFrameRecord:
         assert not hasattr(f, "wake_reason")
 
     def test_to_dict_roundtrip_full(self):
-        """Full FrameRecord (with verdict) roundtrip is consistent."""
-        vf = VerdictFailure(
-            kind="assertion_failed",
-            assertion="assert z == 0",
-            message="z is 1",
-        )
-        verdict = Verdict(total=1, passed=0, failures=(vf,))
-        obs = Observation(stdout="out\n", diff="+z=1", error=None, verdict=verdict)
+        """FrameRecord roundtrip is consistent."""
+        obs = Observation(stdout="out\n", stderr="", diff="+z=1", error=None)
         original = make_frame_record(observation=obs)
         restored = FrameRecord.from_dict(original.to_dict())
         assert restored == original
 
     def test_to_dict_roundtrip_minimal(self):
-        """Minimal FrameRecord (no verdict) roundtrip is consistent."""
-        obs = Observation(stdout="", diff="", error=None, verdict=None)
+        """Minimal FrameRecord roundtrip is consistent."""
+        obs = Observation(stdout="", stderr="", diff="", error=None)
         original = make_frame_record(observation=obs)
         restored = FrameRecord.from_dict(original.to_dict())
         assert restored == original
-
-    def test_failures_is_tuple_after_roundtrip(self):
-        """After roundtrip, Verdict.failures is still a tuple, not a list."""
-        vf = make_verdict_failure()
-        v = Verdict(total=1, passed=0, failures=(vf,))
-        obs = make_observation(verdict=v)
-        original = make_frame_record(observation=obs)
-        restored = FrameRecord.from_dict(original.to_dict())
-        assert isinstance(restored.observation.verdict.failures, tuple)
 
 
 # ─────────────────────────────────────────────
@@ -426,7 +405,7 @@ class TestJsonKeyStability:
     def test_observation_keys(self):
         """Observation.to_dict() key names are stable."""
         obs = make_observation()
-        assert set(obs.to_dict().keys()) == {"stdout", "diff", "error", "verdict"}
+        assert set(obs.to_dict().keys()) == {"stdout", "stderr", "diff", "error"}
 
     def test_verdict_keys(self):
         """Verdict.to_dict() key names are stable."""
