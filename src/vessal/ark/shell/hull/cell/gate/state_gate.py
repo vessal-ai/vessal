@@ -12,9 +12,12 @@ Design principles:
 from __future__ import annotations
 
 import logging
+import time as _time
 from collections.abc import Callable
 
+from vessal.ark.shell.hull.cell._errors_helper import append_error
 from vessal.ark.shell.hull.cell.gate.gate_base import _GateBase
+from vessal.ark.shell.hull.cell.protocol import ErrorRecord
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,10 @@ class StateGate(_GateBase):
         gate = StateGate(mode="safe")
         result = gate.check(state)
         if not result.allowed:
-            ns["_error"] = f"State gate blocked: {result.reason}"
+            append_error(ns, ErrorRecord(
+                "protocol", f"State gate blocked: {result.reason}",
+                ns.get("_frame", 0), _time.time(),
+            ))
     """
 
     def __init__(self, mode: str = "auto") -> None:

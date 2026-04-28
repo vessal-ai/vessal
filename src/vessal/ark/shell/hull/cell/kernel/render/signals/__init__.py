@@ -1,7 +1,7 @@
 """signals/__init__.py — Kernel base signal module.
 
 BASE_SIGNALS is a list of always-present signal functions that do not depend on any Skill.
-Each entry is a (name, fn) tuple. Skill signals are collected by Kernel.update_signals()
+Each entry is a (name, fn) tuple. Skill signals are collected by Kernel._signal_scan()
 via duck-typing scan.
 
 Signal function protocol: fn(ns: dict) -> str

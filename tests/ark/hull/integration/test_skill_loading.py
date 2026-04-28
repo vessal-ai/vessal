@@ -79,6 +79,6 @@ def test_isinstance_scan_integration(skill_env):
     cls = sm.load("test_skill")
     k = Kernel()
     k.L["ts"] = cls()
-    k.update_signals()
+    k.ping(None, {"globals": k.G, "locals": k.L})
     outputs = k.L["_signal_outputs"]
     assert any("test_signal" in body for _, body in outputs)

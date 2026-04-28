@@ -41,8 +41,4 @@ def render(ns: dict[str, Any]) -> str:
     if wake:
         lines.append(f"wake: {wake}")
 
-    error = ns.get("_error")
-    if error is not None:
-        lines.append(f"error: {error}")
-
     return "\n".join(lines)

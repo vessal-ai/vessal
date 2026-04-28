@@ -554,47 +554,52 @@ class TestDroppedFrameCount:
 # Step 7: TestKernelRenderV3  (filled after step 8 modifications)
 # ──────────────────────────────────────────────────────────────────────────────
 
+from tests.unit.kernel._ping_helpers import _ns, _exec
+
+
 class TestKernelRenderV3:
     """Integration tests for Kernel using v4 renderer."""
 
     def test_kernel_render_returns_string(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
-        result = k.render()
+        result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
 
     def test_kernel_exec_operation_returns_exec_result(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         from vessal.ark.shell.hull.cell.kernel.executor import ExecResult
         k = Kernel()
-        result = k.exec_operation("x = 1", frame_number=1)
-        assert isinstance(result, ExecResult)
+        # ping(pong, ns) executes operation internally; observation.diff proves it ran
+        _exec(k, "x = 1")
+        assert k.L["observation"].diff != "" or k.L.get("x") == 1
 
     def test_frame_stream_not_populated_by_exec(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
-        k.exec_operation("x = 1", frame_number=1)
-        # exec_operation does NOT commit frames to _frame_stream — that is Cell's job
-        fs = k.L.get("_frame_stream")
-        assert fs is None or fs.hot_frame_count() == 0
+        # ping(pong, ns) DOES commit to _frame_stream (Cell's job moved to Kernel.ping in PR 2)
+        before = k.L["_frame_stream"].hot_frame_count()
+        _exec(k, "x = 1")
+        # One frame was committed by ping
+        assert k.L["_frame_stream"].hot_frame_count() == before + 1
 
     def test_system_prompt_key_used(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         k.L["_system_prompt"] = "Test system prompt"
-        ping = k.render()
+        ping = k.ping(None, _ns(k))
         assert "Test system prompt" in ping.system_prompt
 
     def test_no_tracer_arg_in_render(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
-        result = k.render()
+        result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
 
     def test_kernel_render_updates_context_pct(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
-        k.render()
+        k.ping(None, _ns(k))
         assert "_context_pct" in k.L
         assert isinstance(k.L["_context_pct"], int)
 

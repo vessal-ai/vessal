@@ -4,10 +4,11 @@ Agent execution kernel. Holds namespace dict, coordinates code execution, assert
 
 Responsible for:
 - Holding, initializing, snapshotting (cloudpickle), and restoring namespace dict
-- Operation code execution (exec_operation → executor.py)
-- expect assertion evaluation (eval_expect → expect.py)
-- Signal collection (update_signals: BASE_SIGNALS + duck-typing scan)
-- Rendering namespace to Ping (render → render/renderer.py)
+- Single entry point: ping(pong, namespace) → Ping (bootstrap when pong=None; exec+commit+render when pong=Pong)
+- Operation code execution (→ executor.py)
+- expect assertion evaluation (→ expect.py)
+- Signal collection (BASE_SIGNALS + duck-typing scan)
+- Rendering namespace to Ping (→ render/renderer.py)
 
 Not responsible for:
 - Gate checking (handled by Gate)
@@ -31,9 +32,9 @@ graph TD
     Describe["describe/\n(pure function: render objects to text)"]
     Render["render/\n(namespace → Ping assembly)"]
 
-    KernelPy -->|"exec_operation()"| Exec
-    KernelPy -->|"eval_expect()"| Expect
-    KernelPy -->|"render()"| Render
+    KernelPy -->|"ping() → exec"| Exec
+    KernelPy -->|"ping() → eval"| Expect
+    KernelPy -->|"ping() → render"| Render
     Exec -->|"diff computation"| Describe
     Render -->|"namespace display"| Describe
 ```
@@ -68,9 +69,9 @@ flowchart TD
     CheckDropped -->|no| Done
 ```
 
-_frame_log invariants: frame records are indirectly constructed by Cell via kernel.step(); _commit_frame handles FrameRecord assembly, but the append logic is inside kernel.py; max capacity _FRAME_LOG_MAX=200 frames. On schema version mismatch after restore, _frame_log is cleared to prevent old format frames from polluting new logic.
+_frame_log invariants: frame records are constructed inside kernel.ping() via the internal _commit helper; max capacity _FRAME_LOG_MAX=200 frames. On schema version mismatch after restore, _frame_log is cleared to prevent old format frames from polluting new logic.
 
-Kernel and adjacent component relationships: Cell calls Kernel.step() to complete single-frame execution; Gate intercepts at the Cell layer and does not enter Kernel. Core receives Ping (the output of Kernel.render()) and returns Pong, which is then passed into Kernel.step(). Kernel does not reference Cell, Core, or Gate.
+Kernel and adjacent component relationships: Cell calls kernel.ping(pong, namespace) to complete single-frame execution; Gate intercepts at the Cell layer and does not enter Kernel. Core receives Ping (the output of kernel.ping(None, ns) or the next-Ping returned by kernel.ping(pong, ns)) and returns Pong, which is then passed back into kernel.ping(). Kernel does not reference Cell, Core, or Gate.
 
 Known scale issue: kernel.py is close to the 400-line limit; describe/ + render/ together exceed 700 lines; total exceeds 1100 lines. The scale comes from the inherent complexity of namespace management; not splitting for now, but new features must be evaluated for extraction into sub-modules.
 
@@ -87,6 +88,13 @@ Operation execution result.
 ### class Kernel
 
 Agent execution kernel.
+
+Primary entry point: `ping(pong: Pong | None, namespace: dict) -> Ping`
+
+| pong value | Behavior |
+|------------|----------|
+| `None` | Bootstrap: update_signals + render only. No code executed, no frame committed. Returns initial Ping. |
+| `Pong(...)` | Full frame: exec operation → `L["observation"]`, eval expect → `L["verdict"]`, signal_scan, `_commit` frame to `_frame_log`, render → return next Ping. |
 
 ### class RenderConfig
 

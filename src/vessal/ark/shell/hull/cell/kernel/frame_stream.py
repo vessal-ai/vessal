@@ -86,7 +86,7 @@ class FrameStream:
         return None
 
     def commit_frame(self, frame: dict) -> None:
-        """Append a raw frame dict to B_0. Called by Kernel._commit_frame."""
+        """Append a raw frame dict to B_0. Called by Kernel._commit()."""
         if frame.get("schema_version") != FRAME_SCHEMA_VERSION:
             raise ValueError(
                 f"FrameStream.commit_frame: schema_version mismatch, "

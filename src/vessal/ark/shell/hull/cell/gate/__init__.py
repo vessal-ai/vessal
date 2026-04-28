@@ -1,7 +1,7 @@
 """gate — safety gating module for action / state before execution.
 
 Provides two independent gates:
-- ActionGate: checks action code before it is sent to Kernel.exec_operation()
+- ActionGate: checks action code before Kernel.ping() executes it
 - StateGate: checks the state string before it is sent to Core.step()
 
 Both gates support three modes:

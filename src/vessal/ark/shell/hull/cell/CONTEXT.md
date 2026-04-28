@@ -3,11 +3,11 @@
 Single-frame SORA execution engine. Encapsulates Kernel (execution) and Core (inference), driving one Ping → Core → Pong → Kernel → FrameRecord cycle via step().
 
 Responsible for:
-- Single-frame execution orchestration (step()): prepare, state_gate, core.step, action_gate, kernel.step
+- Single-frame execution orchestration (step()): kernel.ping(None, ns) [bootstrap, first call only] → state_gate → core.step → action_gate → kernel.ping(pong, ns) [exec+commit+render]
 - Lifecycle and mode switching for ActionGate and StateGate
 - Read/write proxy for namespace (get / set / keys / ns pass-through to Kernel)
 - Snapshot serialization and restore (pass-through to Kernel; Skill manifest is Hull's concern)
-- Frame perception generation (calls kernel.prepare() at the start of each frame to produce a fresh Ping)
+- Bootstrap: first call only calls kernel.ping(None, namespace) to produce the initial Ping before any LLM call
 - Exposing cell.ping / cell.pong as read-only projections of the latest committed FrameRecord
 
 Not responsible for:
@@ -42,12 +42,12 @@ Cell is a leaf: execution engine only. These constraints are executable — see 
 
 ## Invariants
 
-- `ns["_frame"]` increments exactly once per frame, inside `_commit_frame`. The in-progress frame number is an explicit parameter passed through the call chain.
+- `ns["_frame"]` increments exactly once per frame, inside `_commit` (the private helper). The in-progress frame number is an explicit parameter passed through the call chain.
 - `ns["sleep"]` is `Kernel.sleep` bound method. Re-bound by `_migrate_snapshot()` after restore so closures do not capture stale state.
 - `ns["_errors"]` capped by `ns["_error_buffer_cap"]` (default 200) via `append_error()` in `_errors_helper.py`.
 - `cell.ping` / `cell.pong` are projections from `FrameStream.latest_hot_frame()`, updated at the end of each `step()`.
 - Compaction defaults K=16 / N=8 are defined once in `Kernel.__init__`; no other site sets them.
-- Single-frame execution method: `Kernel.step`, `Core.step`. Long-running loop: `run_forever` (Hull EventLoop). These names are enforced by `tests/architecture/vessal/test_cell_dependency_tree.py`.
+- Single-frame execution method: `Kernel.ping`, `Core.step`. Long-running loop: `run_forever` (Hull EventLoop). These names are enforced by `tests/architecture/vessal/test_cell_dependency_tree.py`.
 
 ## Design
 
@@ -68,8 +68,9 @@ sequenceDiagram
 
     Hull->>Cell: cell.step()
 
-    Cell->>Kernel: kernel.prepare() → Ping
-    Note over Kernel: update_signals + render (fresh each frame)
+    Note over Cell: Bootstrap (first call only)
+    Cell->>Kernel: kernel.ping(None, namespace) → Ping
+    Note over Kernel: ① update_signals + render (no exec, no commit)
 
     Cell->>StateGate: check(ping.state)
     alt state intercepted
@@ -84,16 +85,16 @@ sequenceDiagram
         Cell-->>Hull: protocol_error
     end
 
-    Cell->>Kernel: kernel.step(pong)
-    Note over Kernel: exec code, commit frame (no pre-render)
+    Cell->>Kernel: kernel.ping(pong, namespace) → Ping (next frame)
+    Note over Kernel: ①②③④⑤ exec → L["observation"], eval → L["verdict"], commit frame, render next Ping
     Cell-->>Hull: FrameRecord committed to _frame_log
 ```
 
-Two key internal decisions. First, step() unconditionally calls kernel.prepare() each frame to generate a fresh Ping, ensuring signals (unread messages, timestamps, etc.) are always up to date. kernel.step() is only responsible for exec + commit, no longer pre-rendering the next frame's Ping. Second, Gates are exposed to the outside via string properties (cell.action_gate = "safe"), so Hull does not need to know the concrete types of ActionGate/StateGate, reducing inter-layer coupling.
+Two key internal decisions. First, step() calls kernel.ping(None, namespace) once on bootstrap to generate the initial Ping (signals + render only, no exec). On every subsequent step it calls kernel.ping(pong, namespace) once, which executes the Pong, commits the FrameRecord, and returns the next Ping in a single atomic call. Second, Gates are exposed to the outside via string properties (cell.action_gate = "safe"), so Hull does not need to know the concrete types of ActionGate/StateGate, reducing inter-layer coupling.
 
-Invariants: each successful step() call (protocol_error is None) produces exactly one FrameRecord committed by Kernel (schema v6, with ping field); _ping is the output of the current frame's prepare(), its semantics expire at frame end (regenerated next frame); _pong always points to the previous frame's LLM output; _actual_tokens_in/_actual_tokens_out are overwritten with real values when the API returns usage, otherwise remain None; on protocol exceptions _errors appends ErrorRecord("protocol", ...).
+Invariants: each successful step() call (protocol_error is None) produces exactly one FrameRecord committed by Kernel; _ping is the output of the most recent kernel.ping() call; _pong always points to the current frame's LLM output (None before first LLM response); _actual_tokens_in/_actual_tokens_out are overwritten with real values when the API returns usage, otherwise remain None; on protocol exceptions _errors appends ErrorRecord("protocol", ...).
 
-Cell and Hull relationship: Hull creates Cell, operates it via public interfaces step(), G, L, snapshot(), restore(), and does not access Cell internals. Cell and Kernel relationship: Cell calls kernel.prepare() and kernel.step(), reads kernel.G and kernel.L, but does not directly operate on Kernel's internal Executor or Renderer. Cell and Core relationship: Cell calls core.step(ping), passes the resulting Pong directly to Kernel; Core is stateless.
+Cell and Hull relationship: Hull creates Cell, operates it via public interfaces step(), G, L, snapshot(), restore(), and does not access Cell internals. Cell and Kernel relationship: Cell calls kernel.ping(pong, namespace) (the single Kernel primitive), reads kernel.G and kernel.L, but does not directly operate on Kernel's internal Executor or Renderer. Cell and Core relationship: Cell calls core.step(ping), passes the resulting Pong directly to kernel.ping(); Core is stateless.
 
 ## Status
 
@@ -106,3 +107,4 @@ None.
 ### Active
 - 2026-04-09: FrameRecord schema v6 landed, added ping field (Ping.to_dict/from_dict), from_dict is compatible with v5.
 - 2026-04-13: Core.step() returns (Pong, prompt_tokens, completion_tokens) tuple; Cell.step() overwrites _context_pct with real API token data (_actual_tokens_in/_actual_tokens_out); protocol exceptions written to _errors (ErrorRecord).
+- 2026-04-28: Cell.step() uses kernel.ping(None, ns) for bootstrap (render-only, first call once) and kernel.ping(pong, ns) for every subsequent frame (exec+commit+render); kernel.prepare() and kernel.step() are deleted. Frame outputs land in L["observation"] (Observation dataclass) and L["verdict"] (Verdict | None).

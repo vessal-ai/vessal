@@ -22,6 +22,8 @@ from vessal.ark.shell.hull.cell.kernel.render import render
 from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
+from tests.unit.kernel._ping_helpers import _ns, _exec
+
 # ─────────────────────────────────────────────
 # Helper: construct a minimal namespace (without defaults)
 # ─────────────────────────────────────────────
@@ -87,27 +89,25 @@ class TestIsUserVar:
 # ─────────────────────────────────────────────
 
 class TestExecute:
-    def test_empty_action_resets_side_effects(self):
-        """Empty operation resets the four side-effect variables to empty values; no code is executed."""
+    def test_empty_action_returns_empty_exec_result(self):
+        """Empty operation returns ExecResult with empty fields; no code is executed."""
         ns = bare_ns()
-        # execute once to leave side effects
-        execute("x = 1", {}, ns, frame_number=1)
-        # execute empty code
-        execute("", {}, ns, frame_number=2)
-        assert ns["_operation"] == ""
-        assert ns["_stdout"] == ""
-        assert ns["_error"] is None
-        assert ns["_diff"] == ""
+        result = execute("", {}, ns, frame_number=2)
+        assert isinstance(result, ExecResult)
+        assert result.stdout == ""
+        assert result.error is None
+        assert result.diff == ""
 
     def test_whitespace_action_treated_as_empty(self):
         ns = bare_ns()
-        execute("   \n  ", {}, ns, frame_number=1)
-        assert ns["_operation"] == ""
+        result = execute("   \n  ", {}, ns, frame_number=1)
+        assert result.stdout == ""
+        assert result.error is None
 
     def test_none_action_treated_as_empty(self):
         ns = bare_ns()
-        execute(None, {}, ns, frame_number=1)
-        assert ns["_operation"] == ""
+        result = execute(None, {}, ns, frame_number=1)
+        assert result.error is None
 
     def test_returns_exec_result(self):
         """execute returns an ExecResult."""
@@ -115,56 +115,60 @@ class TestExecute:
         result = execute("x = 1", {}, ns, frame_number=1)
         assert isinstance(result, ExecResult)
 
-    def test_operation_recorded(self):
+    def test_operation_does_not_pollute_ns(self):
+        """execute() does not write _operation to ns; side-effect keys are not scattered."""
         ns = bare_ns()
         code = "x = 42"
+        # _operation is pre-populated in bare_ns; execute should not overwrite it
+        ns["_operation"] = "old"
         execute(code, {}, ns, frame_number=1)
-        assert ns["_operation"] == code
+        # execute() no longer writes _operation back; ns still has old value
+        assert ns["_operation"] == "old"
 
     def test_simple_assignment(self):
         ns = bare_ns()
-        execute("x = 42", {}, ns, frame_number=1)
+        result = execute("x = 42", {}, ns, frame_number=1)
         assert ns["x"] == 42
-        assert ns["_error"] is None
+        assert result.error is None
 
     def test_stdout_captured(self):
         ns = bare_ns()
-        execute("print('hello world')", {}, ns, frame_number=1)
-        assert ns["_stdout"] == "hello world\n"
-        assert ns["_error"] is None
+        result = execute("print('hello world')", {}, ns, frame_number=1)
+        assert result.stdout == "hello world\n"
+        assert result.error is None
 
     def test_multiple_prints(self):
         ns = bare_ns()
-        execute("print('a')\nprint('b')", {}, ns, frame_number=1)
-        assert "a\n" in ns["_stdout"]
-        assert "b\n" in ns["_stdout"]
+        result = execute("print('a')\nprint('b')", {}, ns, frame_number=1)
+        assert "a\n" in result.stdout
+        assert "b\n" in result.stdout
 
     def test_stdout_empty_when_no_print(self):
         ns = bare_ns()
-        execute("x = 1", {}, ns, frame_number=1)
-        assert ns["_stdout"] == ""
+        result = execute("x = 1", {}, ns, frame_number=1)
+        assert result.stdout == ""
 
     def test_runtime_error_captured(self):
         ns = bare_ns()
-        execute("1 / 0", {}, ns, frame_number=1)
-        assert ns["_error"] is not None
-        assert "ZeroDivisionError" in ns["_error"]
+        result = execute("1 / 0", {}, ns, frame_number=1)
+        assert result.error is not None
+        assert "ZeroDivisionError" in result.error
 
     def test_syntax_error_captured(self):
         ns = bare_ns()
-        execute("def foo(:\n    pass", {}, ns, frame_number=1)
-        assert ns["_error"] is not None
+        result = execute("def foo(:\n    pass", {}, ns, frame_number=1)
+        assert result.error is not None
 
     def test_name_error_captured(self):
         ns = bare_ns()
-        execute("y = undefined_var", {}, ns, frame_number=1)
-        assert ns["_error"] is not None
-        assert "NameError" in ns["_error"]
+        result = execute("y = undefined_var", {}, ns, frame_number=1)
+        assert result.error is not None
+        assert "NameError" in result.error
 
     def test_error_none_on_success(self):
         ns = bare_ns()
-        execute("x = 1", {}, ns, frame_number=1)
-        assert ns["_error"] is None
+        result = execute("x = 1", {}, ns, frame_number=1)
+        assert result.error is None
 
     def test_no_builtins_pollution(self):
         """__builtins__ injected by exec should be cleaned up."""
@@ -174,33 +178,33 @@ class TestExecute:
 
     def test_diff_added(self):
         ns = bare_ns()
-        execute("a = 1\nb = 'hello'", {}, ns, frame_number=1)
-        assert "+a = 1" in ns["_diff"]
-        assert "+b = hello" in ns["_diff"]
+        result = execute("a = 1\nb = 'hello'", {}, ns, frame_number=1)
+        assert "+a = 1" in result.diff
+        assert "+b = hello" in result.diff
 
     def test_diff_modified(self):
         ns = bare_ns()
         execute("x = 1", {}, ns, frame_number=1)
-        execute("x = 99", {}, ns, frame_number=2)
-        assert "-x = 1" in ns["_diff"]
-        assert "+x = 99" in ns["_diff"]
+        result = execute("x = 99", {}, ns, frame_number=2)
+        assert "-x = 1" in result.diff
+        assert "+x = 99" in result.diff
 
     def test_diff_deleted(self):
         ns = bare_ns()
         execute("x = 1", {}, ns, frame_number=1)
-        execute("del x", {}, ns, frame_number=2)
-        assert "-x = 1" in ns["_diff"]
+        result = execute("del x", {}, ns, frame_number=2)
+        assert "-x = 1" in result.diff
 
     def test_diff_ignores_system_vars(self):
         """Variables starting with _ do not participate in diff."""
         ns = bare_ns()
-        execute("_observe = ['x']", {}, ns, frame_number=1)
-        assert ns["_diff"] == ""
+        result = execute("_observe = ['x']", {}, ns, frame_number=1)
+        assert result.diff == ""
 
     def test_diff_empty_when_no_change(self):
         ns = bare_ns()
-        execute("pass", {}, ns, frame_number=1)
-        assert ns["_diff"] == ""
+        result = execute("pass", {}, ns, frame_number=1)
+        assert result.diff == ""
 
     def test_history_not_managed_by_execute(self):
         """executor does not commit to _frame_stream; frame logging is managed by Cell (Phase 3)."""
@@ -261,28 +265,28 @@ class TestExecute:
         assert ns["y"] == 15
 
     def test_system_exit_captured_as_error(self):
-        """LLM calling sys.exit() should not terminate the process; it should be captured as _error."""
+        """LLM calling sys.exit() should not terminate the process; it should be captured in ExecResult.error."""
         ns = bare_ns()
-        execute("import sys; sys.exit(0)", {}, ns, frame_number=1)
-        assert ns["_error"] is not None
-        assert "SystemExit" in ns["_error"]
+        result = execute("import sys; sys.exit(0)", {}, ns, frame_number=1)
+        assert result.error is not None
+        assert "SystemExit" in result.error
 
     def test_exit_builtin_captured_as_error(self):
-        """LLM calling builtin exit() should not terminate the process; it should be captured as _error."""
+        """LLM calling builtin exit() should not terminate the process; it should be captured in ExecResult.error."""
         ns = bare_ns()
-        execute("exit(0)", {}, ns, frame_number=1)
-        assert ns["_error"] is not None
-        assert "SystemExit" in ns["_error"]
+        result = execute("exit(0)", {}, ns, frame_number=1)
+        assert result.error is not None
+        assert "SystemExit" in result.error
 
     def test_redefine_to_builtin_no_crash(self):
         """When a function is reassigned to a builtin object, execute does not crash."""
         ns = bare_ns()
-        execute("def foo():\n    pass\nfoo = 42", {}, ns, frame_number=1)
-        assert ns["_error"] is None
+        result = execute("def foo():\n    pass\nfoo = 42", {}, ns, frame_number=1)
+        assert result.error is None
         assert ns["foo"] == 42
 
     def test_frame_not_written_by_execute(self):
-        """execute() does not write ns['_frame']; that is _commit_frame's responsibility."""
+        """execute() does not write ns['_frame']; that is _commit's responsibility."""
         ns = bare_ns()
         initial = ns.get("_frame", 0)
         execute("x = 1", {}, ns, frame_number=5)
@@ -349,8 +353,8 @@ class TestCompressTraceback:
         )
         code = f"{funcs}\ndef f20(): return 1/0\nf0()"
         # Pass ns as both G and L so cross-function calls resolve via ns
-        execute(code, ns, ns, frame_number=1)
-        error = ns["_error"]
+        result = execute(code, ns, ns, frame_number=1)
+        error = result.error
         assert error is not None
         assert "ZeroDivisionError" in error
         # After compression there should be an omission notice (call chain is deep enough, > 20 lines)
@@ -359,8 +363,8 @@ class TestCompressTraceback:
     def test_execute_short_error_not_compressed(self):
         """Simple exceptions in execute() are not compressed; full traceback is retained."""
         ns = bare_ns()
-        execute("1 / 0", {}, ns, frame_number=1)
-        error = ns["_error"]
+        result = execute("1 / 0", {}, ns, frame_number=1)
+        error = result.error
         assert error is not None
         # Short traceback does not contain omission notice
         assert "lines omitted" not in error
@@ -371,35 +375,30 @@ class TestCompressTraceback:
 # ─────────────────────────────────────────────
 
 class TestRenderIntegration:
-    """Kernel.render() integration tests with the v3 renderer."""
+    """Kernel.render/ping integration tests with the v3 renderer."""
 
     def test_render_returns_str(self):
         from vessal.ark.shell.hull.cell.protocol import Ping
         k = Kernel()
-        result = k.render()
+        result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
-        # New mechanism: render only reads _signal_outputs; signals being empty before
-        # update_signals() is called is normal. Verify that update_signals() + render()
-        # together return non-empty content.
-        k.update_signals()
-        result2 = k.render()
+        # After ping(None, ...) signals are always scanned; verify non-empty
+        result2 = k.ping(None, _ns(k))
         assert isinstance(result2, Ping)
         assert len(result2.state.signals) > 0
 
     def test_exec_operation_result_affects_render(self):
-        """render reflects state changes after exec_operation."""
+        """render reflects state changes after exec via ping."""
         from vessal.ark.shell.hull.cell.protocol import Ping
         k = Kernel()
-        frame = k.L.get("_frame", 0) + 1
-        k.exec_operation("print('hi')\nx = 1", frame_number=frame)
-        state = k.render()
+        state = _exec(k, "print('hi')\nx = 1")
         assert isinstance(state, Ping)
 
     def test_stdout_in_ns_after_exec_operation(self):
-        """_stdout is written to ns after exec_operation; readable."""
+        """observation.stdout is populated after exec via ping."""
         k = Kernel()
-        k.exec_operation("print('hello from kernel')", frame_number=1)
-        assert "hello from kernel" in k.L["_stdout"]
+        _exec(k, "print('hello from kernel')")
+        assert "hello from kernel" in k.L["observation"].stdout
 
     def test_frame_stream_in_state(self):
         """Frame stream section appears in the rendered output."""
@@ -413,7 +412,7 @@ class TestRenderIntegration:
             "pong": {"think": "", "action": {"operation": "x = 1", "expect": ""}},
             "observation": {"stdout": "", "diff": "+x = 1", "error": None, "verdict": None},
         })
-        ping = k.render()
+        ping = k.ping(None, _ns(k))
         assert "══════ frame stream ══════" in ping.state.frame_stream
 
     def test_context_budget_default_set_by_kernel(self):
@@ -423,10 +422,9 @@ class TestRenderIntegration:
         assert k.L["_context_budget"] == 128000
 
     def test_auxiliary_section_in_output(self):
-        """Auxiliary section (system variables) appears in render output after update_signals()."""
+        """Auxiliary section (system variables) appears in render output after ping(None, ...)."""
         k = Kernel()
-        k.update_signals()
-        pong = k.render()
+        pong = k.ping(None, _ns(k))
         assert "context" in pong.state.signals
 
 
@@ -456,7 +454,7 @@ class TestKernel:
     def test_init_from_snapshot(self):
         """snapshot_path parameter: restore namespace from file to continue a previous session."""
         k = Kernel()
-        k.exec_operation("counter = 10", frame_number=1)
+        _exec(k, "counter = 10")
 
         with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
             snap_path = f.name
@@ -477,102 +475,95 @@ class TestKernel:
         k.L["custom_var"] = "hello"
         assert k.L["custom_var"] == "hello"
 
-    def test_exec_operation_returns_exec_result(self):
-        """exec_operation() returns ExecResult."""
-        k = Kernel()
-        result = k.exec_operation("x = 1", frame_number=1)
-        assert isinstance(result, ExecResult)
-
-    def test_exec_operation_empty_returns_exec_result(self):
-        """exec_operation() returns ExecResult for empty code."""
-        k = Kernel()
-        result = k.exec_operation("", frame_number=1)
-        assert isinstance(result, ExecResult)
-
-    def test_render_method_returns_str(self):
-        """render() method does not execute code; only renders current state. Has content after update_signals()."""
+    def test_exec_via_ping_returns_ping(self):
+        """ping(pong, ns) returns Ping after executing code."""
         from vessal.ark.shell.hull.cell.protocol import Ping
         k = Kernel()
-        k.update_signals()
-        ping = k.render()
-        assert isinstance(ping, Ping)
-        assert len(ping.state.signals) > 0
+        result = _exec(k, "x = 1")
+        assert isinstance(result, Ping)
 
-    def test_render_method_does_not_increment_frame(self):
-        """render() does not increment the frame number."""
+    def test_ping_none_returns_ping(self):
+        """ping(None, ns) returns Ping (boot call)."""
+        from vessal.ark.shell.hull.cell.protocol import Ping
+        k = Kernel()
+        result = k.ping(None, _ns(k))
+        assert isinstance(result, Ping)
+
+    def test_ping_none_does_not_increment_frame(self):
+        """ping(None, ns) does not increment the frame number."""
         k = Kernel()
         frame_before = k.L["_frame"]
-        k.render()
+        k.ping(None, _ns(k))
         assert k.L["_frame"] == frame_before
 
-    def test_render_method_does_not_append_frame_stream(self):
-        """render() does not commit to the frame stream (_frame_stream)."""
+    def test_ping_none_does_not_append_frame_stream(self):
+        """ping(None, ns) does not commit to the frame stream."""
         k = Kernel()
-        k.render()
-        k.render()
+        k.ping(None, _ns(k))
+        k.ping(None, _ns(k))
         assert k.L["_frame_stream"].hot_frame_count() == 0
 
-    def test_kernel_render_returns_ping(self, tmp_path):
+    def test_kernel_ping_returns_ping(self, tmp_path):
         from vessal.ark.shell.hull.cell.protocol import Ping
         kernel = Kernel()
         kernel.L["_system_prompt"] = "You are an agent."
-        ping = kernel.render()
+        ping = kernel.ping(None, _ns(kernel))
         assert isinstance(ping, Ping)
         assert ping.system_prompt == "You are an agent."
 
-    def test_exec_operation_does_not_set_frame(self):
-        """exec_operation does not write ns['_frame']; that is _commit_frame's responsibility."""
+    def test_exec_via_ping_does_not_set_frame_before_pong(self):
+        """ping(pong, ns) increments _frame exactly once (via _commit)."""
         k = Kernel()
         initial = k.L["_frame"]
-        k.exec_operation("pass", frame_number=5)
-        assert k.L["_frame"] == initial
+        _exec(k, "pass")
+        assert k.L["_frame"] == initial + 1
 
-    def test_exec_operation_does_not_append_frame_stream(self):
-        """exec_operation does not commit to _frame_stream (Cell's responsibility, Phase 3)."""
+    def test_exec_via_ping_commits_to_frame_stream(self):
+        """ping(pong, ns) commits one frame to _frame_stream."""
         k = Kernel()
-        k.exec_operation("x = 1", frame_number=1)
-        k.exec_operation("y = 2", frame_number=2)
-        assert k.L["_frame_stream"].hot_frame_count() == 0
+        _exec(k, "x = 1")
+        _exec(k, "y = 2")
+        assert k.L["_frame_stream"].hot_frame_count() == 2
 
-    def test_variable_persists_across_exec_operations(self):
+    def test_variable_persists_across_pings(self):
         k = Kernel()
-        k.exec_operation("x = 42", frame_number=1)
-        k.exec_operation("y = x + 1", frame_number=2)
+        _exec(k, "x = 42")
+        _exec(k, "y = x + 1")
         assert k.L["y"] == 43
 
-    def test_stdout_in_ns_after_exec(self):
-        """_stdout is written to ns after execution."""
+    def test_stdout_in_observation_after_exec(self):
+        """observation.stdout is populated after execution via ping."""
         k = Kernel()
-        k.exec_operation("print('hello from kernel')", frame_number=1)
-        assert "hello from kernel" in k.L["_stdout"]
+        _exec(k, "print('hello from kernel')")
+        assert "hello from kernel" in k.L["observation"].stdout
 
-    def test_error_in_ns_after_exec(self):
-        """Exception is captured into ns['_error']."""
+    def test_error_in_observation_after_exec(self):
+        """Exception is captured into observation.error."""
         k = Kernel()
-        k.exec_operation("1 / 0", frame_number=1)
-        assert k.L["_error"] is not None
-        assert "ZeroDivisionError" in k.L["_error"]
+        _exec(k, "1 / 0")
+        assert k.L["observation"].error is not None
+        assert "ZeroDivisionError" in k.L["observation"].error
 
-    def test_diff_in_ns_after_exec(self):
-        """New variables appear in diff."""
+    def test_diff_in_observation_after_exec(self):
+        """New variables appear in observation.diff."""
         k = Kernel()
-        k.exec_operation("alpha = 999", frame_number=1)
-        assert "alpha" in k.L["_diff"]
+        _exec(k, "alpha = 999")
+        assert "alpha" in k.L["observation"].diff
 
     def test_snapshot_restore(self):
         k = Kernel()
-        k.exec_operation("counter = 10", frame_number=1)
+        _exec(k, "counter = 10")
 
         with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
             snap_path = f.name
 
         try:
             k.snapshot(snap_path)
-            k.exec_operation("counter = 999", frame_number=2)  # modify state
+            _exec(k, "counter = 999")  # modify state
 
             k.restore(snap_path)
             # counter should be 10 after restore
-            k.exec_operation("result = counter", frame_number=1)
+            _exec(k, "result = counter")
             assert "counter" in k.L
             assert k.L["counter"] == 10
         finally:
@@ -581,7 +572,7 @@ class TestKernel:
     def test_snapshot_restore_no_skills(self, tmp_path):
         """snapshot/restore works normally without Skills present in the namespace."""
         k = Kernel()
-        k.exec_operation("x = 42", frame_number=1)
+        _exec(k, "x = 42")
         snap = str(tmp_path / "test.pkl")
         k.snapshot(snap)
 
@@ -648,7 +639,7 @@ class TestKernel:
 
             TasksCls = sm.load("tasks")
             k.L["TasksCls"] = TasksCls
-            k.exec_operation('t = TasksCls(); task_id = t.add("test goal")', frame_number=1)
+            _exec(k, 't = TasksCls(); task_id = t.add("test goal")')
 
             assert k.L["task_id"] == "1"
 
@@ -715,92 +706,80 @@ class TestKernel:
             assert issubclass(k2.L["TasksCls"], SkillBase)
 
     def test_ns_direct_write_affects_exec(self):
-        """Writing directly to kernel.L is visible to subsequent exec_operation() calls."""
+        """Writing directly to kernel.L is visible to subsequent ping() calls."""
         k = Kernel()
         k.L["injected"] = 42
-        k.exec_operation("answer = injected + 1", frame_number=1)
+        _exec(k, "answer = injected + 1")
         assert k.L["answer"] == 43
 
     def test_sleeping_lifecycle_var(self):
         """_sleeping is a lifecycle variable in namespace; Agent can set it via sleep()."""
         k = Kernel()
         assert k.L["_sleeping"] is False
-        k.exec_operation("sleep()", frame_number=1)
+        _exec(k, "sleep()")
         assert k.L["_sleeping"] is True
 
     def test_wake_driven_exec(self):
         """Simulate event-driven execution: write _wake, execute, then call sleep()."""
         k = Kernel()
         k.L["_wake"] = "user_message: compute 1+2+3"
-        k.exec_operation("total = 1 + 2 + 3", frame_number=1)
-        k.exec_operation("sleep()", frame_number=2)
+        _exec(k, "total = 1 + 2 + 3")
+        _exec(k, "sleep()")
         assert k.L["total"] == 6
         assert k.L["_sleeping"] is True
 
     def test_eval_expect_returns_verdict(self):
-        """eval_expect() returns a Verdict."""
+        """ping with expect returns Verdict in L['verdict']."""
         from vessal.ark.shell.hull.cell.protocol import Verdict
         k = Kernel()
-        k.exec_operation("x = 1", frame_number=1)
-        verdict = k.eval_expect("assert x == 1")
-        assert isinstance(verdict, Verdict)
+        _exec(k, "x = 1")
+        _exec(k, "pass", expect="assert x == 1")
+        assert isinstance(k.L["verdict"], Verdict)
 
     def test_eval_expect_passes(self):
-        """eval_expect() returns passed == total for satisfied assertions."""
+        """ping with passing expect: verdict.passed == verdict.total."""
         k = Kernel()
-        k.exec_operation("x = 42", frame_number=1)
-        verdict = k.eval_expect("assert x == 42")
+        _exec(k, "x = 42")
+        _exec(k, "pass", expect="assert x == 42")
+        verdict = k.L["verdict"]
         assert verdict.total == 1
         assert verdict.passed == 1
         assert verdict.failures == ()
 
     def test_eval_expect_fails(self):
-        """eval_expect() returns non-empty failures for failed assertions."""
+        """ping with failing expect: verdict.failures is non-empty."""
         k = Kernel()
-        k.exec_operation("x = 1", frame_number=1)
-        verdict = k.eval_expect("assert x == 99")
+        _exec(k, "x = 1")
+        _exec(k, "pass", expect="assert x == 99")
+        verdict = k.L["verdict"]
         assert verdict.total == 1
         assert verdict.passed == 0
         assert len(verdict.failures) == 1
 
-    def test_eval_expect_does_not_modify_ns(self):
-        """eval_expect() evaluates on a shallow copy of the namespace; does not modify the real one."""
+    def test_eval_expect_does_not_leak_arbitrary_keys(self):
+        """ping with expect evaluates on a copy; post-ping key delta is exactly the allowed set."""
         k = Kernel()
-        k.exec_operation("x = 1", frame_number=1)
+        _exec(k, "x = 1")
         ns_keys_before = set(k.L.keys())
-        k.eval_expect("assert x == 1")
-        assert set(k.L.keys()) == ns_keys_before
+        _exec(k, "pass", expect="assert x == 1")
+        allowed_new_keys = {"verdict", "observation", "_frame", "_signal_outputs",
+                            "_context_pct", "_budget_total", "_dropped_frame_count"}
+        leaked_extra_keys = set(k.L.keys()) - ns_keys_before - allowed_new_keys
+        assert leaked_extra_keys == set(), f"Unexpected new keys after expect: {leaked_extra_keys}"
         assert k.L["x"] == 1
 
-    def test_run_returns_none_and_commits_frame(self):
-        """run(Pong) returns None; _frame_stream gets one frame committed; _frame increments by 1.
-
-        ns["_frame"] is written by _commit_frame (not by exec_operation).
-        """
+    def test_ping_commits_frame_and_increments(self):
+        """ping(pong, ns) commits one frame; _frame increments by 1."""
         from vessal.ark.shell.hull.cell.protocol import Action, Pong
-        from vessal.ark.shell.hull.cell.kernel.executor import ExecResult
 
         k = Kernel()
         frame_before = k.L["_frame"]
         count_before = k.L["_frame_stream"].hot_frame_count()
 
-        pong = Pong(think="", action=Action(operation="x = 1", expect=""))
+        _exec(k, "x = 1")
 
-        mock_result = ExecResult(stdout="", diff="+x = 1", error=None)
-
-        def _fake_exec(operation, frame_number, tracer=None):
-            # exec_operation no longer writes ns["_frame"]; _commit_frame does
-            return mock_result
-
-        with patch.object(k, "exec_operation", side_effect=_fake_exec) as mock_exec:
-            result = k.step(pong)
-
-        assert result is None
         assert k.L["_frame"] == frame_before + 1
         assert k.L["_frame_stream"].hot_frame_count() == count_before + 1
-        mock_exec.assert_called_once_with(
-            "x = 1", frame_before + 1, None
-        )
 
 
 # ─────────────────────────────────────────────
@@ -811,55 +790,55 @@ class TestExprCapture:
     """Bare expression value capture tests."""
 
     def test_bare_variable(self):
-        """Value of a bare variable name is appended to _stdout."""
+        """Value of a bare variable name is appended to stdout in ExecResult."""
         ns = bare_ns()
         ns["x"] = 42
-        execute("x", {}, ns, frame_number=1)
-        assert "42" in ns["_stdout"]
+        result = execute("x", {}, ns, frame_number=1)
+        assert "42" in result.stdout
 
     def test_bare_expression_result(self):
-        """Value of a bare expression (e.g. 1+2) is appended to _stdout."""
+        """Value of a bare expression (e.g. 1+2) is appended to ExecResult.stdout."""
         ns = bare_ns()
-        execute("1 + 2", {}, ns, frame_number=1)
-        assert "3" in ns["_stdout"]
+        result = execute("1 + 2", {}, ns, frame_number=1)
+        assert "3" in result.stdout
 
     def test_assignment_no_capture(self):
         """Assignment statements do not trigger expression capture."""
         ns = bare_ns()
-        execute("x = 42", {}, ns, frame_number=1)
-        assert ns["_stdout"] == ""
+        result = execute("x = 42", {}, ns, frame_number=1)
+        assert result.stdout == ""
 
     def test_function_def_no_capture(self):
         """Function definitions do not trigger expression capture."""
         ns = bare_ns()
-        execute("def foo(): pass", {}, ns, frame_number=1)
-        assert ns["_stdout"] == ""
+        result = execute("def foo(): pass", {}, ns, frame_number=1)
+        assert result.stdout == ""
 
     def test_print_plus_expr(self):
-        """Both print output and bare expression value appear in _stdout."""
+        """Both print output and bare expression value appear in ExecResult.stdout."""
         ns = bare_ns()
-        execute("print('out')\n1 + 1", {}, ns, frame_number=1)
-        assert "out" in ns["_stdout"]
-        assert "2" in ns["_stdout"]
+        result = execute("print('out')\n1 + 1", {}, ns, frame_number=1)
+        assert "out" in result.stdout
+        assert "2" in result.stdout
 
     def test_none_result_not_shown(self):
-        """Expression value of None is not appended to _stdout."""
+        """Expression value of None is not appended to ExecResult.stdout."""
         ns = bare_ns()
-        execute("None", {}, ns, frame_number=1)
-        assert ns["_stdout"] == ""
+        result = execute("None", {}, ns, frame_number=1)
+        assert result.stdout == ""
 
     def test_long_repr_truncated(self):
         """Oversized repr is truncated to _EXPR_REPR_MAX_LEN characters."""
         ns = bare_ns()
         ns["big"] = list(range(100000))
-        execute("big", {}, ns, frame_number=1)
-        assert len(ns["_stdout"]) <= 2010  # repr + "\n"
+        result = execute("big", {}, ns, frame_number=1)
+        assert len(result.stdout) <= 2010  # repr + "\n"
 
     def test_syntax_error_passthrough(self):
-        """Syntax errors are executed as-is; the error is captured in _error; no crash."""
+        """Syntax errors are executed as-is; the error is captured in ExecResult.error; no crash."""
         ns = bare_ns()
-        execute("def foo(:\n    pass", {}, ns, frame_number=1)
-        assert ns["_error"] is not None
+        result = execute("def foo(:\n    pass", {}, ns, frame_number=1)
+        assert result.error is not None
 
     def test_source_uses_original_action(self):
         """source_cache registers the original operation text (NOT the
@@ -880,10 +859,10 @@ class TestExprCapture:
         assert "_expr_result" not in ns
 
     def test_expr_result_not_in_diff(self):
-        """_expr_result does not appear in _diff (system variable with _ prefix)."""
+        """_expr_result does not appear in ExecResult.diff (system variable with _ prefix)."""
         ns = bare_ns()
-        execute("42", {}, ns, frame_number=1)
-        assert "_expr_result" not in ns["_diff"]
+        result = execute("42", {}, ns, frame_number=1)
+        assert "_expr_result" not in result.diff
 
     def test_maybe_capture_assignment_unchanged(self):
         """_maybe_capture_last_expr does not rewrite assignment statements."""
@@ -903,27 +882,27 @@ class TestExprCapture:
     def test_print_returns_none_no_extra_stdout(self):
         """print() is a bare expression but returns None; no extra output is produced."""
         ns = bare_ns()
-        execute("print('hi')", {}, ns, frame_number=1)
-        assert ns["_stdout"] == "hi\n"
+        result = execute("print('hi')", {}, ns, frame_number=1)
+        assert result.stdout == "hi\n"
 
 
 # ─────────────────────────────────────────────
 # kernel.step() return value
 # ─────────────────────────────────────────────
 
-class TestStepReturnsNone:
-    """kernel.step() no longer returns a Ping — it returns None."""
+class TestPingReturnsPing:
+    """kernel.ping() returns a Ping, never None."""
 
-    def test_step_returns_none(self):
-        """step() returns None after eliminating pre-render."""
+    def test_ping_returns_ping(self):
+        """ping() returns a Ping object."""
         from vessal.ark.shell.hull.cell.kernel import Kernel
-        from vessal.ark.shell.hull.cell.protocol import Action, Pong
+        from vessal.ark.shell.hull.cell.protocol import Action, Ping, Pong
 
         k = Kernel()
         k.L["_system_prompt"] = "test"
         pong = Pong(think="t", action=Action(operation="x = 1", expect=""))
-        result = k.step(pong)
-        assert result is None, f"Expected None, got {type(result)}"
+        result = k.ping(pong, _ns(k))
+        assert isinstance(result, Ping), f"Expected Ping, got {type(result)}"
 
 
 def test_restore_clears_incompatible_frame_stream(tmp_path):
@@ -1048,7 +1027,7 @@ def test_restore_emits_reconstruction_signal(tmp_path):
 
     kernel2 = Kernel()
     kernel2.restore(path)
-    kernel2.update_signals()
+    kernel2.ping(None, {"globals": kernel2.G, "locals": kernel2.L})
 
     signals = kernel2.L.get("_signal_outputs", [])
     signal_text = "\n".join(body for _, body in signals)
@@ -1080,7 +1059,7 @@ class TestInspectGetSource:
     def test_inspect_getsource_function_after_execute(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
-        k.exec_operation("def add(a, b):\n    return a + b", frame_number=1)
+        _exec(k, "def add(a, b):\n    return a + b")
         src = inspect.getsource(k.L["add"])
         assert "def add(a, b):" in src
         assert "return a + b" in src
@@ -1088,7 +1067,7 @@ class TestInspectGetSource:
     def test_inspect_getsource_class_after_execute(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
-        k.exec_operation("class Bar:\n    def m(self):\n        return 1", frame_number=2)
+        _exec(k, "class Bar:\n    def m(self):\n        return 1")
         src = inspect.getsource(k.L["Bar"])
         assert "class Bar:" in src
         assert "def m(self):" in src
@@ -1096,7 +1075,7 @@ class TestInspectGetSource:
     def test_inspect_getsource_async_function(self):
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
-        k.exec_operation("async def waiter():\n    return 42", frame_number=3)
+        _exec(k, "async def waiter():\n    return 42")
         src = inspect.getsource(k.L["waiter"])
         assert "async def waiter" in src
 
@@ -1111,7 +1090,7 @@ class TestInspectGetSource:
             "def decorated():\n"
             "    return 42"
         )
-        k.exec_operation(code, frame_number=4)
+        _exec(k, code)
         src = inspect.getsource(k.L["decorated"])
         assert "@my_decorator" in src
         assert "def decorated" in src
@@ -1123,7 +1102,7 @@ class TestInspectGetSource:
         from vessal.ark.shell.hull.cell.kernel import Kernel
         k = Kernel()
         code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
-        k.exec_operation(code, frame_number=5)
+        _exec(k, code)
         foo_src = inspect.getsource(k.L["foo"])
         bar_src = inspect.getsource(k.L["bar"])
         assert "def foo" in foo_src

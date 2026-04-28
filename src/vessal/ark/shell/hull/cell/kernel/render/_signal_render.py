@@ -1,7 +1,7 @@
 """_signal_render.py — Signal assembly (pure function).
 
 render_signals(ns) -> str
-    Reads ns["_signal_outputs"] (populated by Kernel.update_signals()),
+    Reads ns["_signal_outputs"] (populated by Kernel._signal_scan()),
     wraps each section with a ══════ {title} ══════ separator header,
     and joins sections with "\\n\\n".
 """

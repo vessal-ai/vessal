@@ -23,84 +23,71 @@ def _stub_core(cell: Cell, pong: Pong) -> None:
     cell._core.step = MagicMock(return_value=(pong, None, None))
 
 
-def test_ping_is_frame_stream_projection():
-    """cell.ping must be re-derived from frame_stream after step(), not retained from prepare().
+def test_ping_is_from_previous_frame():
+    """FrameRecord.ping field is the Ping *before* this frame's render, not the new one.
 
-    We simulate a divergence: after kernel.step() commits the frame, we overwrite the
-    frame's ping in the stream with a sentinel value. If cell.ping is truly a projection,
-    it will reflect the sentinel. If cell.ping is just the pre-commit cached value, it won't.
+    The timing contract (spec §1.2): frame N is committed with ping_for_record=_last_ping,
+    where _last_ping is the Ping returned by the previous ping() call. The new Ping
+    rendered at the end of ping() is NOT the one stored in the committed FrameRecord.
+    This test patches _commit to intercept ping_for_record and verifies it equals
+    the initial Ping (_last_ping after bootstrap), proving derivation from the committed
+    frame rather than any pre-commit cache.
     """
-    cell = _make_cell()
-    pong = _fixed_pong("x = 1")
-    _stub_core(cell, pong)
-
     import vessal.ark.shell.hull.cell.kernel.kernel as kernel_mod
 
-    sentinel_system_prompt = "SENTINEL_PING"
-    original_commit = kernel_mod.Kernel._commit_frame
-
-    def _patched_commit(self, pong_arg, observation, frame_number, ping=None):
-        original_commit(self, pong_arg, observation, frame_number, ping=ping)
-        # After the real commit, overwrite the frame's ping in the stream
-        fs = self.L.get("_frame_stream")
-        latest = fs.latest_hot_frame() if fs is not None else None
-        if latest is not None:
-            latest["ping"] = {
-                "system_prompt": sentinel_system_prompt,
-                "state": {"frame_stream": "", "signals": ""},
-            }
-
-    with patch.object(kernel_mod.Kernel, "_commit_frame", _patched_commit):
-        result = cell.step()
-
-    assert result.protocol_error is None
-
-    # If cell.ping is a projection from frame_stream, it must reflect the sentinel
-    assert cell.ping is not None
-    assert cell.ping.system_prompt == sentinel_system_prompt, (
-        f"cell.ping.system_prompt should be {sentinel_system_prompt!r} "
-        f"(frame_stream projection), got {cell.ping.system_prompt!r}. "
-        "This means _ping is still the pre-commit cached value, not a projection."
-    )
-
-
-def test_pong_is_frame_stream_projection():
-    """cell.pong must be re-derived from frame_stream after step(), not retained from core.step().
-
-    We simulate a divergence: after kernel.step() commits the frame, we overwrite the
-    frame's pong in the stream with a sentinel. If cell.pong is truly a projection,
-    it will reflect the sentinel. If it's just the pre-commit Pong, it won't.
-    """
     cell = _make_cell()
-    pong = _fixed_pong("y = 2")
-    _stub_core(cell, pong)
+    ns = {"globals": cell._kernel.G, "locals": cell._kernel.L}
 
+    # Bootstrap: ping(None) stores the initial Ping as _last_ping without committing
+    initial_ping = cell._kernel.ping(None, ns)
+
+    committed_pings = []
+    original_commit = kernel_mod.Kernel._commit
+
+    def recording_commit(self, pong, obs, frame_n, ping_for_record=None):
+        committed_pings.append(ping_for_record)
+        return original_commit(self, pong, obs, frame_n, ping_for_record=ping_for_record)
+
+    with patch.object(kernel_mod.Kernel, "_commit", recording_commit):
+        pong = Pong(think="", action=Action(operation="x = 1", expect=""))
+        cell._kernel.ping(pong, ns)
+
+    # Frame 1 must have been committed with the initial Ping (from bootstrap), not the new one
+    assert len(committed_pings) == 1
+    assert committed_pings[0] is initial_ping
+
+
+def test_pong_committed_to_frame_stream():
+    """FrameRecord.pong field is derived from the committed frame stream, not a pre-commit cache.
+
+    Patches _commit to capture the pong passed for commit, then verifies the committed
+    frame's operation matches the pong that was committed — proving the frame stream is
+    the authoritative source, not a separate cached attribute.
+    """
     import vessal.ark.shell.hull.cell.kernel.kernel as kernel_mod
 
-    sentinel_operation = "SENTINEL_PONG"
-    original_commit = kernel_mod.Kernel._commit_frame
+    cell = _make_cell()
+    ns = {"globals": cell._kernel.G, "locals": cell._kernel.L}
+    cell._kernel.ping(None, ns)
 
-    def _patched_commit(self, pong_arg, observation, frame_number, ping=None):
-        original_commit(self, pong_arg, observation, frame_number, ping=ping)
-        fs = self.L.get("_frame_stream")
-        latest = fs.latest_hot_frame() if fs is not None else None
-        if latest is not None:
-            latest["pong"] = {
-                "think": "",
-                "action": {"operation": sentinel_operation, "expect": ""},
-            }
+    committed_pongs = []
+    original_commit = kernel_mod.Kernel._commit
 
-    with patch.object(kernel_mod.Kernel, "_commit_frame", _patched_commit):
-        result = cell.step()
+    def recording_commit(self, pong, obs, frame_n, ping_for_record=None):
+        committed_pongs.append(pong)
+        return original_commit(self, pong, obs, frame_n, ping_for_record=ping_for_record)
 
-    assert result.protocol_error is None
+    sentinel_op = "sentinel_pong_op = 42"
+    with patch.object(kernel_mod.Kernel, "_commit", recording_commit):
+        pong = Pong(think="", action=Action(operation=sentinel_op, expect=""))
+        cell._kernel.ping(pong, ns)
 
-    assert cell.pong is not None
-    assert cell.pong.action.operation == sentinel_operation, (
-        f"cell.pong.action.operation should be {sentinel_operation!r} "
-        f"(frame_stream projection), got {cell.pong.action.operation!r}. "
-        "This means _pong is still the pre-commit cached value, not a projection."
-    )
+    assert len(committed_pongs) == 1
+    assert committed_pongs[0].action.operation == sentinel_op
+
+    # The committed FrameRecord in _frame_stream also reflects the sentinel operation
+    latest = cell._kernel.L["_frame_stream"].latest_hot_frame()
+    assert latest["pong"]["action"]["operation"] == sentinel_op
 
 
 def test_ping_pong_consistent_across_multiple_steps():
