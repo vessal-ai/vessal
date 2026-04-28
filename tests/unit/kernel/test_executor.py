@@ -349,3 +349,22 @@ class TestLinecacheRegistration:
         assert "__name__" not in ns
         execute("x = 1\n", ns, frame_number=5)
         assert "__name__" not in ns
+
+
+class TestExecuteThreeArg:
+    def test_execute_writes_to_L_not_G(self):
+        from vessal.ark.shell.hull.cell.kernel.executor import execute
+        G = {}
+        L = {"_protected_keys": []}
+        result = execute("foo = 1", G, L, frame_number=1)
+        assert L["foo"] == 1
+        assert "foo" not in G
+        assert result.error is None
+
+    def test_execute_reads_g_via_legb_fallback(self):
+        from vessal.ark.shell.hull.cell.kernel.executor import execute
+        G = {"helper": lambda: 7}
+        L = {"_protected_keys": []}
+        execute("result = helper()", G, L, frame_number=2)
+        assert L["result"] == 7
+        assert "helper" not in L

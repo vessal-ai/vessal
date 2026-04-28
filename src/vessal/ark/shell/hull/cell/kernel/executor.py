@@ -1,8 +1,8 @@
 """executor.py — Code execution engine: safely executes Agent-generated code in a sandboxed namespace."""
 #   ExecResult                  operation execution result dataclass
-#   execute(operation, ns, frame_number) -> ExecResult
-#       Execute Python code in a namespace dict, return ExecResult.
-#       All side effects are written to ns system variables:
+#   execute(operation, G, L, frame_number) -> ExecResult
+#       Execute Python code via exec(code, G, L), return ExecResult.
+#       All side effects are written to L system variables:
 #         _operation  the code that was executed
 #         _stdout     captured print output
 #         _error      exception info (None if no exception)
@@ -76,48 +76,54 @@ def is_user_var(name: str) -> bool:
     return not name.startswith("_")
 
 
-def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> ExecResult:
+def execute(
+    operation: str | None,
+    G: dict[str, Any],
+    L: dict[str, Any],
+    frame_number: int,
+) -> ExecResult:
     """Execute operation code in the namespace.
 
     frame_number: passed in by Cell via Kernel; used for ErrorRecord and _ns_meta tracking.
     execute() is responsible for updating _stdout/_diff/_error/_ns_meta and _operation.
-    execute() must NOT write ns["_frame"] — that is _commit_frame's responsibility.
+    execute() must NOT write L["_frame"] — that is _commit_frame's responsibility.
     execute() must NOT write _frame_log or construct FrameRecord.
 
     Args:
         operation: Python code string to execute. None or whitespace-only is treated as a no-op.
-        ns: Agent's namespace dict; side effects are written directly to it.
-        frame_number: Current frame number; used for ErrorRecord and _ns_meta, not written to ns["_frame"].
+        G: Preset assets dict (Skills, boot globals); read-only by convention. Globals for exec().
+        L: Agent state dict; side effects are written directly to it. Locals for exec().
+        frame_number: Current frame number; used for ErrorRecord and _ns_meta, not written to L["_frame"].
 
     Returns:
         ExecResult containing stdout, diff, and error fields.
 
     Side effects:
-        ns["_operation"], ns["_stdout"], ns["_error"], ns["_diff"] are updated after execution.
-        ns["_ns_meta"] is updated with variable metadata after execution.
+        L["_operation"], L["_stdout"], L["_error"], L["_diff"] are updated after execution.
+        L["_ns_meta"] is updated with variable metadata after execution.
     """
     # Step 1: return immediately for empty code, reset side-effect variables
     # Note: _ns_meta and _frame_log are not reset; empty operation produces no new frame data
     if not operation or not operation.strip():
-        ns["_operation"] = ""
-        ns["_stdout"] = ""
-        ns["_error"] = None
-        ns["_diff"] = ""
+        L["_operation"] = ""
+        L["_stdout"] = ""
+        L["_error"] = None
+        L["_diff"] = ""
         return ExecResult(stdout="", diff="", error=None)
 
     # Step 2: record the operation source
-    ns["_operation"] = operation
+    L["_operation"] = operation
 
     # Step 3: before-snapshot — record keys, id()s, and value references before execution
     # id(v) is the object's memory address; unchanged for the same object; changes when value is replaced
     # before_values only stores references (no deep copy); used by _compute_diff to generate -old lines
-    before_keys = set(ns.keys())
-    before_ids = {k: id(v) for k, v in ns.items()}
-    before_values = {k: v for k, v in ns.items() if is_user_var(k)}
+    before_keys = set(L.keys())
+    before_ids = {k: id(v) for k, v in L.items()}
+    before_values = {k: v for k, v in L.items() if is_user_var(k)}
 
     # Snapshot protected keys before exec (for restoring builtins agent deleted)
-    protected_keys = set(ns.get("_protected_keys", []))
-    protected_snapshot = {k: ns[k] for k in protected_keys if k in ns}
+    protected_keys = set(L.get("_protected_keys", []))
+    protected_snapshot = {k: L[k] for k in protected_keys if k in L}
 
     # Step 3.5: check if the last statement is a bare expression; rewrite as assignment if so
     modified_operation = _maybe_capture_last_expr(operation)
@@ -138,9 +144,9 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
         code = compile(modified_operation, filename, "exec")
         # Set __name__ so classes defined in this exec record __module__ = filename,
         # enabling inspect.getsource(SomeClass) via the sys.modules entry registered above.
-        ns["__name__"] = filename
+        G["__name__"] = filename
         with redirect_stdout(stdout_buffer):
-            exec(code, ns)  # noqa: S102
+            exec(code, G, L)  # noqa: S102
     except KeyboardInterrupt:
         raise  # User interrupt (Ctrl+C); do not catch; allow Agent to be stopped
     except BaseException:
@@ -150,10 +156,10 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
             error = _compress_traceback(traceback.format_exc())
         except Exception:
             error = traceback.format_exc()  # use raw traceback if compression itself fails
-        append_error(ns, ErrorRecord("runtime", error, frame_number, _time.time()))
+        append_error(L, ErrorRecord("runtime", error, frame_number, _time.time()))
 
     # Step 5.5: if there is a bare expression result, append it to stdout
-    expr_result = ns.pop("_expr_result", None)
+    expr_result = L.pop("_expr_result", None)
     captured_stdout = stdout_buffer.getvalue()
     if expr_result is not None and error is None:
         result_repr = repr(expr_result)
@@ -163,39 +169,37 @@ def execute(operation: str | None, ns: dict[str, Any], frame_number: int) -> Exe
             captured_stdout += "\n"
         captured_stdout += result_repr + "\n"
 
-    ns["_stdout"] = captured_stdout
-    ns["_error"] = error
+    L["_stdout"] = captured_stdout
+    L["_error"] = error
 
-    # Step 6: clean up __builtins__ and __name__ injected by exec
-    # exec() injects __builtins__ into ns; __name__ was set for class __module__ resolution.
-    # Remove both if they weren't in ns before this execute() call.
-    if "__builtins__" in ns and "__builtins__" not in before_keys:
-        del ns["__builtins__"]
-    if "__name__" in ns and "__name__" not in before_keys:
-        del ns["__name__"]
+    # Step 6: clean up __builtins__ and __name__ injected by exec into G
+    if "__builtins__" in G:
+        del G["__builtins__"]
+    if "__name__" in G and G.get("__name__") == filename:
+        del G["__name__"]
 
     # Step 6.5: restore protected keys deleted by agent code
     restored_keys = []
     for k, v in protected_snapshot.items():
-        if k not in ns:
-            ns[k] = v
+        if k not in L:
+            L[k] = v
             restored_keys.append(k)
     if restored_keys:
         warning = f"[system] The following variables were deleted by code and have been automatically restored: {', '.join(sorted(restored_keys))}\n"
         captured_stdout += warning
-        ns["_stdout"] = captured_stdout
-        append_error(ns, ErrorRecord(
+        L["_stdout"] = captured_stdout
+        append_error(L, ErrorRecord(
             "builtin_restored", warning.strip(),
             frame_number, _time.time(),
         ))
 
     # Step 7: compute diff (git-style +/- format), write to _diff
-    _compute_diff(ns, before_keys, before_ids, before_values)
+    _compute_diff(L, before_keys, before_ids, before_values)
 
     # Step 8: update _ns_meta — variable lifecycle tracking
-    ns["_ns_meta"] = _update_ns_meta(ns, before_keys, before_ids, frame_number)
+    L["_ns_meta"] = _update_ns_meta(L, before_keys, before_ids, frame_number)
 
-    return ExecResult(stdout=ns["_stdout"], diff=ns["_diff"], error=ns["_error"])
+    return ExecResult(stdout=L["_stdout"], diff=L["_diff"], error=L["_error"])
 
 
 def _maybe_capture_last_expr(action: str) -> str:
@@ -299,7 +303,7 @@ def _compress_traceback(tb_text: str) -> str:
     return "\n".join(result)
 
 
-def _update_ns_meta(ns: dict[str, Any], before_keys: set, before_ids: dict, frame: int) -> dict[str, Any]:
+def _update_ns_meta(L: dict[str, Any], before_keys: set, before_ids: dict, frame: int) -> dict[str, Any]:
     """Update and return the new _ns_meta — tracking lifecycle metadata for user variables.
 
     Rules (only processes user variables, i.e., those not starting with _):
@@ -309,23 +313,23 @@ def _update_ns_meta(ns: dict[str, Any], before_keys: set, before_ids: dict, fram
     - Deleted variable: automatically excluded from new_meta
 
     Args:
-        ns:          Current namespace (after execute)
+        L:           Agent state dict (after execute)
         before_keys: Set of keys before execution
         before_ids:  id() mapping for each variable before execution
         frame:       Current frame number (frame_number, passed in by Cell)
 
     Returns:
-        Updated _ns_meta dict (written by execute; caller assigns to ns["_ns_meta"])
+        Updated _ns_meta dict (written by execute; caller assigns to L["_ns_meta"])
     """
-    # Read old meta (already present in ns before execute)
-    old_meta: dict = ns.get("_ns_meta", {})
+    # Read old meta (already present in L before execute)
+    old_meta: dict = L.get("_ns_meta", {})
     new_meta: dict = {}
-    after_keys = set(ns.keys())
+    after_keys = set(L.keys())
 
     for k in sorted(after_keys):
         if not is_user_var(k):
             continue  # skip system variables
-        obj = ns[k]
+        obj = L[k]
         if k not in before_keys:
             # New variable
             new_meta[k] = {
@@ -358,9 +362,9 @@ def _update_ns_meta(ns: dict[str, Any], before_keys: set, before_ids: dict, fram
 
 
 def _compute_diff(
-    ns: dict, before_keys: set, before_ids: dict, before_values: dict
+    L: dict, before_keys: set, before_ids: dict, before_values: dict
 ) -> None:
-    """Compute diff and write to ns["_diff"].
+    """Compute diff and write to L["_diff"].
 
     Format (git-style, only + and - symbols):
     - New variable:      +name = preview
@@ -371,28 +375,28 @@ def _compute_diff(
     are kept consecutive.
 
     Args:
-        ns:             Current namespace (after execute)
+        L:              Agent state dict (after execute)
         before_keys:    Set of keys before execution
         before_ids:     id() mapping for each variable before execution
         before_values:  Value references for each user variable before execution
                         (references only, no deep copy)
 
     Side effects:
-        Writes to ns["_diff"].
+        Writes to L["_diff"].
     """
-    after_keys = set(ns.keys())
+    after_keys = set(L.keys())
     lines = []
 
     # New variables (sorted by name)
     for k in sorted(after_keys - before_keys):
         if is_user_var(k):
-            lines.append(f"+{k} = {render_value(ns[k], 'diff')}")
+            lines.append(f"+{k} = {render_value(L[k], 'diff')}")
 
     # Modified variables (id changed) — consecutive -old / +new
     for k in sorted(after_keys & before_keys):
-        if is_user_var(k) and id(ns[k]) != before_ids.get(k):
+        if is_user_var(k) and id(L[k]) != before_ids.get(k):
             old_preview = render_value(before_values[k], "diff")
-            new_preview = render_value(ns[k], "diff")
+            new_preview = render_value(L[k], "diff")
             lines.append(f"-{k} = {old_preview}")
             lines.append(f"+{k} = {new_preview}")
 
@@ -402,4 +406,4 @@ def _compute_diff(
             old_preview = render_value(before_values[k], "diff")
             lines.append(f"-{k} = {old_preview}")
 
-    ns["_diff"] = "\n".join(lines)
+    L["_diff"] = "\n".join(lines)

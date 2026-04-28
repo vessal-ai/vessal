@@ -180,7 +180,7 @@ class Kernel:
         """
         if tracer:
             tracer.start(frame_number, "executor.execute")
-        result = execute(operation, self.L, frame_number)
+        result = execute(operation, self.G, self.L, frame_number)
         if tracer:
             tracer.end(frame_number, "executor.execute")
         return result
