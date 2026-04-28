@@ -12,10 +12,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from vessal.ark.shell.hull.cell import Cell
     from vessal.ark.shell.hull.cell.core import Core
-    from vessal.ark.shell.hull.cell.kernel import RenderConfig
-    from vessal.ark.shell.hull.cell.kernel.render.prompt import SystemPromptBuilder
     from vessal.ark.shell.hull.event_loop import EventLoop
     from vessal.ark.shell.hull.hull_api import HullApi
+    from vessal.ark.shell.hull.hull_init_mixin import RenderConfig, SystemPromptBuilder
     from vessal.ark.shell.hull.skill_loader import SkillLoader
     from vessal.ark.util.logging import Tracer
 
@@ -79,25 +78,45 @@ class HullRuntimeMixin:
         return list(self._cell.L.keys())
 
     def frames(self, after: int | None = None) -> list[dict]:
-        """Query hot-zone frames from the frame stream, in flat wire shape.
+        """Query layer-0 frames from SQLite frame_log in flat wire shape.
 
         Args:
             after: Only return frames with n > after. Returns all if None.
 
         Returns:
             Frames in the flat wire shape (kernel doc §4.3 frame_content columns),
-            ordered oldest to newest. See cell.protocol.flatten_frame_dict.
+            ordered oldest to newest.
         """
-        from vessal.ark.shell.hull.cell.protocol import flatten_frame_dict
+        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
 
-        fs = self._cell.L.get("_frame_stream")
-        if fs is None:
+        frame_log = self._cell._kernel.frame_log
+        if frame_log is None:
             return []
-        # Flatten hot buckets oldest-first (B_4..B_0) into a single list
-        raw: list[dict] = []
-        for bucket in reversed(fs._hot):
-            raw.extend(bucket)
-        flat = [flatten_frame_dict(f) for f in raw]
+        fs = render_frame_stream(frame_log._conn)
+        flat: list[dict] = []
+        for entry in fs.entries:
+            if entry.layer != 0:
+                continue
+            c = entry.content
+            flat.append({
+                "n": entry.n_start,
+                "layer": entry.layer,
+                "n_start": entry.n_start,
+                "n_end": entry.n_end,
+                "pong_think": c.think,
+                "pong_operation": c.operation,
+                "pong_expect": c.expect,
+                "obs_stdout": c.observation.get("stdout", ""),
+                "obs_stderr": c.observation.get("stderr", ""),
+                "obs_diff_json": c.observation.get("diff", ""),
+                "obs_error": c.observation.get("error"),
+                "verdict_value": c.verdict.get("value") if c.verdict else None,
+                "verdict_error": c.verdict.get("error") if c.verdict else None,
+                "signals": [
+                    {"class_name": k[0], "var_name": k[1], "scope": k[2], "payload": v}
+                    for k, v in c.signals.items()
+                ],
+            })
         if after is not None:
             flat = [f for f in flat if f["n"] > after]
         return flat
@@ -225,15 +244,16 @@ class HullRuntimeMixin:
         """
         self._cell.L["_frame_type"] = "work"
         self._cell.L["_render_config"] = self._work_render_config
-        self._cell.L["_system_prompt"] = self._prompt_builder.build(self._cell.L)
         # SOUL hot-reload: detect SOUL.md changes each frame (mtime check ~1μs).
-        # Re-read on change; otherwise use cached value.
+        # Re-read on change; otherwise use cached value. Must run before build() so
+        # _soul is in L when Section("soul") reads ns.get("_soul").
         if self._soul_path.exists():
             current_mtime = self._soul_path.stat().st_mtime
             if current_mtime != self._soul_mtime:
                 self._soul_text = self._soul_path.read_text(encoding="utf-8")
                 self._soul_mtime = current_mtime
         self._cell.L["_soul"] = self._soul_text
+        self._cell.L["_system_prompt"] = self._prompt_builder.build(self._cell.L)
 
     def _after_frame(self) -> None:
         """Called after each successful frame."""

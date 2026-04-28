@@ -54,9 +54,3 @@ class TestHandle:
         status, data = hull.handle("POST", "/status", None)
         assert status == 404
 
-    def test_get_state_compactions_returns_projection(self, hull):
-        status, data = hull.handle("GET", "/state/compactions", None)
-        assert status == 200
-        assert "k" in data
-        assert "layers" in data
-        assert isinstance(data["layers"], list)

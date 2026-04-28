@@ -4,7 +4,6 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from vessal.ark.shell.hull.event_loop import EventLoop
-from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 
 
 @pytest.fixture

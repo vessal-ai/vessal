@@ -8,7 +8,10 @@ from __future__ import annotations
 import logging
 import sys
 import tomllib
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
+
 logger = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -20,6 +23,73 @@ def _load_prompt(name: str) -> str:
     if path.exists():
         return path.read_text(encoding="utf-8")
     return ""
+
+
+# ─────────────────────────────────────────────
+# Hull-owned renderer helpers
+# (moved from the deleted kernel/render/ directory in PR 5)
+# ─────────────────────────────────────────────
+
+
+@dataclass
+class RenderConfig:
+    """Hull renderer configuration passed via hull.toml [renderer] section.
+
+    Attributes:
+        system_prompt_key: L-key holding the assembled system prompt. Default "_system_prompt".
+        frame_budget_ratio: Ratio of context budget allocated to frame history. Default 0.7.
+    """
+    system_prompt_key: str = "_system_prompt"
+    frame_budget_ratio: float = 0.7
+
+
+@dataclass(frozen=True)
+class Section:
+    """An independent segment of system_prompt, participating in assembly by priority.
+
+    Attributes:
+        name:     Segment name, unique identifier.
+        priority: Rendering order; lower value renders first.
+        required: When True, cannot be trimmed.
+        render:   Render function with signature (ns: dict) -> str.
+    """
+    name: str
+    priority: int
+    required: bool
+    render: Callable[[dict], str]
+
+
+class SystemPromptBuilder:
+    """system_prompt assembler. Registers Sections; build(ns) sorts and joins them."""
+
+    def __init__(self) -> None:
+        self._sections: list[Section] = []
+
+    def register(self, section: Section) -> None:
+        self._sections.append(section)
+
+    def build(self, ns: dict) -> str:
+        sorted_sections = sorted(self._sections, key=lambda s: s.priority)
+        parts: list[str] = []
+        for section in sorted_sections:
+            text = section.render(ns)
+            if text.strip():
+                parts.append(text)
+        return "\n\n".join(parts)
+
+
+def render_capabilities(ns: dict) -> str:
+    """Generate the Loaded Tools section from Skill instances in the namespace."""
+    lines: list[str] = []
+    for key, obj in ns.items():
+        if isinstance(getattr(obj, "name", None), str) and isinstance(getattr(obj, "description", None), str):
+            name = getattr(obj, "name", key)
+            description = getattr(obj, "description", "")
+            if description:
+                lines.append(f"- `{name}` — {description}")
+    if not lines:
+        return ""
+    return "## Loaded Tools\n\n" + "\n".join(sorted(lines))
 
 
 class HullInitMixin:
@@ -172,9 +242,6 @@ class HullInitMixin:
 
     def _init_prompts(self, renderer_cfg: dict) -> None:
         """Phase 4: Load system prompts, SOUL, build RenderConfig."""
-        from vessal.ark.shell.hull.cell.kernel import RenderConfig
-        from vessal.ark.shell.hull.cell.kernel.render.prompt import Section, SystemPromptBuilder, render_capabilities
-
         protocol_text = _load_prompt("system.md")
         self._soul_path = self._project_dir / "SOUL.md"
         if self._soul_path.exists():
@@ -186,6 +253,7 @@ class HullInitMixin:
 
         self._prompt_builder = SystemPromptBuilder()
         self._prompt_builder.register(Section("protocol", 0, True, lambda ns: protocol_text))
+        self._prompt_builder.register(Section("soul", 10, False, lambda ns: ns.get("_soul", "")))
         self._prompt_builder.register(Section("capabilities", 20, False, render_capabilities))
 
         self._work_render_config = RenderConfig(
