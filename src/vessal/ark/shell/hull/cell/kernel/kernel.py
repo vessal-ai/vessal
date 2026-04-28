@@ -9,9 +9,6 @@
 #   L                              Agent state dict, fully exposed, readable/writable directly
 #   G                              preset assets dict (Skills, boot globals); read-only by convention
 #
-# Legacy multi-entry surface (prepare/step/exec_operation/eval_expect/update_signals/render/_commit_frame)
-# is inlined into ping() and deleted in PR 2 Task 7.
-#
 # Initialization: decides where to start (fresh L or snapshot restore),
 # and initializes all system variables.
 # Kernel has no state outside of G and L — no Gate, no counters, no config attributes.
@@ -22,7 +19,7 @@ import cloudpickle
 import logging
 from datetime import datetime, timezone
 
-from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, execute
+from vessal.ark.shell.hull.cell.kernel.executor import execute
 from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
 from vessal.ark.shell.hull.cell.protocol import (
     FRAME_SCHEMA_VERSION,
@@ -31,7 +28,6 @@ from vessal.ark.shell.hull.cell.protocol import (
     Ping,
     Pong,
     State,
-    Verdict,
 )
 from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
 from vessal.ark.shell.hull.cell.kernel import source_cache
@@ -39,7 +35,6 @@ from vessal.ark.shell.hull.cell.kernel.frame_stream import FrameStream
 from vessal.ark.shell.hull.cell.kernel.lenient import LenientUnpickler
 from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
-from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +63,8 @@ def _picklable(obj) -> bool:
 class Kernel:
     """Agent execution kernel.
 
-    Core equation: exec_result = kernel.exec_operation(operation, frame_number)
-    operation is a Python code string; exec_result contains stdout/diff/error.
+    Public entry point: kernel.ping(pong, namespace) — single-frame primitive.
+    operation is executed as Python code; result contains stdout/diff/error.
 
     L is fully exposed; external code may read/write it directly. Keys starting
     with _ are system variables; modify them at your own risk.
@@ -103,7 +98,7 @@ class Kernel:
     def ping(self, pong: "Pong | None", namespace: dict) -> Ping:
         """Single Kernel primitive (spec §1.2). Runs five steps internally:
 
-          ① archive pong (deferred to _commit_frame inside this call)
+          ① archive pong (deferred to _commit inside this call)
           ② exec(pong.operation, G, L) → L["observation"]
           ③ eval(pong.expect, G, copy(L)) → L["verdict"]
           ④ signal_scan → L["_signal_outputs"]   (PR 3 will rename to L["signals"])
@@ -144,21 +139,21 @@ class Kernel:
             else:
                 L["verdict"] = None
             # ④ signal_scan
-            self.update_signals()
+            self._signal_scan()
             # commit frame N (uses self._last_ping as the FrameRecord.ping field)
-            observation_for_record = Observation(
+            L["observation"] = Observation(
                 stdout=L["observation"].stdout,
                 diff=L["observation"].diff,
                 error=L["observation"].error,
                 verdict=L["verdict"],   # FrameRecord still nests verdict inside observation in v7
             )
-            self._commit_frame(pong, observation_for_record, frame_n, ping=self._last_ping)
+            self._commit(pong, L["observation"], frame_n, ping_for_record=self._last_ping)
         else:
             # First call after boot: signal_scan only (no exec/eval, no commit)
-            self.update_signals()
+            self._signal_scan()
 
         # ⑤ render
-        self._last_ping = self.render()
+        self._last_ping = _render(self.L, self.L.get("_render_config"))
         return self._last_ping
 
     def _init_L(self) -> None:
@@ -191,18 +186,9 @@ class Kernel:
         L["_context_budget"] = 128000
         L["_token_budget"] = 4096
 
-        # Initial values of side-effect variables written by executor
-        # (ensures fields exist when rendering the first frame)
-        L["_operation"] = ""
-        L["_stdout"] = ""
-        L["_error"] = None
+        # Errors ring buffer
         L["_errors"] = []
-        L["_actual_tokens_in"] = None
-        L["_actual_tokens_out"] = None
-        L["_diff"] = ""
-
-        # Mirror variable (updated by Cell._commit_frame())
-        L["_verdict"] = None
+        L["_error_buffer_cap"] = 50
 
         # Frame drop count
         L["_dropped_frame_count"] = 0
@@ -211,119 +197,6 @@ class Kernel:
         L["_sleeping"] = False
         L["sleep"] = self.sleep
         L["_next_wake"] = None
-
-        # Protected keys: all keys present at L init time.
-        # executor restores any of these that agent code deletes.
-        L["_protected_keys"] = list(L.keys())
-
-    def exec_operation(
-        self,
-        operation: str,
-        frame_number: int,
-        tracer: TracerLike | None = None,
-    ) -> ExecResult:
-        """Execute operation code. Does not increment _frame or append _frame_log.
-
-        Delegates to executor.execute(), passing frame_number.
-        _frame incrementing and _frame_log construction are Cell's responsibility.
-
-        Args:
-            operation: Python code string to execute.
-            frame_number: Current frame number; passed to executor for ErrorRecord/_ns_meta tracking.
-                          Not written to L["_frame"] — that is _commit_frame's responsibility.
-            tracer: Optional TracerLike for recording execution time.
-
-        Returns:
-            ExecResult containing stdout, diff, and error fields.
-        """
-        if tracer:
-            tracer.start(frame_number, "executor.execute")
-        result = execute(operation, self.G, self.L, frame_number)
-        if tracer:
-            tracer.end(frame_number, "executor.execute")
-        return result
-
-    def eval_expect(
-        self,
-        expect: str,
-        tracer: TracerLike | None = None,
-        frame_number: int | None = None,
-    ) -> Verdict:
-        """Evaluate prediction assertions on a shallow copy of L. Does not modify the real L.
-
-        Delegates to expect.evaluate_expect().
-
-        Args:
-            expect: Expect code string (containing assert statements).
-            tracer: Optional TracerLike for recording evaluation time.
-            frame_number: Current frame number for linecache registration. When None,
-                falls back to L["_frame"] + 1 (next frame).
-
-        Returns:
-            Verdict containing total/passed/failures fields.
-        """
-        frame = frame_number if frame_number is not None else self.L.get("_frame", 0) + 1
-        if tracer:
-            tracer.start(frame, "kernel.eval_expect")
-        result = evaluate_expect(expect, self.G, self.L, frame)
-        if tracer:
-            tracer.end(frame, "kernel.eval_expect")
-        return result
-
-    def update_signals(self) -> None:
-        """Collect base signals + duck-typing signal sources into L["_signal_outputs"].
-
-        Signal format is uniformly a (title, body) tuple.
-
-        1. Iterate over BASE_SIGNALS (list of (name, fn(L) -> str)); include fn result
-           in outputs when it returns a non-empty str.
-        2. Iterate over all objects in L that have a _signal method
-           (duck-typing); call _signal() and collect returned (title, body) tuples.
-           Any object only needs to implement the _signal protocol; no inheritance
-           from SkillBase is required.
-        3. Signal errors are caught and logged; they never interrupt the agent.
-
-        Side effects:
-            Writes to L["_signal_outputs"] (list[tuple[str, str]]).
-        """
-        outputs: list[tuple[str, str]] = []
-
-        # Base signals (system-level, always present)
-        for signal_name, fn in BASE_SIGNALS:
-            try:
-                result = fn(self.L)
-                if isinstance(result, str) and result.strip():
-                    outputs.append((signal_name, result))
-            except Exception as e:
-                fn_name = getattr(fn, "__name__", repr(fn))
-                logger.warning("Base signal '%s' failed: %s", fn_name, e)
-
-        # TODO: future optimization — switch to explicit registry via
-        # L["_signal_sources"] when O(|L|) full scan becomes measurable.
-        # Current duck-typing scan is intentional design — see console/1-active/
-        # 20260421-cell-architecture-review.md C16.
-        # Duck-typing signal scan: any object in L with a _signal method
-        for obj in list(self.L.values()):
-            if hasattr(obj, "_signal") and callable(getattr(obj, "_signal")):
-                try:
-                    result = obj._signal()
-                    if isinstance(result, tuple) and len(result) == 2:
-                        title, body = result
-                        if isinstance(body, str) and body.strip():
-                            outputs.append((str(title), body))
-                except Exception as e:
-                    obj_name = getattr(obj, "name", repr(obj))
-                    logger.warning("Signal source '%s' failed: %s", obj_name, e)
-
-        self.L["_signal_outputs"] = outputs
-
-    def render(self) -> Ping:
-        """Render current L state only, without executing code.
-
-        Returns:
-            Ping(system_prompt, state)
-        """
-        return _render(self.L, self.L.get("_render_config"))
 
     def snapshot(self, path: str) -> None:
         """Serialize L to file. Pure bytes — no Skill awareness. G is NOT serialized.
@@ -445,80 +318,55 @@ class Kernel:
         """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
         self.L["_sleeping"] = True
 
-    # ------------------------------------------------------------------ High-level interface
+    # ------------------------------------------------------------------ Private helpers
 
-    def prepare(self) -> Ping:
-        """Per-frame init: update signals, render and return Ping.
+    def _signal_scan(self) -> None:
+        """Collect base signals + duck-typed _signal() Skill outputs.
 
-        Cell calls this method at the start of each step() to ensure Ping
-        always contains the latest signals.
-
-        Returns:
-            Rendered Ping.
+        Writes self.L["_signal_outputs"] (list[(title, body)]).
+        PR 3 will swap to spec's dict[(class_name, var_name, scope), payload]
+        and rename the key to L["signals"].
         """
-        self.update_signals()
-        return self.render()
+        outputs: list[tuple[str, str]] = []
+        for signal_name, fn in BASE_SIGNALS:
+            try:
+                result = fn(self.L)
+                if isinstance(result, str) and result.strip():
+                    outputs.append((signal_name, result))
+            except Exception as e:
+                fn_name = getattr(fn, "__name__", repr(fn))
+                logger.warning("Base signal '%s' failed: %s", fn_name, e)
+        for obj in list(self.L.values()):
+            if hasattr(obj, "_signal") and callable(getattr(obj, "_signal")):
+                try:
+                    result = obj._signal()
+                    if isinstance(result, tuple) and len(result) == 2:
+                        title, body = result
+                        if isinstance(body, str) and body.strip():
+                            outputs.append((str(title), body))
+                except Exception as e:
+                    obj_name = getattr(obj, "name", repr(obj))
+                    logger.warning("Signal source '%s' failed: %s", obj_name, e)
+        self.L["_signal_outputs"] = outputs
 
-    def step(
-        self,
-        pong: Pong,
-        tracer: TracerLike | None = None,
-        ping: "Ping | None" = None,
-        frame_number: int | None = None,
-    ) -> None:
-        """Single-frame execution: exec → expect → observation → frame → commit.
-
-        Receives a Pong and completes all Kernel-side work for this frame:
-        executes the operation, evaluates predictions, constructs Observation and
-        the frame dict, and commits the frame.
-        No longer pre-renders the next Ping — signal collection and rendering are
-        done by Cell at the start of the next frame via prepare().
-
-        Args:
-            pong:         Control signal from the reasoner, containing action.operation / action.expect.
-            tracer:       Optional TracerLike, forwarded to exec_operation and eval_expect.
-            ping:         Perceptual input seen by the model for this frame (optional;
-                          used to write into FrameRecord v6).
-            frame_number: Frame sequence number. When None, computed from L["_frame"] + 1
-                          (backward-compatibility guard for callers that do not pass it).
-        """
-        if frame_number is None:
-            frame_number = self.L["_frame"] + 1
-
-        exec_result = self.exec_operation(pong.action.operation, frame_number, tracer)
-
-        if exec_result.error is None and pong.action.expect.strip():
-            verdict = self.eval_expect(pong.action.expect, tracer, frame_number)
-        else:
-            verdict = None
-
-        observation = Observation(
-            stdout=exec_result.stdout,
-            diff=exec_result.diff,
-            error=exec_result.error,
-            verdict=verdict,
-        )
-
-        self._commit_frame(pong, observation, frame_number, ping=ping)
-
-    def _commit_frame(
+    def _commit(
         self,
         pong: Pong,
         observation: Observation,
         frame_number: int,
-        ping: "Ping | None" = None,
+        ping_for_record: "Ping | None" = None,
     ) -> None:
-        """Construct FrameRecord, commit to _frame_stream, update verdict mirror.
+        """Construct FrameRecord, commit to _frame_stream, update _frame counter.
 
         Args:
-            pong:         Control signal from the reasoner.
-            observation:  Execution result observation for this frame.
-            frame_number: Frame sequence number.
-            ping:         Perceptual input seen by the model for this frame
-                          (optional; uses empty Ping when absent).
+            pong:            Control signal from the reasoner.
+            observation:     Execution result observation for this frame.
+            frame_number:    Frame sequence number.
+            ping_for_record: Perceptual input seen by the model for this frame
+                             (optional; uses empty Ping when absent).
         """
         L = self.L
-        effective_ping = ping if ping is not None else Ping(
+        effective_ping = ping_for_record if ping_for_record is not None else Ping(
             system_prompt="", state=State(frame_stream="", signals="")
         )
         record = FrameRecord(
@@ -533,11 +381,10 @@ class Kernel:
             L["_frame_stream"] = fs
         fs.commit_frame(record.to_dict())
         L["_frame"] = frame_number
-        L["_verdict"] = observation.verdict
         if self.frame_log is not None:
-            self.frame_log.write_frame(self._build_frame_write_spec(record))
+            self.frame_log.write_frame(self._build_write_spec(record))
 
-    def _build_frame_write_spec(self, record: FrameRecord) -> "FrameWriteSpec":
+    def _build_write_spec(self, record: FrameRecord) -> "FrameWriteSpec":
         """Translate a FrameRecord into a FrameWriteSpec for the frame_log writer.
 
         Args:
