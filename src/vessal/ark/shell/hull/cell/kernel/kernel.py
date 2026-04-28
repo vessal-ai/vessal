@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import cloudpickle
 import logging
-from datetime import datetime, timezone
 
 from vessal.ark.shell.hull.cell.kernel.executor import execute
 from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
@@ -37,11 +36,6 @@ from vessal.ark.shell.hull.cell.kernel.render import render as _render
 from vessal.ark.shell.hull.cell.kernel.render.signals import BASE_SIGNALS
 
 logger = logging.getLogger(__name__)
-
-
-def _utc_now() -> str:
-    """Return the current UTC time as an ISO 8601 string with microsecond precision and Z suffix."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
 
 
 def _picklable(obj) -> bool:

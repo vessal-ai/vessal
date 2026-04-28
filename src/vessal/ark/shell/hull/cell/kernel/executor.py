@@ -5,7 +5,7 @@
 #       NO SIDE EFFECTS on L beyond _ns_meta and any user variables the code itself binds.
 #       Caller (Kernel.ping) is responsible for assembling Observation from ExecResult
 #       and writing L["observation"].
-#       Does NOT write ns["_frame"] — that is _commit_frame's responsibility.
+#       Does NOT write ns["_frame"] — that is Kernel._commit()'s responsibility.
 #       Does NOT write _frame_log or construct FrameRecord — that is Cell's responsibility.
 #       Exception tracebacks are intelligently compressed — user code frames and exception
 #       info are retained while library-internal frames are folded.
@@ -83,7 +83,7 @@ def execute(
     """Execute operation code in the namespace.
 
     frame_number: passed in by Cell via Kernel; used for ErrorRecord and _ns_meta tracking.
-    execute() must NOT write L["_frame"] — that is _commit_frame's responsibility.
+    execute() must NOT write L["_frame"] — that is Kernel._commit()'s responsibility.
     execute() must NOT write _frame_log or construct FrameRecord.
 
     Args:

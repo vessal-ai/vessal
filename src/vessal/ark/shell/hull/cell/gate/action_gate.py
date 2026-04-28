@@ -1,6 +1,6 @@
 """action_gate.py — Safety gate for action before execution.
 
-ActionGate checks action code before it is sent to Kernel.exec_operation().
+ActionGate checks action code before Kernel.ping() executes it.
 Goal: intercept high-risk operations and protect the host environment.
 
 Design principles:
