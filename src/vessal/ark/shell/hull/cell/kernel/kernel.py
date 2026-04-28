@@ -19,6 +19,8 @@
 from __future__ import annotations
 
 import cloudpickle
+import contextlib
+import io
 import logging
 
 from vessal.ark.shell.hull.cell.kernel.executor import execute
@@ -99,7 +101,6 @@ class Kernel:
         self.L["sleep"] = _sleep_fn
 
         # ② boot script — captures Skill __init__ prints into stdout/stderr
-        import contextlib, io
         boot_stdout = io.StringIO()
         boot_stderr = io.StringIO()
         with contextlib.redirect_stdout(boot_stdout), contextlib.redirect_stderr(boot_stderr):
@@ -273,8 +274,7 @@ class Kernel:
         """Restore L from file. sys.modules populated by boot script before this runs."""
         with open(path, "rb") as f:
             raw = f.read()
-        import io as _io
-        self.L = LenientUnpickler(_io.BytesIO(raw)).load()
+        self.L = LenientUnpickler(io.BytesIO(raw)).load()
 
     def sleep(self) -> None:
         """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
