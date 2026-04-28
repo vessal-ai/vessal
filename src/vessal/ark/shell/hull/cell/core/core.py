@@ -87,6 +87,11 @@ class Core:
         return self._api_params.get("max_tokens",
                 self._api_params.get("max_completion_tokens", 4096))
 
+    @staticmethod
+    def _build_messages(ping: "Ping") -> list[dict]:
+        from vessal.ark.shell.hull.cell.core.composer import compose
+        return compose(ping)
+
     def step(
         self,
         ping: Ping,
@@ -113,12 +118,7 @@ class Core:
             PermissionDeniedError: Insufficient permissions (raised immediately)
             BadRequestError: Malformed request (raised immediately)
         """
-        state_parts = [p for p in [ping.state.frame_stream, ping.state.signals] if p.strip()]
-        state = "\n\n".join(state_parts)
-        messages = [
-            {"role": "system", "content": ping.system_prompt},
-            {"role": "user", "content": state},
-        ]
+        messages = self._build_messages(ping)
 
         start_time = time.time()
         last_exception = None
