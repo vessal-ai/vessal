@@ -75,8 +75,28 @@ class Kernel:
             restore_path: pathname of a cloudpickle-dumps(L) blob. None = cold start.
         """
         self.G: dict = {}
-        # ① empty L
-        self.L: dict = {}
+        # ① empty L — seed system defaults that every agent needs from frame 0
+        self.L: dict = {
+            "_system_prompt": "",
+            "_frame_type": "work",
+            "_render_config": None,
+            "_frame": 0,
+            "_ns_meta": {},
+            "_frame_stream": FrameStream(k=16, n=8),
+            "signals": {},
+            "_context_pct": 0,
+            "_budget_total": 0,
+            "_context_budget": 128000,
+            "_errors": [],
+            "_error_buffer_cap": 50,
+            "_dropped_frame_count": 0,
+            "_sleeping": False,
+            "_next_wake": None,
+        }
+        _L = self.L
+        def _sleep_fn():
+            _L["_sleeping"] = True
+        self.L["sleep"] = _sleep_fn
 
         # ② boot script — captures Skill __init__ prints into stdout/stderr
         import contextlib, io
@@ -102,6 +122,7 @@ class Kernel:
             self.frame_log = FrameLog(conn)
 
         # ③ restart only
+        _L_before_restore = dict(self.L)
         if restore_path is not None:
             self.restore(restore_path)
 
@@ -112,6 +133,7 @@ class Kernel:
             boot_script=boot_script,
             boot_stdout=boot_stdout.getvalue(),
             boot_stderr=boot_stderr.getvalue(),
+            l_before_restore=_L_before_restore,
         )
 
     def _write_boot_frame(
@@ -120,14 +142,18 @@ class Kernel:
         boot_script: str,
         boot_stdout: str,
         boot_stderr: str,
+        l_before_restore: dict,
     ) -> None:
-        """Spec §7.6: write a layer=0 entry at n = n_prev + 1 capturing the boot."""
+        """Spec §7.6: write a layer=0 entry at n = n_prev + 1 capturing the boot.
+
+        Always initializes L["_frame"]; the frame_log write is skipped when no db.
+        """
         if self.frame_log is None:
             return
 
         last = self.frame_log.last_committed_frame() or 0
         n = last + 1
-        diff_json = self._compute_boot_diff_json()
+        diff_json = self._compute_boot_diff_json(l_before_restore)
 
         from vessal.ark.shell.hull.cell.kernel.frame_log.types import FrameWriteSpec
         spec = FrameWriteSpec(
@@ -146,11 +172,18 @@ class Kernel:
         self.frame_log.write_frame(spec)
         self.L["_frame"] = n
 
-    def _compute_boot_diff_json(self) -> str:
-        """Spec §7.6: diff(empty, L_restored) — each value repr()'d."""
+    def _compute_boot_diff_json(self, l_before_restore: dict) -> str:
+        """Spec §7.6: diff(L_before_restore, L_after_restore) — only new/changed keys, each repr()'d.
+
+        For cold start (no restore), l_before_restore == self.L, so diff is empty → "{}".
+        For restart, diff contains every key that was loaded from the snapshot and differs from
+        the pre-restore defaults.
+        """
         import json
         diff: dict[str, str] = {}
         for k, v in self.L.items():
+            if k in l_before_restore:
+                continue
             try:
                 diff[k] = repr(v)
             except Exception as e:

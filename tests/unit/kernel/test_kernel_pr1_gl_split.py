@@ -15,28 +15,28 @@ import pytest
 
 from vessal.ark.shell.hull.cell.kernel import Kernel
 from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
-from tests.unit.kernel._ping_helpers import _ns, _exec
+from tests.unit.kernel._ping_helpers import _ns, _exec, minimal_kernel
 
 
 class TestKernelHasGAndL:
     def test_kernel_exposes_g_and_l_as_dicts(self):
-        k = Kernel()
+        k = minimal_kernel()
         assert isinstance(k.G, dict)
         assert isinstance(k.L, dict)
 
     def test_g_and_l_are_distinct_objects(self):
-        k = Kernel()
+        k = minimal_kernel()
         assert k.G is not k.L
 
     def test_g_starts_with_system_skill(self):
         # PR 3 populates G["_system"] with SystemSkill; boot script (PR 4) adds more.
         from vessal.skills.system import SystemSkill
-        k = Kernel()
+        k = minimal_kernel()
         assert "_system" in k.G
         assert isinstance(k.G["_system"], SystemSkill)
 
     def test_l_has_init_namespace_keys(self):
-        k = Kernel()
+        k = minimal_kernel()
         # Spot-check a few keys that belong to _init_L
         assert "_frame" in k.L
         assert "_frame_stream" in k.L
@@ -45,13 +45,13 @@ class TestKernelHasGAndL:
 
 class TestThreeArgExecWritesToLOnly:
     def test_assignment_in_operation_lands_in_L(self):
-        k = Kernel()
+        k = minimal_kernel()
         _exec(k, "x = 42")
         assert k.L["x"] == 42
         assert "x" not in k.G
 
     def test_g_is_readable_from_operation(self):
-        k = Kernel()
+        k = minimal_kernel()
         k.G["chat"] = "g_chat_marker"
         # Agent reads `chat`; Python LEGB falls back from L to G
         _exec(k, "found = chat")
@@ -59,7 +59,7 @@ class TestThreeArgExecWritesToLOnly:
         assert "chat" not in k.L  # still only in G
 
     def test_g_is_not_written_by_assignment(self):
-        k = Kernel()
+        k = minimal_kernel()
         k.G["counter"] = 0
         _exec(k, "counter = 99")
         # Agent's reassignment shadows in L; G stays put
@@ -71,7 +71,7 @@ class TestEvalExpectUsesCopyOfL:
     def test_walrus_in_expect_does_not_pollute_L(self):
         # expect normally blocks walrus, but the contract here is that
         # whatever eval does internally cannot mutate the real L.
-        k = Kernel()
+        k = minimal_kernel()
         k.L["base"] = 1
         # Use a benign expect that reads but does not assign
         _exec(k, "pass", expect="assert base == 1")
@@ -82,7 +82,7 @@ class TestEvalExpectUsesCopyOfL:
 
 class TestSnapshotDumpsOnlyL:
     def test_snapshot_file_is_cloudpickle_of_L(self, tmp_path):
-        k = Kernel()
+        k = minimal_kernel()
         k.L["agent_var"] = "value_from_L"
         k.G["preset_var"] = "value_from_G"
         path = tmp_path / "snap.cp"
@@ -99,13 +99,13 @@ class TestSnapshotDumpsOnlyL:
 class TestRestoreLoadsOnlyIntoL:
     def test_restore_into_L_leaves_G_to_init(self, tmp_path):
         # Step 1: write a snapshot
-        k1 = Kernel()
+        k1 = minimal_kernel()
         k1.L["session_x"] = 7
         path = tmp_path / "snap.cp"
         k1.snapshot(str(path))
 
         # Step 2: restore in a fresh kernel
-        k2 = Kernel(snapshot_path=str(path))
+        k2 = minimal_kernel(restore_path=str(path))
         assert k2.L["session_x"] == 7
         # G is rebuilt by __init__, not from snapshot; PR 3 adds _system
         assert "_system" in k2.G
@@ -148,7 +148,7 @@ class TestLenientRestoreStillWorks:
         path = tmp_path / "snap.cp"
         path.write_bytes(blob)
 
-        k = Kernel(snapshot_path=str(path))
+        k = minimal_kernel(restore_path=str(path))
         assert isinstance(k.L["vanished"], UnresolvedRef)
         # G is rebuilt by __init__ (PR 3 adds _system); restore does not touch G
         assert "_system" in k.G
