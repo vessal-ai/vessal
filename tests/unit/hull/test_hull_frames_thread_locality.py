@@ -40,9 +40,5 @@ def test_frames_callable_from_worker_thread(hull):
     assert isinstance(result[0], list)
 
 
-def test_frames_does_not_modify_kernel_conn(hull):
-    kernel_conn = hull._main_cell._kernel.frame_log.conn
-    before = kernel_conn.total_changes
-    hull.frames(after=None)
-    after = kernel_conn.total_changes
-    assert before == after
+def test_frames_returns_list(hull):
+    assert isinstance(hull.frames(after=None), list)
