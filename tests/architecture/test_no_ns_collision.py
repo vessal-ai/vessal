@@ -8,7 +8,6 @@ from pathlib import Path
 _SKILLS_DIR = Path(__file__).resolve().parents[2] / "src/vessal/skills"
 
 _HULL_RESERVED = {
-    "skill_paths",
     "_data_dir",
     "_compress_threshold",
     "_compaction_k",

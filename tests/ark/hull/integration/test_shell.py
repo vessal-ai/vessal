@@ -618,7 +618,7 @@ class TestStartForegroundLock:
         toml = (
             '[agent]\nname = "test"\n'
             '[cell]\nmax_frames=1\n'
-            '[hull]\nskills=[]\nskill_paths=[]\n'
+            '[hull]\nskills=[]\n'
             '[core]\ntimeout=60\nmax_retries=3\n'
             '[compression]\nenabled=false\n'
             '[gates]\n'
@@ -658,7 +658,7 @@ class TestStartForegroundLock:
         toml = (
             '[agent]\nname = "test"\n'
             '[cell]\nmax_frames=1\n'
-            '[hull]\nskills=[]\nskill_paths=[]\n'
+            '[hull]\nskills=[]\n'
             '[core]\ntimeout=60\nmax_retries=3\n'
             '[compression]\nenabled=false\n'
             '[gates]\n'
@@ -698,7 +698,7 @@ class TestStartForegroundLock:
         toml = (
             '[agent]\nname = "test"\n'
             '[cell]\nmax_frames=1\n'
-            '[hull]\nskills=[]\nskill_paths=[]\n'
+            '[hull]\nskills=[]\n'
             '[core]\ntimeout=60\nmax_retries=3\n'
             '[compression]\nenabled=false\n'
             '[gates]\n'

@@ -32,7 +32,7 @@ def _write_minimal_project(path) -> None:
     from pathlib import Path
     p = Path(path)
     (p / "hull.toml").write_text(
-        '[agent]\nname = "test"\n[cell]\nmax_frames = 20\n[hull]\nskills = []\nskill_paths = []\n',
+        '[agent]\nname = "test"\n[cell]\nmax_frames = 20\n[hull]\nskills = []\n',
         encoding="utf-8",
     )
     (p / ".env").write_text("OPENAI_API_KEY=test-key\n", encoding="utf-8")

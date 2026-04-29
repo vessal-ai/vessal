@@ -29,7 +29,7 @@ def test_hull_skills_absent_from_ns_when_not_configured(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test")
     monkeypatch.chdir(tmp_path)
     (tmp_path / "hull.toml").write_text(
-        "[hull]\nskills = []\nskill_paths = []\n", encoding="utf-8"
+        "[hull]\nskills = []\n", encoding="utf-8"
     )
     from vessal.ark.shell.hull.hull import Hull
     hull = Hull(str(tmp_path))

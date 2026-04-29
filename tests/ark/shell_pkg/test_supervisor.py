@@ -9,7 +9,7 @@ def test_shell_server_spawns_hull_subprocess(tmp_path):
 
     # Create minimal hull.toml
     (tmp_path / "hull.toml").write_text(
-        '[agent]\nname = "test"\n[hull]\nskills = []\nskill_paths = []\n'
+        '[agent]\nname = "test"\n[hull]\nskills = []\n'
         '[cell]\n[core]\n[core.api_params]\n'
     )
     (tmp_path / "SOUL.md").write_text("test agent")
@@ -33,7 +33,7 @@ def test_shell_server_detects_hull_crash(tmp_path):
     from vessal.ark.shell.server import ShellServer
 
     (tmp_path / "hull.toml").write_text(
-        '[agent]\nname = "test"\n[hull]\nskills = []\nskill_paths = []\n'
+        '[agent]\nname = "test"\n[hull]\nskills = []\n'
         '[cell]\n[core]\n[core.api_params]\n'
     )
     (tmp_path / "SOUL.md").write_text("test agent")

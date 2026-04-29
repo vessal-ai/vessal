@@ -12,7 +12,7 @@ def hull_factory(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.chdir(tmp_path)
     (tmp_path / "hull.toml").write_text(
-        "[hull]\nskills = []\nskill_paths = []\n", encoding="utf-8"
+        "[hull]\nskills = []\n", encoding="utf-8"
     )
     from vessal.ark.shell.hull.hull import Hull
 

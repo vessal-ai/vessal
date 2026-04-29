@@ -12,7 +12,7 @@ def _seed_project(tmp_path: Path) -> Path:
         '[agent]\nname = "t"\nlanguage = "en"\n'
         '[core]\ntimeout = 5\n'
         '[cell]\nmax_frames = 3\ncontext_budget = 4096\n'
-        '[hull]\nskills = []\nskill_paths = []\n'
+        '[hull]\nskills = []\n'
     )
     (tmp_path / ".env").write_text("OPENAI_API_KEY=test-key\n")
     (tmp_path / "SOUL.md").write_text("v1")

@@ -43,7 +43,6 @@ def agent_project(tmp_path):
         'name = "test"\n'
         "[hull]\n"
         "skills = []\n"
-        "skill_paths = []\n"
         "[cell]\n"
         "[core]\n"
         "[core.api_params]\n"
