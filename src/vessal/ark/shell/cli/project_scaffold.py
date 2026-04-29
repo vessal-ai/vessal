@@ -11,8 +11,9 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
     """Create a Vessal project scaffold at `project_dir`.
 
     Writes hull.toml, SOUL.md, pyproject.toml, .env.example, .gitignore,
-    skills/{bundled,hub,local}/ with an example skill, and gates/.
-    Optionally installs the virtual environment via uv or venv+pip.
+    skills/ (flat, one dir per Skill), and gates/.
+    Optionally installs the virtual environment via uv or venv+pip and writes
+    a vessal_user_skills.pth into the venv site-packages.
     Raises FileExistsError if project_dir already exists.
     """
     if project_dir.exists():
@@ -20,36 +21,38 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
     project_dir.mkdir(parents=True)
     project_name = project_dir.name
 
-    bundled_dir = project_dir / "skills" / "bundled"
-    hub_dir = project_dir / "skills" / "hub"
-    local_dir = project_dir / "skills" / "local"
+    skills_dir = project_dir / "skills"
+    skills_dir.mkdir(parents=True, exist_ok=True)
+    (skills_dir / "__init__.py").write_text(
+        '"""Project Skills package — populated by `vessal create` from vessal.skills.*."""\n',
+        encoding="utf-8",
+    )
 
     builtin_skills_src = Path(__file__).resolve().parent.parent.parent.parent / "skills"
     if builtin_skills_src.exists():
-        # ui, search, audio, vision are distributed via SkillHub — not bundled
-        shutil.copytree(
-            str(builtin_skills_src),
-            str(bundled_dir),
-            ignore=shutil.ignore_patterns("__pycache__", "ui", "search", "audio", "vision"),
-        )
-    else:
-        bundled_dir.mkdir(parents=True)
-
-    hub_dir.mkdir(parents=True, exist_ok=True)
-    local_dir.mkdir(parents=True, exist_ok=True)
+        for child in builtin_skills_src.iterdir():
+            if not child.is_dir():
+                continue  # Skip _base.py and __init__.py — library code stays in vessal package
+            if child.name.startswith("_") or child.name == "__pycache__":
+                continue
+            shutil.copytree(
+                str(child),
+                str(skills_dir / child.name),
+                ignore=shutil.ignore_patterns("__pycache__"),
+            )
 
     _write_hull_toml(project_dir, project_name)
     _write_soul_md(project_dir, project_name)
     _write_pyproject(project_dir, project_name)
     _write_env_example(project_dir)
     _write_gitignore(project_dir)
-    _write_example_skill(local_dir)
     _write_gates(project_dir)
     _write_main_cell_data_dir(project_dir)
     _write_compaction_cell_data_dir(project_dir)
 
     if install_venv:
         _install_dependencies(project_dir)
+        _write_user_skills_pth(project_dir)
 
 
 def _write_hull_toml(project_dir: Path, project_name: str) -> None:
@@ -77,7 +80,6 @@ def _write_hull_toml(project_dir: Path, project_name: str) -> None:
         f'\n'
         f'[hull]\n'
         f'skills = ["tasks", "pin", "chat", "heartbeat", "skill_manager"]\n'
-        f'skill_paths = ["skills/bundled", "skills/hub", "skills/local"]\n'
         f'# compress_threshold = 50  # Context pressure signal threshold (default 50%, read by Memory skill)\n'
         f'\n'
         f'[cells.main]\n'
@@ -138,88 +140,6 @@ def _write_gitignore(project_dir: Path) -> None:
         "logs/\n"
         "__pycache__/\n"
         "data/*/frame_log.sqlite-*\n",
-        encoding="utf-8",
-    )
-
-
-def _write_example_skill(local_dir: Path) -> None:
-    example_dir = local_dir / "example"
-    example_dir.mkdir()
-
-    (example_dir / "__init__.py").write_text(
-        '"""Example toolkit\n'
-        '\n'
-        'Provides basic text processing and math utilities, demonstrating Skill package conventions.\n'
-        '"""\n'
-        '\n'
-        '__all__ = ["word_count", "reverse_text", "add", "multiply"]\n'
-        '\n'
-        '\n'
-        'def word_count(text: str) -> int:\n'
-        '    """Count the number of words in text.\n'
-        '\n'
-        '    text: input string to count words in\n'
-        '    returns: number of words (split by whitespace)\n'
-        '    """\n'
-        '    return len(text.split())\n'
-        '\n'
-        '\n'
-        'def reverse_text(text: str) -> str:\n'
-        '    """Reverse a string.\n'
-        '\n'
-        '    text: string to reverse\n'
-        '    returns: reversed string\n'
-        '    """\n'
-        '    return text[::-1]\n'
-        '\n'
-        '\n'
-        'def add(a: float, b: float) -> float:\n'
-        '    """Return the sum of two numbers.\n'
-        '\n'
-        '    a: first number\n'
-        '    b: second number\n'
-        '    returns: a + b\n'
-        '    """\n'
-        '    return a + b\n'
-        '\n'
-        '\n'
-        'def multiply(a: float, b: float) -> float:\n'
-        '    """Return the product of two numbers.\n'
-        '\n'
-        '    a: first number\n'
-        '    b: second number\n'
-        '    returns: a * b\n'
-        '    """\n'
-        '    return a * b\n',
-        encoding="utf-8",
-    )
-
-    (example_dir / "SKILL.md").write_text(
-        '---\n'
-        'name: example\n'
-        'version: "1.0"\n'
-        'description: "Example toolkit"\n'
-        'tags: [example, demo]\n'
-        'category: development\n'
-        '---\n'
-        '\n'
-        '# example\n'
-        '\n'
-        'Example toolkit. Provides basic text processing and math utilities, demonstrating Skill package conventions.\n'
-        'Load and call via example.word_count() etc.\n'
-        '\n'
-        '## API\n'
-        '\n'
-        '    example.word_count(text: str) -> int\n'
-        '    example.reverse_text(text: str) -> str\n'
-        '    example.add(a, b) -> number\n'
-        '    example.multiply(a, b) -> number\n',
-        encoding="utf-8",
-    )
-
-    (example_dir / "requirements.txt").write_text(
-        "# Declare Python package dependencies for this Skill, one per line\n"
-        "# e.g.: requests>=2.28\n",
         encoding="utf-8",
     )
 
@@ -292,3 +212,25 @@ def _install_dependencies(project_dir: Path) -> None:
         bin_dir = "Scripts" if sys.platform == "win32" else "bin"
         venv_python = str(venv_dir / bin_dir / "python")
         subprocess.run([venv_python, "-m", "pip", "install", "vessal"], check=True)
+
+
+def _write_user_skills_pth(project_dir: Path) -> None:
+    """Write a .pth file into the project venv so `from skills.<name> import Skill` works.
+
+    Idempotent: overwrites any existing file. Silently no-ops if the venv is missing.
+    """
+    venv = project_dir / ".venv"
+    if not venv.is_dir():
+        return
+    bin_dir = "Scripts" if sys.platform == "win32" else "bin"
+    venv_python = venv / bin_dir / "python"
+    if not venv_python.exists():
+        return
+    out = subprocess.check_output(
+        [str(venv_python), "-c", "import site; print(site.getsitepackages()[0])"],
+        text=True,
+    ).strip()
+    site_packages = Path(out)
+    site_packages.mkdir(parents=True, exist_ok=True)
+    pth = site_packages / "vessal_user_skills.pth"
+    pth.write_text(str(project_dir.resolve()) + "\n", encoding="utf-8")
