@@ -111,25 +111,15 @@ class SkillManager(BaseSkill):
         return "\n".join(lines)
 
     def download_skill(self, name: str) -> str:
-        """Download and install a skill from SkillHub."""
+        """Download and install a skill from SkillHub into <project>/skills/<name>/."""
         from vessal.ark.shell.hull.hub.installer import install
         from vessal.ark.shell.hull.hub.resolver import resolve
 
-        skill_paths = self._hull.get_ns("skill_paths")
-        if not skill_paths:
-            return "download failed: no skill_paths configured"
-
-        hub_dir = None
-        for sp in skill_paths:
-            if sp.endswith("/hub") or sp.endswith("\\hub"):
-                hub_dir = Path(sp)
-                break
-        if hub_dir is None:
-            hub_dir = Path(skill_paths[0])
+        target_dir = Path(__file__).resolve().parent.parent  # <project>/skills/
 
         try:
             resolved = resolve(name)
-            return install(resolved, hub_dir)
+            return install(resolved, target_dir)
         except RuntimeError as e:
             return f"download failed: {e}"
 
