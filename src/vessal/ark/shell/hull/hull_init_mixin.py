@@ -103,18 +103,16 @@ class HullInitMixin:
         from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
         from vessal.ark.shell.hull.skill_loader import SkillLoader
 
-        skill_paths = hull_cfg.get("skill_paths", [])
-        resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
-        self._skill_manager = SkillLoader(skill_paths=resolved_paths)
+        self._skill_manager = SkillLoader()
 
-        entries = [BootSkillEntry("_system", "vessal.skills.system", "Skill", "")]
+        entries = [BootSkillEntry("_system", "skills.system", "Skill", "")]
         for skill_name in hull_cfg.get("skills", []):
             try:
-                skill_cls = self._skill_manager.load(skill_name)
+                self._skill_manager.load(skill_name)  # validates + registers; class discarded
             except Exception as e:
                 print(f"[error] skill '{skill_name}' failed to register: {e}")
                 continue
-            entries.append(BootSkillEntry(skill_name, skill_cls.__module__, skill_cls.__name__, ""))
+            entries.append(BootSkillEntry(skill_name, f"skills.{skill_name}", "Skill", ""))
         return entries
 
     def _init_cell(
@@ -214,11 +212,7 @@ class HullInitMixin:
         """Phase 3: route table, bind hull to G skills, start servers."""
         from vessal.ark.shell.hull.hull_api import HullApi
 
-        skill_paths = hull_cfg.get("skill_paths", [])
-        resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
-
         self._main_cell.L["_builtin_names"] = []
-        self._main_cell.L["skill_paths"] = resolved_paths
         self._main_cell.L["_data_dir"] = str(self._project_dir / "data")
 
         self._routes: dict[tuple[str, str], object] = {}
@@ -392,13 +386,13 @@ trace = false  # disable to reduce IO
         return [
             BootSkillEntry(
                 var_name="_system",
-                import_path="vessal.skills.system.skill",
-                class_name="SystemSkill",
+                import_path="skills.system",
+                class_name="Skill",
             ),
             BootSkillEntry(
                 var_name="compaction",
-                import_path="vessal.skills.compaction._skill",
-                class_name="CompactionSkill",
+                import_path="skills.compaction",
+                class_name="Skill",
                 kwargs_repr=f"main_db_path={main_db_path!r}",
             ),
         ]
