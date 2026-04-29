@@ -2,7 +2,7 @@
 
 See docs/architecture/kernel/04-frame-log.md for the full design.
 """
-from .schema import DDL, open_db
+from .schema import DDL, open_db, open_read_only
 from .types import ErrorOnSource, FrameWriteSpec, SignalRow
 from .writer import FrameLog
 
@@ -13,4 +13,5 @@ __all__ = [
     "FrameWriteSpec",
     "SignalRow",
     "open_db",
+    "open_read_only",
 ]

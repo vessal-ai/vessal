@@ -100,6 +100,7 @@ class Kernel:
         self._transient_names: set[str] = set()
         self._signal_errors_this_frame: list[tuple[str, str, Exception]] = []
         self.frame_log: FrameLog | None = None
+        self.db_path: str | None = db_path
         if db_path is not None:
             conn = open_db(db_path)
             source_cache.reload_from_db(conn)

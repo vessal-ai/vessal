@@ -73,12 +73,17 @@ def open_db(path: str) -> sqlite3.Connection:
     Returns:
         sqlite3.Connection ready for writes. Caller owns lifecycle (must close).
     """
-    conn = sqlite3.connect(path, isolation_level=None)
+    conn = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(DDL)
     _migrate_drop_verdict_error_id(conn)
     return conn
+
+
+def open_read_only(path: str) -> sqlite3.Connection:
+    # URI mode=ro prevents any write at the SQLite level; caller owns lifecycle.
+    return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
 
 
 def _migrate_drop_verdict_error_id(conn: sqlite3.Connection) -> None:
