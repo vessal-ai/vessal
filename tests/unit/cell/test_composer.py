@@ -12,8 +12,8 @@ def _layer0(n: int, op: str = "x = 1") -> Entry:
         layer=0, n_start=n, n_end=n,
         content=FrameContent(
             think="", operation=op, expect="True",
-            observation={"stdout": "", "stderr": "", "diff": {}, "error": None},
-            verdict={"value": "true", "error": None},
+            observation={"stdout": "", "stderr": "", "diff": [], "error": None},
+            verdict={"total": 1, "passed": 1, "failures": []},
             signals={},
         ),
     )
@@ -49,8 +49,8 @@ def test_compose_layer0_frame_block_format():
                     think="thinking",
                     operation="x = 1",
                     expect="x == 1",
-                    observation={"stdout": "ok\n", "stderr": "", "diff": {"x": "1"}, "error": None},
-                    verdict={"value": "true", "error": None},
+                    observation={"stdout": "ok\n", "stderr": "", "diff": [{"op": "+", "name": "x", "type": "int"}], "error": None},
+                    verdict={"total": 1, "passed": 1, "failures": []},
                     signals={},
                 )),
             ]),
@@ -116,3 +116,40 @@ def test_compose_signals_grouped_by_skill():
     body = compose(ping)[0]["content"]
     assert "ChatSkill" in body and "chat" in body and "unread" in body
     assert "ClockSkill" in body and "clock" in body and "now" in body
+
+
+class TestComposerDiffList:
+    """Composer renders diff list[{op,name,type}] (spec §3.4)."""
+
+    def test_format_diff_renders_list(self):
+        from vessal.ark.shell.hull.cell.core.composer import _format_diff
+        diff = [
+            {"op": "+", "name": "x", "type": "int"},
+            {"op": "-", "name": "y", "type": "str"},
+        ]
+        out = _format_diff(diff)
+        assert "+ x: int" in out
+        assert "- y: str" in out
+
+    def test_format_diff_empty_list_is_empty_string(self):
+        from vessal.ark.shell.hull.cell.core.composer import _format_diff
+        assert _format_diff([]) == ""
+
+
+class TestComposerVerdictShape:
+    """Composer renders Verdict.to_dict() = {total, passed, failures} (spec §3.5)."""
+
+    def test_format_verdict_all_passed(self):
+        from vessal.ark.shell.hull.cell.core.composer import _format_verdict
+        out = _format_verdict({"total": 3, "passed": 3, "failures": []})
+        assert "3/3" in out
+
+    def test_format_verdict_with_failures(self):
+        from vessal.ark.shell.hull.cell.core.composer import _format_verdict
+        out = _format_verdict({
+            "total": 2, "passed": 1,
+            "failures": [{"kind": "assertion_failed", "assertion": "assert x == 1", "message": "x is 0"}],
+        })
+        assert "1/2" in out
+        assert "assert x == 1" in out
+        assert "x is 0" in out
