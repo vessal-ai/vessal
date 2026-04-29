@@ -77,9 +77,9 @@ class TestHullStatus:
         """status() values reflect the current state in namespace."""
         hull = _make_hull_with_mock_cell(tmp_path)
         # Manually set namespace values to verify
-        hull._cell.G["_system"]._sleeping = True
-        hull._cell.L["_frame"] = 42
-        hull._cell.G["_system"].wake("heartbeat")
+        hull._main_cell.G["_system"]._sleeping = True
+        hull._main_cell.L["_frame"] = 42
+        hull._main_cell.G["_system"].wake("heartbeat")
         result = hull.status()
         assert result["idle"] is False  # wake() cleared _sleeping
         assert result["frame"] == 42
@@ -90,7 +90,7 @@ class TestHullStatus:
         hull = _make_hull_with_mock_cell(tmp_path)
         result = hull.status()
         result["idle"] = "tampered"
-        assert hull._cell.G["_system"]._sleeping != "tampered"
+        assert hull._main_cell.G["_system"]._sleeping != "tampered"
 
 
 class TestHullNextAlarm:

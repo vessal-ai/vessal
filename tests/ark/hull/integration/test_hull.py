@@ -63,7 +63,7 @@ def _set_responses(hull, responses):
             return (parse_response(resp), None, None)
         return resp
 
-    hull._cell._core.step = MagicMock(side_effect=[make_result(r) for r in responses])
+    hull._main_cell._core.step = MagicMock(side_effect=[make_result(r) for r in responses])
 
 
 def _run_frame_loop(hull):
@@ -80,31 +80,31 @@ class TestConfig:
     def test_no_toml_uses_defaults(self, tmp_path):
         """Uses all defaults when hull.toml does not exist."""
         hull = _make_hull(tmp_path)
-        assert "role" not in hull._cell.L
-        assert "language" not in hull._cell.L
+        assert "role" not in hull._main_cell.L
+        assert "language" not in hull._main_cell.L
 
     def test_empty_toml_uses_defaults(self, tmp_path):
         """Uses all defaults when hull.toml is an empty file."""
         hull = _make_hull(tmp_path, toml_content=" ")
-        assert "role" not in hull._cell.L
+        assert "role" not in hull._main_cell.L
 
     def test_agent_role_not_injected(self, tmp_path):
         """[agent].role is no longer injected into namespace (identity defined by SOUL.md)."""
         toml = '[agent]\nrole = "You are a test assistant"'
         hull = _make_hull(tmp_path, toml_content=toml)
-        assert "role" not in hull._cell.L
+        assert "role" not in hull._main_cell.L
 
     def test_agent_language_injected(self, tmp_path):
         """[agent].language is written to ns["language"]."""
         toml = '[agent]\nlanguage = "zh"'
         hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._cell.L["language"] == "zh"
+        assert hull._main_cell.L["language"] == "zh"
 
     def test_cell_temperature_forwarded(self, tmp_path):
         """[cell].temperature is forwarded to Core api_params."""
         toml = "[cell]\ntemperature = 0.3"
         hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._cell._core._api_params["temperature"] == 0.3
+        assert hull._main_cell._core._api_params["temperature"] == 0.3
 
     def test_max_frames_config(self, tmp_path):
         """[cell].max_frames is stored in Hull (not in Cell)."""
@@ -116,30 +116,30 @@ class TestConfig:
         """[gates] config is written to cell.state_gate and cell.action_gate."""
         toml = '[gates]\nstate_gate = "auto"\naction_gate = "auto"'
         hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._cell.state_gate == "auto"
-        assert hull._cell.action_gate == "auto"
+        assert hull._main_cell.state_gate == "auto"
+        assert hull._main_cell.action_gate == "auto"
 
     def test_core_timeout_forwarded(self, tmp_path):
         """[core].timeout is forwarded to Core."""
         toml = "[core]\ntimeout = 120.0"
         hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._cell._core._timeout == 120.0
+        assert hull._main_cell._core._timeout == 120.0
 
     def test_core_max_retries_forwarded(self, tmp_path):
         """[core].max_retries is forwarded to Core."""
         toml = "[core]\nmax_retries = 5"
         hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._cell._core._max_retries == 5
+        assert hull._main_cell._core._max_retries == 5
 
     def test_core_default_timeout(self, tmp_path):
         """Uses default timeout of 60.0 when hull.toml has no [core] section."""
         hull = _make_hull(tmp_path)
-        assert hull._cell._core._timeout == 60.0
+        assert hull._main_cell._core._timeout == 60.0
 
     def test_core_default_max_retries(self, tmp_path):
         """Uses default max_retries of 3 when hull.toml has no [core] section."""
         hull = _make_hull(tmp_path)
-        assert hull._cell._core._max_retries == 3
+        assert hull._main_cell._core._max_retries == 3
 
 # ============================================================
 # Frame loop tests
@@ -153,18 +153,18 @@ class TestRunLoop:
         """Agent calls sleep(); _frame_loop() stops after that frame."""
         hull = _make_hull(tmp_path)
         _set_responses(hull, ['_system.sleep()'])
-        hull._cell.G["_system"].wake("user_message")
-        hull._cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
-        assert hull._cell.G["_system"]._sleeping is True
+        assert hull._main_cell.G["_system"]._sleeping is True
 
     def test_frame_loop_calls_step(self, tmp_path):
         """_frame_loop() calls cell.step()."""
         hull = _make_hull(tmp_path)
-        assert not hasattr(hull._cell, "run")
+        assert not hasattr(hull._main_cell, "run")
         _set_responses(hull, ['_system.sleep()'])
-        hull._cell.G["_system"].wake("user_message")
-        hull._cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)  # should not raise
 
     def test_frame_loop_max_frames_cutoff(self, tmp_path):
@@ -173,34 +173,34 @@ class TestRunLoop:
         hull = _make_hull(tmp_path, toml_content=toml)
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = "<action>\npass\n</action>"
-        hull._cell._core.step = MagicMock(
+        hull._main_cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].wake("user_message")
-        hull._cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
         # Frame limit reached; _sleeping was not set by Agent
-        assert hull._cell.G["_system"]._sleeping is False
+        assert hull._main_cell.G["_system"]._sleeping is False
 
     def test_frame_loop_rewrite_runtime_owned_each_frame(self, tmp_path):
         """_rewrite_runtime_owned runs before each frame; G['_soul'] is present when step() is called."""
         hull = _make_hull(tmp_path)
         soul_seen = []
 
-        original_step = hull._cell.step
+        original_step = hull._main_cell.step
 
         def capturing_step(tracer=None):
-            soul_seen.append(hull._cell.G.get("_soul"))
+            soul_seen.append(hull._main_cell.G.get("_soul"))
             return original_step(tracer)
 
-        hull._cell.step = capturing_step
+        hull._main_cell.step = capturing_step
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = '<action>\n_system.sleep()\n</action>'
-        hull._cell._core.step = MagicMock(
+        hull._main_cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].wake("user_message")
-        hull._cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
 
         assert all(s is not None for s in soul_seen)
@@ -211,23 +211,23 @@ class TestRunLoop:
         _set_responses(hull, [
             'x = 42\n_system.sleep()',
         ])
-        hull._cell.G["_system"].wake("user_message")
-        hull._cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
-        assert hull._cell.L.get("x") == 42
+        assert hull._main_cell.L.get("x") == 42
 
         _set_responses(hull, ['result_val = x\n_system.sleep()'])
-        hull._cell.G["_system"]._sleeping = False
-        hull._cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
         _run_frame_loop(hull)
-        assert hull._cell.L.get("result_val") == 42
+        assert hull._main_cell.L.get("result_val") == 42
 
     def test_frame_loop_snapshot_not_auto(self, tmp_path):
         """_frame_loop() does not automatically snapshot (snapshots triggered manually by Hull.snapshot())."""
         hull = _make_hull(tmp_path)
         _set_responses(hull, ['_system.sleep()'])
-        hull._cell.G["_system"].wake("user_message")
-        hull._cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
         snapshots = list((tmp_path / "snapshots").glob("*.pkl")) if (tmp_path / "snapshots").exists() else []
         assert len(snapshots) == 0
@@ -318,18 +318,18 @@ class TestSnapshot:
         """Automatically restores the latest .pkl from snapshots/ on startup."""
         hull1 = _make_hull(tmp_path)
         # Set a variable directly in namespace, then manually snapshot
-        hull1._cell.L["my_var"] = "hello"
+        hull1._main_cell.L["my_var"] = "hello"
         hull1.snapshot()
 
         with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
             hull2 = Hull(str(tmp_path))
-        assert hull2._cell.L.get("my_var") == "hello"
+        assert hull2._main_cell.L.get("my_var") == "hello"
 
     def test_no_snapshots_dir_ok(self, tmp_path):
         """Silently skips restore when snapshots/ directory does not exist."""
         hull = _make_hull(tmp_path)
         assert not (tmp_path / "snapshots").exists()
-        assert hull._cell.L is not None
+        assert hull._main_cell.L is not None
 
 
 # ============================================================
@@ -353,7 +353,7 @@ class TestEnv:
     def test_no_env_file_ok(self, tmp_path):
         """Silently skips when .env does not exist; startup proceeds normally."""
         hull = _make_hull(tmp_path)
-        assert hull._cell.L is not None
+        assert hull._main_cell.L is not None
 
 
 # ============================================================
@@ -363,14 +363,14 @@ class TestEnv:
 
 class TestNamespaceAccess:
     def test_ns_injection_visible_to_agent(self, tmp_path):
-        """Variables injected via hull._cell.L are visible during _frame_loop()."""
+        """Variables injected via hull._main_cell.L are visible during _frame_loop()."""
         hull = _make_hull(tmp_path)
-        hull._cell.L["custom_var"] = "test_value"
+        hull._main_cell.L["custom_var"] = "test_value"
         _set_responses(hull, ['result_val = custom_var\n_system.sleep()'])
-        hull._cell.G["_system"].wake("user_message")
-        hull._cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
-        assert hull._cell.L.get("result_val") == "test_value"
+        assert hull._main_cell.L.get("result_val") == "test_value"
 
 
 # ============================================================
@@ -382,19 +382,19 @@ class TestRuntimeOwned:
     def test_soul_in_g_after_init(self, tmp_path):
         """G['_soul'] is set after Hull initialization."""
         hull = _make_hull(tmp_path)
-        assert "_soul" in hull._cell.G
+        assert "_soul" in hull._main_cell.G
 
     def test_system_prompt_in_g_after_init(self, tmp_path):
         """G['_system_prompt'] is set after Hull initialization and not in L."""
         hull = _make_hull(tmp_path)
-        assert "_system_prompt" in hull._cell.G
-        assert "_system_prompt" not in hull._cell.L
+        assert "_system_prompt" in hull._main_cell.G
+        assert "_system_prompt" not in hull._main_cell.L
 
     def test_rewrite_runtime_owned_updates_soul_in_g(self, tmp_path):
         """_rewrite_runtime_owned writes _soul to G."""
         hull = _make_hull(tmp_path)
         hull._rewrite_runtime_owned()
-        assert "_soul" in hull._cell.G
+        assert "_soul" in hull._main_cell.G
 
 
 # ============================================================
@@ -414,13 +414,13 @@ class TestSkills:
         toml = '[hull]\nskill_paths = ["skills/extra/"]'
         hull = _make_hull(tmp_path, toml_content=toml)
         expected = str(tmp_path / "skills/extra")
-        assert any(expected in p for p in hull._cell.L["skill_paths"])
+        assert any(expected in p for p in hull._main_cell.L["skill_paths"])
 
     def test_no_skills_section(self, tmp_path):
         """No Skills are loaded and startup proceeds normally when hull.toml has no [hull] section."""
         toml = '[agent]\nname = "test"'
         hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._cell.L is not None
+        assert hull._main_cell.L is not None
 
 
 # ============================================================
@@ -433,19 +433,19 @@ class TestSoulMd:
         """SOUL.md content is loaded into G['_soul'] when present."""
         soul_content = "# Agent Identity\nYou are a data analysis expert."
         hull = _make_hull(tmp_path, soul_content=soul_content)
-        assert soul_content == hull._cell.G["_soul"]
-        assert "Execution Model" in hull._cell.G["_system_prompt"]
+        assert soul_content == hull._main_cell.G["_soul"]
+        assert "Execution Model" in hull._main_cell.G["_system_prompt"]
 
     def test_soul_empty_when_no_file(self, tmp_path):
         """_soul is empty string in G when SOUL.md does not exist."""
         hull = _make_hull(tmp_path)
-        assert hull._cell.G["_soul"] == ""
-        assert "Execution Model" in hull._cell.G["_system_prompt"]
+        assert hull._main_cell.G["_soul"] == ""
+        assert "Execution Model" in hull._main_cell.G["_system_prompt"]
 
     def test_soul_shown_in_rendered_state(self, tmp_path):
         """SOUL.md content appears in the rendered Ping via three-part renderer concatenation."""
         hull = _make_hull(tmp_path, soul_content="You are a data expert")
-        kernel = hull._cell._kernel
+        kernel = hull._main_cell._kernel
         ping = kernel.ping(None, {"globals": kernel.G, "locals": kernel.L})
         assert "You are a data expert" in ping.system_prompt
 
@@ -470,7 +470,7 @@ class TestVenvActivation:
     def test_no_venv_no_error(self, tmp_path):
         """Silently skips when no .venv directory exists; no error raised."""
         hull = _make_hull(tmp_path)
-        assert hull._cell.L is not None
+        assert hull._main_cell.L is not None
 
 
 
@@ -479,7 +479,7 @@ class TestWake:
         """SystemSkill wake_reason is empty string after Hull initialization."""
         from vessal.skills.system import SystemSkill
         hull = _make_hull(tmp_path)
-        system = hull._cell.G.get("_system")
+        system = hull._main_cell.G.get("_system")
         assert isinstance(system, SystemSkill)
         assert system._wake_reason == ""
 
@@ -487,18 +487,18 @@ class TestWake:
         """_wake_reason retains its injected value during _frame_loop() execution."""
         hull = _make_hull(tmp_path)
         wake_seen = []
-        original_step = hull._cell.step
+        original_step = hull._main_cell.step
         def capturing_step(tracer=None):
-            wake_seen.append(hull._cell.G["_system"]._wake_reason)
+            wake_seen.append(hull._main_cell.G["_system"]._wake_reason)
             return original_step(tracer)
-        hull._cell.step = capturing_step
+        hull._main_cell.step = capturing_step
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = '<action>\n_system.sleep()\n</action>'
-        hull._cell._core.step = MagicMock(
+        hull._main_cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].wake("user_message")
-        hull._cell.G["_system"]._sleeping = False
+        hull._main_cell.G["_system"].wake("user_message")
+        hull._main_cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
         assert all(w == "user_message" for w in wake_seen)
 
@@ -507,6 +507,6 @@ class TestDataDir:
     def test_data_dir_injected(self, tmp_path):
         """Hull should inject _data_dir pointing to project_dir/data."""
         hull = _make_hull(tmp_path)
-        data_dir = hull._cell.L.get("_data_dir")
+        data_dir = hull._main_cell.L.get("_data_dir")
         assert data_dir is not None
         assert data_dir.endswith("/data") or data_dir.endswith("\\data")
