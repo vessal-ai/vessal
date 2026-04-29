@@ -14,9 +14,11 @@ def test_observation_diff_annotated_as_list():
     hints = get_type_hints(Observation)
     diff_hint = hints["diff"]
     assert diff_hint is not str, "Observation.diff must not be annotated as str"
-    import typing
     origin = getattr(diff_hint, "__origin__", None)
     assert origin is list, f"Observation.diff must be a list type; got origin={origin}"
+    assert len(diff_hint.__args__) == 1
+    inner = diff_hint.__args__[0]
+    assert getattr(inner, "__origin__", None) is dict
 
 
 def test_observation_has_stderr_field():
@@ -74,9 +76,8 @@ def test_executor_result_has_stderr_field():
 
 def test_kernel_does_not_hardcode_obs_stderr_empty():
     """Kernel must pass exec_result.stderr to Observation, not hardcode empty string."""
-    src = Path(
-        "/Users/zalelee/Code/vessal/src/vessal/ark/shell/hull/cell/kernel/kernel.py"
-    ).read_text()
+    REPO_ROOT = Path(__file__).resolve().parents[3]
+    src = (REPO_ROOT / "src/vessal/ark/shell/hull/cell/kernel/kernel.py").read_text()
     tree = ast.parse(src)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
