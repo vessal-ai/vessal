@@ -39,7 +39,8 @@ class TestExecuteSideEffects:
         ns = _ns()
         result = execute("x = 1", {}, ns, frame_number=1)
         assert result.stdout == ""
-        assert result.diff != ""  # x = 1 produces a diff
+        assert result.stderr == ""
+        assert result.diff != []  # x = 1 produces a diff
         assert result.error is None
 
     def test_exec_result_on_error(self):
@@ -120,7 +121,7 @@ class TestExecuteSideEffects:
         result = execute("", {}, ns, frame_number=1)
         assert isinstance(result, ExecResult)
         assert result.stdout == ""
-        assert result.diff == ""
+        assert result.diff == []
         assert result.error is None
 
     def test_exec_result_fields_populated(self):
@@ -128,7 +129,7 @@ class TestExecuteSideEffects:
         ns = _ns()
         result = execute("print('hi')\nx = 1", {}, ns, frame_number=1)
         assert "hi" in result.stdout
-        assert "+x = 1" in result.diff
+        assert {"op": "+", "name": "x", "type": "int"} in result.diff
         assert result.error is None
 
 
@@ -139,36 +140,36 @@ class TestDiffCalculation:
     def test_new_variable_diff(self):
         ns = _ns()
         result = execute("alpha = 42", {}, ns, frame_number=1)
-        assert "+alpha = 42" in result.diff
+        assert {"op": "+", "name": "alpha", "type": "int"} in result.diff
 
     def test_modified_variable_diff(self):
         ns = _ns()
         ns["x"] = 1
         result = execute("x = 99", {}, ns, frame_number=1)
-        assert "-x = 1" in result.diff
-        assert "+x = 99" in result.diff
+        assert {"op": "-", "name": "x", "type": "int"} in result.diff
+        assert {"op": "+", "name": "x", "type": "int"} in result.diff
 
     def test_deleted_variable_diff(self):
         ns = _ns()
         ns["x"] = 1
         result = execute("del x", {}, ns, frame_number=1)
-        assert "-x = 1" in result.diff
+        assert {"op": "-", "name": "x", "type": "int"} in result.diff
 
     def test_no_change_empty_diff(self):
         ns = _ns()
         result = execute("pass", {}, ns, frame_number=1)
-        assert result.diff == ""
+        assert result.diff == []
 
     def test_system_vars_excluded_from_diff(self):
         ns = _ns()
         result = execute("_internal = 'hidden'", {}, ns, frame_number=1)
-        assert "_internal" not in result.diff
+        names = [d["name"] for d in result.diff]
+        assert "_internal" not in names
 
     def test_multiple_vars_sorted(self):
         ns = _ns()
         result = execute("z = 1\na = 2", {}, ns, frame_number=1)
-        diff_lines = result.diff.splitlines()
-        names = [line[1:].split(" =")[0] for line in diff_lines]
+        names = [d["name"] for d in result.diff]
         assert names == sorted(names)
 
 

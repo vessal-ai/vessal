@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Union
 
-FRAME_SCHEMA_VERSION = 7
+FRAME_SCHEMA_VERSION = 8
 
 
 # ─────────────────────────────────────────────
@@ -131,31 +131,23 @@ class Observation:
     """Spec §3 — the world's response to an action.
 
     `error` is the raw exception with `__traceback__` cleared so the value
-    survives cloudpickle. The textual traceback for the errors table is
-    formatted at write-time from this exception, not stored here.
+    survives cloudpickle. `diff` is a structured list (spec §3.4); the
+    git-style multi-line string was a Kernel-side stringification, which
+    spec §1.4 forbids.
     """
 
     stdout: str
     stderr: str
-    diff: str
+    diff: list[dict[str, str]]
     error: BaseException | None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "stdout": self.stdout,
             "stderr": self.stderr,
-            "diff": self.diff,
+            "diff": list(self.diff),
             "error": repr(self.error) if self.error is not None else None,
         }
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Observation":
-        return cls(
-            stdout=d.get("stdout", ""),
-            stderr=d.get("stderr", ""),
-            diff=d.get("diff", ""),
-            error=None,
-        )
 
 
 # ─────────────────────────────────────────────
@@ -208,7 +200,7 @@ class FrameContent:
     operation: str
     expect: str
     observation: dict        # {"stdout","stderr","diff","error"}
-    verdict: dict | None     # {"value","error"} or None
+    verdict: dict | None     # {"total","passed","failures"} or None
     signals: dict            # {(class_name, var_name, scope): payload}
 
 
@@ -449,41 +441,18 @@ class FrameRecord:
             if ping_data is not None
             else Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={}))
         )
+        obs_data = d.get("observation", {})
         return cls(
             number=d["number"],
             ping=ping,
             pong=Pong.from_dict(d.get("pong", {})),
-            observation=Observation.from_dict(d.get("observation", {})),
+            observation=Observation(
+                stdout=obs_data.get("stdout", ""),
+                stderr=obs_data.get("stderr", ""),
+                diff=list(obs_data.get("diff", [])),
+                error=None,
+            ),
         )
-
-
-def flatten_frame_dict(d: dict) -> dict:
-    """Translate a FrameRecord.to_dict() shape to the flat wire shape.
-
-    Wire fields mirror SQLite frame_content columns per docs/architecture/kernel/
-    04-frame-log.md §4.3. obs_error / verdict_error carry resolved error text.
-    signals is always [] until PR 4 SQLite-direct sourcing.
-    """
-    pong = d.get("pong", {}) or {}
-    action = pong.get("action", {}) or {}
-    obs = d.get("observation", {}) or {}
-    n = d["number"]
-    return {
-        "n": n,
-        "layer": 0,
-        "n_start": n,
-        "n_end": n,
-        "pong_think": pong.get("think", ""),
-        "pong_operation": action.get("operation", ""),
-        "pong_expect": action.get("expect", ""),
-        "obs_stdout": obs.get("stdout", ""),
-        "obs_stderr": obs.get("stderr", ""),
-        "obs_diff_json": obs.get("diff", ""),
-        "obs_error": obs.get("error"),
-        "verdict_value": None,
-        "verdict_error": None,
-        "signals": [],
-    }
 
 
 # ─────────────────────────────────────────────
@@ -508,6 +477,5 @@ __all__ = [
     "Action", "State",
     "Ping", "Pong", "Observation", "FrameRecord", "StepResult",
     "Verdict", "VerdictFailure",
-    "flatten_frame_dict",
     "FrameContent", "SummaryContent", "Entry", "FrameStream",
 ]

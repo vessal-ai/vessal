@@ -68,7 +68,7 @@ def _fetch_frame_content(conn: sqlite3.Connection, ns: list[int]) -> dict[int, d
     rows = conn.execute(
         f"SELECT n, pong_think, pong_operation, pong_expect, "
         f"       obs_stdout, obs_stderr, obs_diff_json, obs_error_id, "
-        f"       verdict_value, verdict_error_id "
+        f"       verdict_value "
         f"FROM frame_content WHERE n IN ({placeholders})",
         ns,
     ).fetchall()
@@ -80,10 +80,9 @@ def _fetch_frame_content(conn: sqlite3.Connection, ns: list[int]) -> dict[int, d
             "pong_expect": r[3] or "",
             "obs_stdout": r[4] or "",
             "obs_stderr": r[5] or "",
-            "obs_diff_json": r[6] or "{}",
+            "obs_diff_json": r[6] or "[]",
             "obs_error_id": r[7],
             "verdict_value": r[8],
-            "verdict_error_id": r[9],
         }
         for r in rows
     }
@@ -167,22 +166,16 @@ def _build_frame_content(
     err_map: dict[int, str],
 ) -> FrameContent:
     obs_error_text = err_map.get(fc_row["obs_error_id"]) if fc_row["obs_error_id"] is not None else None
-    verdict_error_text = err_map.get(fc_row["verdict_error_id"]) if fc_row["verdict_error_id"] is not None else None
 
     observation = {
         "stdout": fc_row["obs_stdout"],
         "stderr": fc_row["obs_stderr"],
-        "diff": json.loads(fc_row["obs_diff_json"]) if fc_row["obs_diff_json"] else {},
+        "diff": json.loads(fc_row["obs_diff_json"]) if fc_row["obs_diff_json"] else [],
         "error": obs_error_text,
     }
-    verdict: dict | None
-    if fc_row["verdict_value"] is None and verdict_error_text is None:
-        verdict = None
-    else:
-        verdict = {
-            "value": fc_row["verdict_value"],
-            "error": verdict_error_text,
-        }
+
+    verdict_raw = fc_row["verdict_value"]
+    verdict: dict | None = json.loads(verdict_raw) if verdict_raw else None
 
     enriched_signals: dict[tuple[str, str, str], dict] = {}
     for key, payload in signals.items():

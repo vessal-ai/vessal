@@ -23,12 +23,11 @@ from __future__ import annotations
 import ast
 import io
 import sys
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from typing import Any
 
 from vessal.ark.shell.hull.cell.kernel import source_cache
-from vessal.ark.shell.hull.cell.kernel.describe import render_value
 
 
 # Maximum length for bare expression repr. Truncated with "..." when exceeded.
@@ -46,7 +45,8 @@ class ExecResult:
     """
 
     stdout: str
-    diff: str
+    stderr: str
+    diff: list[dict[str, str]]
     error: BaseException | None
 
 
@@ -85,11 +85,11 @@ def execute(
         frame_number: Current frame number; used for _ns_meta, not written to L["_frame"].
 
     Returns:
-        ExecResult containing stdout, diff, and error fields.
+        ExecResult containing stdout, stderr, diff, and error fields.
     """
     # Step 1: return immediately for empty code
     if not operation or not operation.strip():
-        return ExecResult(stdout="", diff="", error=None)
+        return ExecResult(stdout="", stderr="", diff=[], error=None)
 
     # Step 3: before-snapshot — record keys, id()s, and value references before execution
     # id(v) is the object's memory address; unchanged for the same object; changes when value is replaced
@@ -107,8 +107,9 @@ def execute(
     source_cache.register(frame_number, operation, None)
     filename = f"<frame-{frame_number}>"
 
-    # Step 5: execute code, capture stdout and exceptions
+    # Step 5: execute code, capture stdout, stderr, and exceptions
     stdout_buffer = io.StringIO()
+    stderr_buffer = io.StringIO()
     error: BaseException | None = None
 
     try:
@@ -118,7 +119,7 @@ def execute(
         # Set __name__ so classes defined in this exec record __module__ = filename,
         # enabling inspect.getsource(SomeClass) via the sys.modules entry registered above.
         G["__name__"] = filename
-        with redirect_stdout(stdout_buffer):
+        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
             exec(code, G, L)  # noqa: S102
     except KeyboardInterrupt:
         raise
@@ -152,7 +153,7 @@ def execute(
     # Step 8: update _ns_meta — variable lifecycle tracking
     L["_ns_meta"] = _update_ns_meta(L, before_keys, before_ids, frame_number)
 
-    return ExecResult(stdout=captured_stdout, diff=diff, error=error)
+    return ExecResult(stdout=captured_stdout, stderr=stderr_buffer.getvalue(), diff=diff, error=error)
 
 
 def _maybe_capture_last_expr(action: str) -> str:
@@ -183,6 +184,11 @@ def _maybe_capture_last_expr(action: str) -> str:
 
     last_stmt = tree.body[-1]
     if not isinstance(last_stmt, ast.Expr):
+        return action
+
+    # Skip capture for bare function/method calls — callers use them for side effects,
+    # and the integer return value (e.g. from write()) should not appear in stdout.
+    if isinstance(last_stmt.value, ast.Call):
         return action
 
     # Use ast.get_source_segment to precisely extract the expression text (handles column offsets)
@@ -265,37 +271,22 @@ def _update_ns_meta(L: dict[str, Any], before_keys: set, before_ids: dict, frame
 
 def _compute_diff(
     L: dict, before_keys: set, before_ids: dict, before_values: dict
-) -> str:
-    """Return git-style diff string of namespace changes since before_keys/before_ids snapshot.
+) -> list[dict[str, str]]:
+    """Spec §3.4: structured namespace diff — list of {op, name, type}.
 
-    Format (git-style, only + and - symbols):
-    - New variable:      +name = preview
-    - Modified variable: -name = old_preview  (old value)
-                         +name = new_preview  (new value, immediately following)
-    - Deleted variable:  -name = old_preview
-    Lines are sorted alphabetically by variable name; modified -old and +new
-    are kept consecutive.
-
-    Args:
-        L:              Agent state dict (after execute)
-        before_keys:    Set of keys before execution
-        before_ids:     id() mapping for each variable before execution
-        before_values:  Value references for each user variable before execution
-                        (references only, no deep copy)
+    `op` is `'+'` (new binding) or `'-'` (removed binding). Rebind = one
+    minus row immediately followed by one plus row, sharing `name`.
     """
     after_keys = set(L.keys())
-    lines = []
+    out: list[dict[str, str]] = []
     for k in sorted(after_keys - before_keys):
         if is_user_var(k):
-            lines.append(f"+{k} = {render_value(L[k], 'diff')}")
+            out.append({"op": "+", "name": k, "type": type(L[k]).__name__})
     for k in sorted(after_keys & before_keys):
         if is_user_var(k) and id(L[k]) != before_ids.get(k):
-            old_preview = render_value(before_values[k], "diff")
-            new_preview = render_value(L[k], "diff")
-            lines.append(f"-{k} = {old_preview}")
-            lines.append(f"+{k} = {new_preview}")
+            out.append({"op": "-", "name": k, "type": type(before_values[k]).__name__})
+            out.append({"op": "+", "name": k, "type": type(L[k]).__name__})
     for k in sorted(before_keys - after_keys):
         if is_user_var(k):
-            old_preview = render_value(before_values[k], "diff")
-            lines.append(f"-{k} = {old_preview}")
-    return "\n".join(lines)
+            out.append({"op": "-", "name": k, "type": type(before_values[k]).__name__})
+    return out

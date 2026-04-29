@@ -70,8 +70,8 @@ def test_boot_frame_pong_operation_contains_real_script(tmp_path: Path):
         "SELECT pong_operation, pong_expect, verdict_value FROM frame_content WHERE n = 1"
     ).fetchone()
     assert "from vessal.skills.system import SystemSkill" in op
-    assert expect == "True"
-    assert verdict == "true"
+    assert expect == ""
+    assert verdict is None
 
 
 def test_boot_frame_obs_stdout_captures_skill_init_prints(tmp_path: Path):
@@ -89,7 +89,7 @@ def test_boot_frame_obs_stdout_captures_skill_init_prints(tmp_path: Path):
     assert "SystemSkill" in stdout or "_system" in stdout
 
 
-def test_cold_start_obs_diff_json_is_empty_object(tmp_path: Path):
+def test_cold_start_obs_diff_json_is_empty_list(tmp_path: Path):
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([])
     Kernel(boot_script=script, db_path=str(db))
@@ -98,7 +98,7 @@ def test_cold_start_obs_diff_json_is_empty_object(tmp_path: Path):
     (diff,) = conn.execute(
         "SELECT obs_diff_json FROM frame_content WHERE n = 1"
     ).fetchone()
-    assert diff == "{}"
+    assert json.loads(diff) == []
 
 
 # ────────────────────────────────────────────────────────────
@@ -186,10 +186,15 @@ def test_restart_obs_diff_json_lists_restored_keys(tmp_path: Path):
     (diff,) = conn.execute(
         "SELECT obs_diff_json FROM frame_content WHERE n = 2"
     ).fetchone()
-    # diff is {key: repr(value), ...} per spec §7.6
+    # diff is list[{op, name, type}] per spec §7.6
     parsed = json.loads(diff)
-    assert "alpha" in parsed and "'value-a'" in parsed["alpha"]
-    assert "beta" in parsed and parsed["beta"] == "7"
+    names = {row["name"] for row in parsed}
+    assert "alpha" in names
+    assert "beta" in names
+    types_by_name = {row["name"]: row["type"] for row in parsed}
+    assert types_by_name["alpha"] == "str"
+    assert types_by_name["beta"] == "int"
+    assert all(row["op"] == "+" for row in parsed)
 
 
 # ────────────────────────────────────────────────────────────

@@ -49,10 +49,11 @@ class FrameWriteSpec:
         n: Frame number (used as both n_start and n_end for layer=0).
         pong_think / pong_operation / pong_expect: LLM output text. May be empty strings.
         obs_stdout / obs_stderr: captured streams.
-        obs_diff_json: JSON-encoded namespace diff.
-        operation_error: error from running pong.operation (None if succeeded).
-        verdict_value: JSON-encoded verdict (None if expect raised; 'null' if expect was empty).
-        verdict_error: error from running pong.expect (None if succeeded).
+        obs_diff_json: JSON-encoded namespace diff (list[{op,name,type}]).
+        operation_error: error from running pong.operation (None if succeeded; at most one).
+        verdict_value: JSON-encoded Verdict.to_dict() (None if expect was empty / first frame).
+        verdict_errors: per-assert errors from running pong.expect (empty list if no Python
+                        exception fired; one row per ExpectSyntaxError/ExpectRuntimeError).
         signals: list of SignalRow, one per Skill instance scanned this frame.
     """
 
@@ -65,5 +66,5 @@ class FrameWriteSpec:
     obs_diff_json: str
     operation_error: ErrorOnSource | None
     verdict_value: str | None
-    verdict_error: ErrorOnSource | None
+    verdict_errors: list[ErrorOnSource] = field(default_factory=list)
     signals: list[SignalRow] = field(default_factory=list)

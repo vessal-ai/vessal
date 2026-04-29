@@ -27,14 +27,6 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function diffColorize(diff) {
-  return diff.split('\n').map(line => {
-    if (line.startsWith('+')) return `<span class="diff-plus">${escHtml(line)}</span>`;
-    if (line.startsWith('-')) return `<span class="diff-minus">${escHtml(line)}</span>`;
-    return escHtml(line);
-  }).join('\n');
-}
-
 /**
  * HTML wrapper for a single section. Supports <details> partial collapsing.
  * @param {string} key - Section identifier (used for CSS class and toggle matching)
@@ -112,9 +104,16 @@ function renderStdout(obs) {
 }
 
 function renderDiff(obs) {
-  const text = (obs && obs.diff) || '';
-  if (!text.trim()) return '';
-  return section('diff', 'Diff', diffColorize(text));
+  const items = (obs && obs.diff) || [];
+  if (!Array.isArray(items) || items.length === 0) return '';
+  const rows = items.map(d => {
+    const op = d.op || '?';
+    const name = escHtml(d.name || '');
+    const type = escHtml(d.type || '');
+    const cls = op === '+' ? 'diff-add' : (op === '-' ? 'diff-del' : 'diff-other');
+    return `<div class="${cls}">${escHtml(op)} ${name}: ${type}</div>`;
+  });
+  return section('diff', 'Diff', rows.join(''));
 }
 
 function renderError(obs) {

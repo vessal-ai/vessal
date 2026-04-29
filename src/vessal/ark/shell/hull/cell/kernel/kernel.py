@@ -144,34 +144,37 @@ class Kernel:
             n=n,
             pong_think="",
             pong_operation=boot_script,
-            pong_expect="True",
+            pong_expect="",
             obs_stdout=boot_stdout,
             obs_stderr=boot_stderr,
             obs_diff_json=diff_json,
             operation_error=None,
-            verdict_value="true",
-            verdict_error=None,
+            verdict_value=None,
+            verdict_errors=[],
             signals=[],
         )
         self.frame_log.write_frame(spec)
         self.L["_frame"] = n
 
     def _compute_boot_diff_json(self, l_before_restore: dict) -> str:
-        """Spec §7.6: diff(L_before_restore, L_after_restore) — only new/changed keys, each repr()'d.
+        """Spec §7.6: diff(L_before_restore, L_after_restore) as list[{op,name,type}].
 
-        For cold start (no restore), l_before_restore == self.L, so diff is empty → "{}".
-        For restart, diff contains every key that was loaded from the snapshot and differs from
-        the pre-restore defaults.
+        Cold start: l_before_restore == self.L → diff is `[]`.
+        Restart: every key newly present in self.L (not in l_before_restore)
+        appears as a `+` row. The type column carries the live `type().__name__`,
+        which for an `UnresolvedRef` is `"UnresolvedRef"` — that name plus the
+        ref's own `__repr__` self-disclose any restore failures (spec §7.6).
         """
         import json
-        diff: dict[str, str] = {}
-        for k, v in self.L.items():
+        diff: list[dict[str, str]] = []
+        for k in sorted(self.L.keys()):
             if k in l_before_restore:
                 continue
             try:
-                diff[k] = repr(v)
-            except Exception as e:
-                diff[k] = f"<unrepr: {type(v).__name__}: {type(e).__name__}>"
+                type_name = type(self.L[k]).__name__
+            except Exception as e:  # pragma: no cover — type() is total, defensive only
+                type_name = f"<untyped: {type(e).__name__}>"
+            diff.append({"op": "+", "name": k, "type": type_name})
         return json.dumps(diff, ensure_ascii=False)
 
     def ping(self, pong: "Pong | None", namespace: dict) -> Ping:
@@ -206,7 +209,7 @@ class Kernel:
             exec_result = execute(pong.action.operation, G, L, frame_n)
             L["observation"] = Observation(
                 stdout=exec_result.stdout,
-                stderr="",
+                stderr=exec_result.stderr,
                 diff=exec_result.diff,
                 error=exec_result.error,
             )
@@ -408,11 +411,11 @@ class Kernel:
     def _build_write_spec(self, record: FrameRecord) -> "FrameWriteSpec":
         """Translate a FrameRecord into a FrameWriteSpec for the frame_log writer.
 
-        Args:
-            record: Completed FrameRecord from this frame.
-
-        Returns:
-            FrameWriteSpec ready to pass to FrameLog.write_frame().
+        Per spec §3.5.6 / §4.5: each expect_syntax_error / expect_runtime_error
+        VerdictFailure becomes one errors row with source='expect'. The
+        assertion_failed and expect_unsafe_error kinds do not have Python
+        exceptions and are not written to errors (their message lives only
+        in verdict_value JSON).
         """
         import json as _json
         import traceback as _tb
@@ -427,11 +430,18 @@ class Kernel:
             operation_error = ErrorOnSource("operation", None, operation_error_text)
         else:
             operation_error = None
-        verdict_value: str | None = None
         verdict = self.L.get("verdict")
+        verdict_value: str | None = (
+            _json.dumps(verdict.to_dict()) if verdict is not None else None
+        )
+        verdict_errors: list[ErrorOnSource] = []
         if verdict is not None:
-            verdict_value = _json.dumps(verdict.to_dict())
-        diff_json = _json.dumps(obs.diff) if obs.diff else "{}"
+            for failure in verdict.failures:
+                if failure.kind in ("expect_syntax_error", "expect_runtime_error"):
+                    verdict_errors.append(
+                        ErrorOnSource("expect", None, failure.message)
+                    )
+        diff_json = _json.dumps(obs.diff)
         sig_rows: list[SignalRow] = []
         for (cls_name, var_name, scope), payload in self.L.get("signals", {}).items():
             err_id = payload.get("_error_id") if isinstance(payload, dict) else None
@@ -459,10 +469,10 @@ class Kernel:
             pong_operation=record.pong.action.operation,
             pong_expect=record.pong.action.expect,
             obs_stdout=obs.stdout or "",
-            obs_stderr="",
+            obs_stderr=obs.stderr or "",
             obs_diff_json=diff_json,
             operation_error=operation_error,
             verdict_value=verdict_value,
-            verdict_error=None,
+            verdict_errors=verdict_errors,
             signals=sig_rows,
         )

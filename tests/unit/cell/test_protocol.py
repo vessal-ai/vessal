@@ -131,13 +131,13 @@ class TestStepResult:
 
 
 class TestFrameRecord:
-    def test_schema_version_is_7(self):
-        assert FRAME_SCHEMA_VERSION == 7
+    def test_schema_version_is_8(self):
+        assert FRAME_SCHEMA_VERSION == 8
 
     def _make_record(self, number: int = 1) -> FrameRecord:
         ping = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         pong = Pong(think="", action=Action(operation="pass", expect=""))
-        obs = Observation(stdout="", stderr="", diff="", error=None)
+        obs = Observation(stdout="", stderr="", diff=[], error=None)
         return FrameRecord(number=number, ping=ping, pong=pong, observation=obs)
 
     def test_fields(self):
@@ -153,11 +153,11 @@ class TestFrameRecord:
 
     def test_to_dict(self):
         pong = Pong(think="t", action=Action(operation="x=1", expect=""))
-        obs = Observation(stdout="out", stderr="", diff="+x = 1", error=None)
+        obs = Observation(stdout="out", stderr="", diff=[{"op": "+", "name": "x", "type": "int"}], error=None)
         ping = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         fr = FrameRecord(number=3, ping=ping, pong=pong, observation=obs)
         d = fr.to_dict()
-        assert d["schema_version"] == 7
+        assert d["schema_version"] == 8
         assert d["number"] == 3
         assert d["ping"]["system_prompt"] == "sys"
         assert d["ping"]["state"]["signals"] == {}
@@ -184,7 +184,7 @@ class TestFrameRecord:
         v5 = {
             "schema_version": 5, "number": 1,
             "pong": {"think": "", "action": {"operation": "x=1", "expect": ""}},
-            "observation": {"stdout": "", "stderr": "", "diff": "", "error": None},
+            "observation": {"stdout": "", "stderr": "", "diff": [], "error": None},
         }
         fr = FrameRecord.from_dict(v5)
         assert fr.number == 1
@@ -209,19 +209,53 @@ class TestFrameRecord:
     def test_frame_record_v6_includes_ping(self):
         ping = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         pong = Pong(think="t", action=Action(operation="x=1", expect=""))
-        obs = Observation(stdout="", stderr="", diff="+ x: 1", error=None)
+        obs = Observation(stdout="", stderr="", diff=[{"op": "+", "name": "x", "type": "int"}], error=None)
         record = FrameRecord(number=1, ping=ping, pong=pong, observation=obs)
         d = record.to_dict()
-        assert d["schema_version"] == 7
+        assert d["schema_version"] == 8
         assert d["ping"]["system_prompt"] == "sys"
         assert d["ping"]["state"]["signals"] == {}
 
 
 
+class TestObservationDiffIsList:
+    """Observation.diff is structured list[{op,name,type}] per spec §3.6."""
+
+    def test_diff_field_type_is_list(self):
+        obs = Observation(
+            stdout="",
+            stderr="",
+            diff=[{"op": "+", "name": "x", "type": "int"}],
+            error=None,
+        )
+        assert obs.diff == [{"op": "+", "name": "x", "type": "int"}]
+
+    def test_diff_empty_is_empty_list(self):
+        obs = Observation(stdout="", stderr="", diff=[], error=None)
+        assert obs.diff == []
+
+    def test_to_dict_preserves_diff_list(self):
+        obs = Observation(
+            stdout="",
+            stderr="",
+            diff=[{"op": "-", "name": "y", "type": "str"}],
+            error=None,
+        )
+        d = obs.to_dict()
+        assert d["diff"] == [{"op": "-", "name": "y", "type": "str"}]
+
+
 class TestFromDictRoundtrips:
     def test_observation_from_dict(self):
-        obs = Observation(stdout="hello", stderr="", diff="+x=1", error=None)
-        assert Observation.from_dict(obs.to_dict()) == obs
+        obs = Observation(stdout="hello", stderr="", diff=[], error=None)
+        d = obs.to_dict()
+        restored = Observation(
+            stdout=d.get("stdout", ""),
+            stderr=d.get("stderr", ""),
+            diff=list(d.get("diff", [])),
+            error=None,
+        )
+        assert restored == obs
 
     def test_verdict_from_dict(self):
         vf = VerdictFailure(kind="assertion_failed", assertion="assert x == 1", message="x is 2")

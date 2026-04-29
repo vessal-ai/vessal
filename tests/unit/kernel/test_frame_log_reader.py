@@ -22,10 +22,10 @@ def _spec(n: int, op: str = "x = 1") -> FrameWriteSpec:
         pong_expect="True",
         obs_stdout="",
         obs_stderr="",
-        obs_diff_json="{}",
+        obs_diff_json="[]",
         operation_error=None,
         verdict_value="true",
-        verdict_error=None,
+        verdict_errors=[],
         signals=[],
     )
 
@@ -86,10 +86,10 @@ def test_signals_aggregated_per_n_start(tmp_path):
         pong_expect="True",
         obs_stdout="",
         obs_stderr="",
-        obs_diff_json="{}",
+        obs_diff_json="[]",
         operation_error=None,
         verdict_value="true",
-        verdict_error=None,
+        verdict_errors=[],
         signals=[
             SignalRow("ChatSkill", "chat", "L", '{"unread": 3}', None),
             SignalRow("ClockSkill", "clock", "G", '{"now": "t"}', None),
@@ -125,3 +125,58 @@ def test_two_layer1_entries_sorted_by_n_start_asc(tmp_path):
 
     fs = render_frame_stream(conn)
     assert [(e.layer, e.n_start) for e in fs.entries] == [(1, 1), (1, 17)]
+
+
+class TestReaderShapeAlignedWithSpec:
+    """reader returns Verdict.to_dict() shape for verdict and list for diff."""
+
+    def _seed_one_frame(self, db_path, *, verdict_json: str | None, diff_json: str):
+        from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
+        from vessal.ark.shell.hull.cell.kernel.frame_log.types import FrameWriteSpec
+        from vessal.ark.shell.hull.cell.kernel.frame_log.writer import FrameLog
+        conn = open_db(str(db_path))
+        FrameLog(conn).write_frame(FrameWriteSpec(
+            n=1,
+            pong_think="", pong_operation="x = 1", pong_expect="",
+            obs_stdout="", obs_stderr="", obs_diff_json=diff_json,
+            operation_error=None,
+            verdict_value=verdict_json,
+            verdict_errors=[], signals=[],
+        ))
+        return conn
+
+    def test_reader_observation_diff_is_list(self, tmp_path):
+        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        conn = self._seed_one_frame(
+            tmp_path / "fl.sqlite",
+            verdict_json=None,
+            diff_json='[{"op":"+","name":"x","type":"int"}]',
+        )
+        fs = render_frame_stream(conn)
+        fc = fs.entries[0].content
+        assert fc.observation["diff"] == [{"op": "+", "name": "x", "type": "int"}]
+
+    def test_reader_verdict_is_total_passed_failures(self, tmp_path):
+        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        conn = self._seed_one_frame(
+            tmp_path / "fl.sqlite",
+            verdict_json='{"total": 2, "passed": 1, "failures": [{"kind":"assertion_failed","assertion":"assert y","message":"y is False"}]}',
+            diff_json="[]",
+        )
+        fs = render_frame_stream(conn)
+        fc = fs.entries[0].content
+        assert fc.verdict == {
+            "total": 2,
+            "passed": 1,
+            "failures": [{"kind": "assertion_failed", "assertion": "assert y", "message": "y is False"}],
+        }
+
+    def test_reader_verdict_is_none_when_value_is_null(self, tmp_path):
+        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        conn = self._seed_one_frame(
+            tmp_path / "fl.sqlite",
+            verdict_json=None,
+            diff_json="[]",
+        )
+        fs = render_frame_stream(conn)
+        assert fs.entries[0].content.verdict is None

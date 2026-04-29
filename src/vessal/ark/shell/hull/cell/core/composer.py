@@ -99,14 +99,27 @@ def _compose_layerk(n_start: int, n_end: int, sc: SummaryContent) -> str:
     return f"── summary [{n_start}..{n_end}] ──\n{sc.body}"
 
 
-def _format_diff(diff: dict) -> str:
-    return "\n".join(f"{k}: {v}" for k, v in diff.items())
+def _format_diff(diff: list[dict[str, str]]) -> str:
+    if not diff:
+        return ""
+    return "\n".join(
+        f"{entry['op']} {entry['name']}: {entry['type']}" for entry in diff
+    )
 
 
 def _format_verdict(verdict: dict) -> str:
-    if verdict.get("error"):
-        return f"error: {verdict['error']}"
-    return str(verdict.get("value", ""))
+    total = verdict.get("total", 0)
+    passed = verdict.get("passed", 0)
+    failures = verdict.get("failures", [])
+    head = f"{passed}/{total} passed"
+    if not failures:
+        return head
+    lines = [head]
+    for failure in failures:
+        lines.append(
+            f"  [{failure.get('kind', '?')}] {failure.get('assertion', '')}: {failure.get('message', '')}"
+        )
+    return "\n".join(lines)
 
 
 def _compose_signals(signals: dict) -> str:

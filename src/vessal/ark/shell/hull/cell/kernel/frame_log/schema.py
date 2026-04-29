@@ -24,8 +24,7 @@ CREATE TABLE IF NOT EXISTS frame_content (
     obs_stderr       TEXT,
     obs_diff_json    TEXT,
     obs_error_id     INTEGER REFERENCES errors(id),
-    verdict_value    TEXT,
-    verdict_error_id INTEGER REFERENCES errors(id)
+    verdict_value    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS summary_content (
@@ -65,6 +64,9 @@ CREATE INDEX IF NOT EXISTS idx_errors_entry  ON errors  (layer, n_start);
 def open_db(path: str) -> sqlite3.Connection:
     """Open (or create) a frame_log SQLite database with WAL + foreign_keys + 5-table schema.
 
+    On open, applies any pending in-place schema migration (currently: drop the
+    legacy `verdict_error_id` column from `frame_content`).
+
     Args:
         path: Filesystem path to the .sqlite file. Created if absent.
 
@@ -75,4 +77,17 @@ def open_db(path: str) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(DDL)
+    _migrate_drop_verdict_error_id(conn)
     return conn
+
+
+def _migrate_drop_verdict_error_id(conn: sqlite3.Connection) -> None:
+    """Drop the legacy `frame_content.verdict_error_id` column if present.
+
+    The column was retired when verdict became a single Verdict.to_dict() JSON
+    in `verdict_value` (spec §3.5 / §4.3). Existing databases keep the column
+    until this migration drops it. SQLite 3.35+ supports ALTER TABLE DROP COLUMN.
+    """
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(frame_content)").fetchall()}
+    if "verdict_error_id" in cols:
+        conn.execute("ALTER TABLE frame_content DROP COLUMN verdict_error_id")

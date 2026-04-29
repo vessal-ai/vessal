@@ -18,7 +18,6 @@ def _spec(n: int) -> FrameWriteSpec:
         obs_diff_json='{"x": ["__missing__", 1]}',
         operation_error=None,
         verdict_value="null",
-        verdict_error=None,
         signals=[],
     )
 
@@ -37,9 +36,9 @@ def test_write_frame_inserts_one_frame_content_row(tmp_path: Path) -> None:
     log.write_frame(_spec(7))
     row = db.execute(
         "SELECT n, pong_think, pong_operation, pong_expect, obs_stdout, obs_diff_json, "
-        "obs_error_id, verdict_value, verdict_error_id FROM frame_content"
+        "obs_error_id, verdict_value FROM frame_content"
     ).fetchone()
-    assert row == (7, "thought", "x = 1", "", "", '{"x": ["__missing__", 1]}', None, "null", None)
+    assert row == (7, "thought", "x = 1", "", "", '{"x": ["__missing__", 1]}', None, "null")
 
 
 def test_write_frame_inserts_no_signals_no_errors(tmp_path: Path) -> None:

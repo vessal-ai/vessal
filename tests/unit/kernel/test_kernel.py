@@ -91,7 +91,7 @@ class TestExecute:
         assert isinstance(result, ExecResult)
         assert result.stdout == ""
         assert result.error is None
-        assert result.diff == ""
+        assert result.diff == []
 
     def test_whitespace_action_treated_as_empty(self):
         ns = bare_ns()
@@ -172,32 +172,32 @@ class TestExecute:
     def test_diff_added(self):
         ns = bare_ns()
         result = execute("a = 1\nb = 'hello'", {}, ns, frame_number=1)
-        assert "+a = 1" in result.diff
-        assert "+b = hello" in result.diff
+        assert {"op": "+", "name": "a", "type": "int"} in result.diff
+        assert {"op": "+", "name": "b", "type": "str"} in result.diff
 
     def test_diff_modified(self):
         ns = bare_ns()
         execute("x = 1", {}, ns, frame_number=1)
         result = execute("x = 99", {}, ns, frame_number=2)
-        assert "-x = 1" in result.diff
-        assert "+x = 99" in result.diff
+        assert {"op": "-", "name": "x", "type": "int"} in result.diff
+        assert {"op": "+", "name": "x", "type": "int"} in result.diff
 
     def test_diff_deleted(self):
         ns = bare_ns()
         execute("x = 1", {}, ns, frame_number=1)
         result = execute("del x", {}, ns, frame_number=2)
-        assert "-x = 1" in result.diff
+        assert {"op": "-", "name": "x", "type": "int"} in result.diff
 
     def test_diff_ignores_system_vars(self):
         """Variables starting with _ do not participate in diff."""
         ns = bare_ns()
         result = execute("_observe = ['x']", {}, ns, frame_number=1)
-        assert result.diff == ""
+        assert result.diff == []
 
     def test_diff_empty_when_no_change(self):
         ns = bare_ns()
         result = execute("pass", {}, ns, frame_number=1)
-        assert result.diff == ""
+        assert result.diff == []
 
     def test_history_not_managed_by_execute(self):
         """executor does not write _frame_stream; frame logging is managed by Cell via SQLite."""
@@ -454,7 +454,7 @@ class TestKernel:
         """New variables appear in observation.diff."""
         k = minimal_kernel()
         _exec(k, "alpha = 999")
-        assert "alpha" in k.L["observation"].diff
+        assert {"op": "+", "name": "alpha", "type": "int"} in k.L["observation"].diff
 
     def test_snapshot_restore(self):
         k = minimal_kernel()

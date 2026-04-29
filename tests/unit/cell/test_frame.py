@@ -69,10 +69,10 @@ def make_pong(
 
 def make_observation(
     stdout: str = "hello\n",
-    diff: str = "+x = 1",
+    diff: list | None = None,
     error: BaseException | None = None,
 ) -> Observation:
-    return Observation(stdout=stdout, stderr="", diff=diff, error=error)
+    return Observation(stdout=stdout, stderr="", diff=diff if diff is not None else [], error=error)
 
 
 def make_frame_record(**overrides) -> FrameRecord:
@@ -255,36 +255,42 @@ class TestObservation:
         obs = Observation(
             stdout="hello\n",
             stderr="",
-            diff="+x = 1",
+            diff=[{"op": "+", "name": "x", "type": "int"}],
             error=None,
         )
         assert obs.stdout == "hello\n"
         assert obs.stderr == ""
-        assert obs.diff == "+x = 1"
+        assert obs.diff == [{"op": "+", "name": "x", "type": "int"}]
         assert obs.error is None
 
     def test_with_error_exception(self):
         """error can be a BaseException instance."""
         exc = ZeroDivisionError("division by zero")
-        obs = Observation(stdout="", stderr="", diff="", error=exc)
+        obs = Observation(stdout="", stderr="", diff=[], error=exc)
         assert obs.error is exc
 
     def test_to_dict_no_verdict_key(self):
         """to_dict does not include a verdict key."""
-        obs = Observation(stdout="", stderr="", diff="", error=None)
+        obs = Observation(stdout="", stderr="", diff=[], error=None)
         d = obs.to_dict()
         assert "verdict" not in d
 
     def test_to_dict_roundtrip(self):
-        """Roundtrip is correct (error loses exception object on deserialise)."""
-        original = Observation(stdout="out", stderr="", diff="+x=1", error=None)
-        restored = Observation.from_dict(original.to_dict())
+        """Roundtrip via to_dict is correct (error loses exception object on deserialise)."""
+        original = Observation(stdout="out", stderr="", diff=[{"op": "+", "name": "x", "type": "int"}], error=None)
+        d = original.to_dict()
+        restored = Observation(
+            stdout=d.get("stdout", ""),
+            stderr=d.get("stderr", ""),
+            diff=list(d.get("diff", [])),
+            error=None,
+        )
         assert restored == original
 
     def test_to_dict_error_serialised_as_repr(self):
         """error is serialised via repr() in to_dict."""
         exc = ValueError("bad input")
-        obs = Observation(stdout="", stderr="", diff="", error=exc)
+        obs = Observation(stdout="", stderr="", diff=[], error=exc)
         d = obs.to_dict()
         assert "ValueError" in d["error"]
         assert "bad input" in d["error"]
@@ -315,14 +321,14 @@ class TestFrameRecord:
 
     def test_to_dict_roundtrip_full(self):
         """FrameRecord roundtrip is consistent."""
-        obs = Observation(stdout="out\n", stderr="", diff="+z=1", error=None)
+        obs = Observation(stdout="out\n", stderr="", diff=[{"op": "+", "name": "z", "type": "int"}], error=None)
         original = make_frame_record(observation=obs)
         restored = FrameRecord.from_dict(original.to_dict())
         assert restored == original
 
     def test_to_dict_roundtrip_minimal(self):
         """Minimal FrameRecord roundtrip is consistent."""
-        obs = Observation(stdout="", stderr="", diff="", error=None)
+        obs = Observation(stdout="", stderr="", diff=[], error=None)
         original = make_frame_record(observation=obs)
         restored = FrameRecord.from_dict(original.to_dict())
         assert restored == original
