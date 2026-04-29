@@ -23,14 +23,14 @@ def _make_record_dict(
     operation: str = "x = 1",
     expect: str = "assert x == 1",
     stdout: str = "out",
-    diff: str = "[+x]",
+    diff: list | None = None,
     error: BaseException | None = None,
 ) -> dict:
     record = FrameRecord(
         number=number,
         ping=Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})),
         pong=Pong(think=think, action=Action(operation=operation, expect=expect)),
-        observation=Observation(stdout=stdout, stderr="", diff=diff, error=error),
+        observation=Observation(stdout=stdout, stderr="", diff=diff if diff is not None else [], error=error),
     )
     return record.to_dict()
 
@@ -53,9 +53,10 @@ def test_flatten_promotes_pong_fields_to_top_level() -> None:
 
 
 def test_flatten_promotes_observation_fields_to_top_level() -> None:
-    flat = flatten_frame_dict(_make_record_dict(stdout="hello", diff="[+y]"))
+    diff_entry = {"op": "+", "name": "y", "type": "int"}
+    flat = flatten_frame_dict(_make_record_dict(stdout="hello", diff=[diff_entry]))
     assert flat["obs_stdout"] == "hello"
-    assert flat["obs_diff_json"] == "[+y]"
+    assert flat["obs_diff_json"] == [diff_entry]
     assert flat["obs_stderr"] == ""
     assert flat["obs_error"] is None
     assert "observation" not in flat

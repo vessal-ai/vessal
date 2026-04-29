@@ -131,31 +131,23 @@ class Observation:
     """Spec §3 — the world's response to an action.
 
     `error` is the raw exception with `__traceback__` cleared so the value
-    survives cloudpickle. The textual traceback for the errors table is
-    formatted at write-time from this exception, not stored here.
+    survives cloudpickle. `diff` is a structured list (spec §3.4); the
+    git-style multi-line string was a Kernel-side stringification, which
+    spec §1.4 forbids.
     """
 
     stdout: str
     stderr: str
-    diff: str
+    diff: list[dict[str, str]]
     error: BaseException | None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "stdout": self.stdout,
             "stderr": self.stderr,
-            "diff": self.diff,
+            "diff": list(self.diff),
             "error": repr(self.error) if self.error is not None else None,
         }
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Observation":
-        return cls(
-            stdout=d.get("stdout", ""),
-            stderr=d.get("stderr", ""),
-            diff=d.get("diff", ""),
-            error=None,
-        )
 
 
 # ─────────────────────────────────────────────
@@ -449,11 +441,17 @@ class FrameRecord:
             if ping_data is not None
             else Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={}))
         )
+        obs_data = d.get("observation", {})
         return cls(
             number=d["number"],
             ping=ping,
             pong=Pong.from_dict(d.get("pong", {})),
-            observation=Observation.from_dict(d.get("observation", {})),
+            observation=Observation(
+                stdout=obs_data.get("stdout", ""),
+                stderr=obs_data.get("stderr", ""),
+                diff=list(obs_data.get("diff", [])),
+                error=None,
+            ),
         )
 
 
