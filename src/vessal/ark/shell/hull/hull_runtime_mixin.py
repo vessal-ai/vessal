@@ -47,14 +47,14 @@ class HullRuntimeMixin:
             - frame (int): Current frame number
             - wake (str): Most recent wake reason
         """
-        system = self._cell.G.get("_system")
+        system = self._main_cell.G.get("_system")
         # Hull is _system's only external consumer of _sleeping — direct access is intentional.
         sleeping = system._sleeping if system is not None else False
         return {
             "idle": sleeping,
             "sleeping": sleeping,
-            "frame": self._cell.L.get("_frame", 0),
-            "wake": self._cell.G["_system"]._wake_reason if "_system" in self._cell.G else "",
+            "frame": self._main_cell.L.get("_frame", 0),
+            "wake": self._main_cell.G["_system"]._wake_reason if "_system" in self._main_cell.G else "",
         }
 
     def reload_soul(self) -> None:
@@ -70,15 +70,15 @@ class HullRuntimeMixin:
 
     def get_ns(self, key: str) -> Any:
         """Get a value from Cell namespace."""
-        return self._cell.L.get(key)
+        return self._main_cell.L.get(key)
 
     def set_ns(self, key: str, value: Any) -> None:
         """Set a value in Cell namespace."""
-        self._cell.L[key] = value
+        self._main_cell.L[key] = value
 
     def ns_keys(self) -> list[str]:
         """Return all keys in Cell namespace."""
-        return list(self._cell.L.keys())
+        return list(self._main_cell.L.keys())
 
     def frames(self, after: int | None = None) -> list[dict]:
         """Query layer-0 frames from SQLite frame_log in flat wire shape.
@@ -92,7 +92,7 @@ class HullRuntimeMixin:
         """
         from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
 
-        frame_log = self._cell._kernel.frame_log
+        frame_log = self._main_cell._kernel.frame_log
         if frame_log is None:
             return []
         fs = render_frame_stream(frame_log.conn)
@@ -241,7 +241,7 @@ class HullRuntimeMixin:
             if current_mtime != self._soul_mtime:
                 self._soul_text = self._soul_path.read_text(encoding="utf-8")
                 self._soul_mtime = current_mtime
-        self._cell.G["_soul"] = self._soul_text
+        self._main_cell.G["_soul"] = self._soul_text
 
     def _after_frame(self) -> None:
         """Called after each successful frame."""

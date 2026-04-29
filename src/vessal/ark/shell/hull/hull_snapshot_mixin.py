@@ -24,7 +24,7 @@ class HullSnapshotMixin:
             self._snapshots_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             path = str(self._snapshots_dir / f"{timestamp}.pkl")
-        self._cell.snapshot(path)
+        self._main_cell.snapshot(path)
         return path
 
     def _latest_snapshot_path(self) -> str | None:
