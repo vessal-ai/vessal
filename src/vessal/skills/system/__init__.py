@@ -1,4 +1,4 @@
 """system — built-in SystemSkill carrying Kernel signals."""
-from vessal.skills.system.skill import SystemSkill
+from .skill import SystemSkill as Skill
 
-__all__ = ["SystemSkill"]
+__all__ = ["Skill"]

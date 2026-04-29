@@ -166,7 +166,7 @@ def test_read_pending_skips_layers_already_covered(main_db):
 
 
 def test_system_prompt_loads_and_is_nonempty():
-    from vessal.skills.compaction import COMPACTION_SYSTEM_PROMPT
+    from vessal.ark.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
 
     assert isinstance(COMPACTION_SYSTEM_PROMPT, str)
     assert "compaction" in COMPACTION_SYSTEM_PROMPT.lower()

@@ -33,7 +33,7 @@ def test_dead_handle_unresolved_ref_transient_exported() -> None:
 
 
 def test_system_skill_has_sleep_wake() -> None:
-    from vessal.skills.system import SystemSkill
+    from vessal.skills.system.skill import SystemSkill
     assert callable(SystemSkill.sleep)
     assert callable(SystemSkill.wake)
 

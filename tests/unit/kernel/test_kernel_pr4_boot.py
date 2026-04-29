@@ -121,7 +121,7 @@ def test_preset_skills_live_in_G(tmp_path: Path):
 
 def test_systemskill_zero_arg_construction():
     """Spec §7.4 example: `_system = SystemSkill()` — no arguments."""
-    from vessal.skills.system import SystemSkill
+    from vessal.skills.system.skill import SystemSkill
     s = SystemSkill()
     assert isinstance(s.signal, dict)
 

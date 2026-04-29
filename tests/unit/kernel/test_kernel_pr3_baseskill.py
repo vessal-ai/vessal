@@ -33,7 +33,7 @@ def test_baseskill_requires_signal_dict_and_signal_update():
 
 
 def test_systemskill_in_G_after_init():
-    from vessal.skills.system import SystemSkill
+    from vessal.skills.system.skill import SystemSkill
 
     k = minimal_kernel()
     assert "_system" in k.G
