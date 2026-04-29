@@ -40,3 +40,7 @@ class Hull(HullInitMixin, HullSkillsMixin, HullSnapshotMixin, HullRuntimeMixin):
         self._init_skills(hull_cfg)
         self._init_prompts()
         self._init_loop(gates_cfg)
+
+    @property
+    def cells(self) -> list:
+        return [self._main_cell, self._compaction_cell]
