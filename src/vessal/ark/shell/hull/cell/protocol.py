@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Union
 
-FRAME_SCHEMA_VERSION = 7
+FRAME_SCHEMA_VERSION = 8
 
 
 # ─────────────────────────────────────────────

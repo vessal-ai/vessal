@@ -131,8 +131,8 @@ class TestStepResult:
 
 
 class TestFrameRecord:
-    def test_schema_version_is_7(self):
-        assert FRAME_SCHEMA_VERSION == 7
+    def test_schema_version_is_8(self):
+        assert FRAME_SCHEMA_VERSION == 8
 
     def _make_record(self, number: int = 1) -> FrameRecord:
         ping = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
@@ -157,7 +157,7 @@ class TestFrameRecord:
         ping = Ping(system_prompt="sys", state=State(frame_stream=_EMPTY_FS, signals={}))
         fr = FrameRecord(number=3, ping=ping, pong=pong, observation=obs)
         d = fr.to_dict()
-        assert d["schema_version"] == 7
+        assert d["schema_version"] == 8
         assert d["number"] == 3
         assert d["ping"]["system_prompt"] == "sys"
         assert d["ping"]["state"]["signals"] == {}
@@ -212,7 +212,7 @@ class TestFrameRecord:
         obs = Observation(stdout="", stderr="", diff=[{"op": "+", "name": "x", "type": "int"}], error=None)
         record = FrameRecord(number=1, ping=ping, pong=pong, observation=obs)
         d = record.to_dict()
-        assert d["schema_version"] == 7
+        assert d["schema_version"] == 8
         assert d["ping"]["system_prompt"] == "sys"
         assert d["ping"]["state"]["signals"] == {}
 
