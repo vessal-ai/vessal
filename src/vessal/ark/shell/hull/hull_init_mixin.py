@@ -274,7 +274,7 @@ class HullInitMixin:
         self._rewrite_runtime_owned()
         self._main_cell.G["_system_prompt"] = self._prompt_builder.build(self._main_cell.G)
 
-        from vessal.skills.compaction import COMPACTION_SYSTEM_PROMPT
+        from vessal.ark.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
         self._compaction_cell.G["_system_prompt"] = COMPACTION_SYSTEM_PROMPT
 
         hooks = FrameHooks(
