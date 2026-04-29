@@ -26,21 +26,25 @@ class FrameLog:
         self.conn = conn
 
     def write_frame(self, spec: FrameWriteSpec) -> None:
-        """Persist one layer=0 frame in a single transaction.
+        """Persist one layer=0 frame in a single transaction (spec §4.6).
 
-        Args:
-            spec: FrameWriteSpec with all fields populated.
+        Write order:
+          INSERT errors rows (operation + each verdict failure + each signal failure)
+          INSERT frame_content (refs operation_error via obs_error_id)
+          INSERT signals
+          INSERT entries (last)
         """
         cur = self.conn.cursor()
         cur.execute("BEGIN")
         try:
             obs_error_id = self._maybe_insert_error(cur, spec.n, spec.operation_error)
-            verdict_error_id = self._maybe_insert_error(cur, spec.n, spec.verdict_error)
+            for verr in spec.verdict_errors:
+                self._maybe_insert_error(cur, spec.n, verr)
             cur.execute(
                 "INSERT INTO frame_content("
                 "n, pong_think, pong_operation, pong_expect, "
                 "obs_stdout, obs_stderr, obs_diff_json, obs_error_id, "
-                "verdict_value, verdict_error_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                "verdict_value) VALUES (?,?,?,?,?,?,?,?,?)",
                 (
                     spec.n,
                     spec.pong_think,
@@ -51,7 +55,6 @@ class FrameLog:
                     spec.obs_diff_json,
                     obs_error_id,
                     spec.verdict_value,
-                    verdict_error_id,
                 ),
             )
             for sig in spec.signals:

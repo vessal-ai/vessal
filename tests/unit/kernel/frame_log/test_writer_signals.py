@@ -16,7 +16,7 @@ def _spec_with_signals(n: int, signals: list[SignalRow]) -> FrameWriteSpec:
     return FrameWriteSpec(
         n=n, pong_think="", pong_operation="", pong_expect="",
         obs_stdout="", obs_stderr="", obs_diff_json="{}",
-        operation_error=None, verdict_value="null", verdict_error=None,
+        operation_error=None, verdict_value="null",
         signals=signals,
     )
 
