@@ -477,7 +477,7 @@ class TestVenvActivation:
 class TestWake:
     def test_wake_default_empty(self, tmp_path):
         """SystemSkill wake_reason is empty string after Hull initialization."""
-        from vessal.skills.system.skill import SystemSkill
+        from skills.system.skill import SystemSkill
         hull = _make_hull(tmp_path)
         system = hull._main_cell.G.get("_system")
         assert isinstance(system, SystemSkill)
