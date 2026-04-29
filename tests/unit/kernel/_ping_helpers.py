@@ -20,6 +20,6 @@ def minimal_kernel(*, db_path: str | None = None, with_system: bool = True, rest
     entries = []
     if with_system:
         entries.append(
-            BootSkillEntry("_system", "vessal.skills.system", "SystemSkill", "")
+            BootSkillEntry("_system", "vessal.skills.system", "Skill", "")
         )
     return Kernel(boot_script=compose_boot_script(entries), db_path=db_path, restore_path=restore_path)

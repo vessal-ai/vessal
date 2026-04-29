@@ -107,7 +107,7 @@ class HullInitMixin:
         resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
         self._skill_manager = SkillLoader(skill_paths=resolved_paths)
 
-        entries = [BootSkillEntry("_system", "vessal.skills.system", "SystemSkill", "")]
+        entries = [BootSkillEntry("_system", "vessal.skills.system", "Skill", "")]
         for skill_name in hull_cfg.get("skills", []):
             try:
                 skill_cls = self._skill_manager.load(skill_name)
@@ -392,12 +392,12 @@ trace = false  # disable to reduce IO
         return [
             BootSkillEntry(
                 var_name="_system",
-                import_path="vessal.skills.system",
+                import_path="vessal.skills.system.skill",
                 class_name="SystemSkill",
             ),
             BootSkillEntry(
                 var_name="compaction",
-                import_path="vessal.skills.compaction",
+                import_path="vessal.skills.compaction._skill",
                 class_name="CompactionSkill",
                 kwargs_repr=f"main_db_path={main_db_path!r}",
             ),

@@ -96,7 +96,7 @@ class Cell:
             # by unit tests that construct Cell in isolation. Revisit if Cell ever gets
             # a true project-less mode.
             boot_script = compose_boot_script([
-                BootSkillEntry("_system", "vessal.skills.system", "SystemSkill", ""),
+                BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
             ])
 
         self._kernel = Kernel(boot_script=boot_script, db_path=db_path, restore_path=restore_path)
