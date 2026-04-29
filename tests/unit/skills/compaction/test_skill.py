@@ -163,3 +163,13 @@ def test_read_pending_skips_layers_already_covered(main_db):
     view = skill.read_pending()
     # layer 0 has no uncovered entries; layer 1 has 1 entry < k; nothing pending
     assert view.groups == []
+
+
+def test_system_prompt_loads_and_is_nonempty():
+    from vessal.skills.compaction import COMPACTION_SYSTEM_PROMPT
+
+    assert isinstance(COMPACTION_SYSTEM_PROMPT, str)
+    assert "compaction" in COMPACTION_SYSTEM_PROMPT.lower()
+    assert "read_pending" in COMPACTION_SYSTEM_PROMPT
+    assert "write_summary" in COMPACTION_SYSTEM_PROMPT
+    assert "schema_version" in COMPACTION_SYSTEM_PROMPT
