@@ -70,8 +70,8 @@ def test_boot_frame_pong_operation_contains_real_script(tmp_path: Path):
         "SELECT pong_operation, pong_expect, verdict_value FROM frame_content WHERE n = 1"
     ).fetchone()
     assert "from vessal.skills.system import SystemSkill" in op
-    assert expect == "True"
-    assert verdict == "true"
+    assert expect == ""
+    assert verdict is None
 
 
 def test_boot_frame_obs_stdout_captures_skill_init_prints(tmp_path: Path):
