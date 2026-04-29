@@ -90,12 +90,16 @@ class HullRuntimeMixin:
             Frames in the flat wire shape (kernel doc §4.3 frame_content columns),
             ordered oldest to newest.
         """
+        from vessal.ark.shell.hull.cell.kernel.frame_log import open_read_only
         from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
 
-        frame_log = self._main_cell._kernel.frame_log
-        if frame_log is None:
+        if not self._main_db_path:
             return []
-        fs = render_frame_stream(frame_log.conn)
+        conn = open_read_only(self._main_db_path)
+        try:
+            fs = render_frame_stream(conn)
+        finally:
+            conn.close()
         flat: list[dict] = []
         for entry in fs.entries:
             if entry.layer != 0:
