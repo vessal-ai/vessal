@@ -411,11 +411,11 @@ class Kernel:
     def _build_write_spec(self, record: FrameRecord) -> "FrameWriteSpec":
         """Translate a FrameRecord into a FrameWriteSpec for the frame_log writer.
 
-        Args:
-            record: Completed FrameRecord from this frame.
-
-        Returns:
-            FrameWriteSpec ready to pass to FrameLog.write_frame().
+        Per spec §3.5.6 / §4.5: each expect_syntax_error / expect_runtime_error
+        VerdictFailure becomes one errors row with source='expect'. The
+        assertion_failed and expect_unsafe_error kinds do not have Python
+        exceptions and are not written to errors (their message lives only
+        in verdict_value JSON).
         """
         import json as _json
         import traceback as _tb
@@ -430,10 +430,17 @@ class Kernel:
             operation_error = ErrorOnSource("operation", None, operation_error_text)
         else:
             operation_error = None
-        verdict_value: str | None = None
         verdict = self.L.get("verdict")
+        verdict_value: str | None = (
+            _json.dumps(verdict.to_dict()) if verdict is not None else None
+        )
+        verdict_errors: list[ErrorOnSource] = []
         if verdict is not None:
-            verdict_value = _json.dumps(verdict.to_dict())
+            for failure in verdict.failures:
+                if failure.kind in ("expect_syntax_error", "expect_runtime_error"):
+                    verdict_errors.append(
+                        ErrorOnSource("expect", None, failure.message)
+                    )
         diff_json = _json.dumps(obs.diff)
         sig_rows: list[SignalRow] = []
         for (cls_name, var_name, scope), payload in self.L.get("signals", {}).items():
@@ -466,6 +473,6 @@ class Kernel:
             obs_diff_json=diff_json,
             operation_error=operation_error,
             verdict_value=verdict_value,
-            verdict_errors=[],
+            verdict_errors=verdict_errors,
             signals=sig_rows,
         )
