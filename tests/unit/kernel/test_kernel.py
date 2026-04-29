@@ -512,69 +512,87 @@ class TestKernel:
     def test_snapshot_restore_with_skill(self, tmp_path):
         """After loading a Skill and doing snapshot/restore, the Skill class object is correctly restored."""
         from vessal.skills._base import BaseSkill
-        skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
-        with patch.dict(sys.modules):
-            k = minimal_kernel()
-            sm = SkillLoader(skill_paths=[skills_root])
-            k.L["_builtin_names"] = []
+        vessal_src = str(Path(__file__).resolve().parents[3] / "src" / "vessal")
+        sys.modules.pop("skills", None)
+        sys.path.insert(0, vessal_src)
+        try:
+            with patch.dict(sys.modules):
+                k = minimal_kernel()
+                sm = SkillLoader()
+                k.L["_builtin_names"] = []
 
-            skill_cls = sm.load("tasks")
-            k.L["tasks_cls"] = skill_cls
+                skill_cls = sm.load("tasks")
+                k.L["tasks_cls"] = skill_cls
 
-            assert issubclass(skill_cls, BaseSkill)
+                assert issubclass(skill_cls, BaseSkill)
 
-            snap = str(tmp_path / "test.pkl")
-            k.snapshot(snap)
+                snap = str(tmp_path / "test.pkl")
+                k.snapshot(snap)
 
-            k2 = minimal_kernel()
-            k2.restore(snap)
+                k2 = minimal_kernel()
+                k2.restore(snap)
 
-            assert issubclass(k2.L["tasks_cls"], BaseSkill)
+                assert issubclass(k2.L["tasks_cls"], BaseSkill)
+        finally:
+            if vessal_src in sys.path:
+                sys.path.remove(vessal_src)
 
     def test_snapshot_restore_skill_with_data(self, tmp_path):
         """Skill-produced data and instances are correctly restored together."""
         from vessal.skills._base import BaseSkill
-        skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
-        with patch.dict(sys.modules):
-            k = minimal_kernel()
-            sm = SkillLoader(skill_paths=[skills_root])
-            k.L["_builtin_names"] = []
+        vessal_src = str(Path(__file__).resolve().parents[3] / "src" / "vessal")
+        sys.modules.pop("skills", None)
+        sys.path.insert(0, vessal_src)
+        try:
+            with patch.dict(sys.modules):
+                k = minimal_kernel()
+                sm = SkillLoader()
+                k.L["_builtin_names"] = []
 
-            TasksCls = sm.load("tasks")
-            k.L["TasksCls"] = TasksCls
-            _exec(k, 't = TasksCls(); task_id = t.add("test goal")')
+                TasksCls = sm.load("tasks")
+                k.L["TasksCls"] = TasksCls
+                _exec(k, 't = TasksCls(); task_id = t.add("test goal")')
 
-            assert k.L["task_id"] == "1"
+                assert k.L["task_id"] == "1"
 
-            snap = str(tmp_path / "test.pkl")
-            k.snapshot(snap)
+                snap = str(tmp_path / "test.pkl")
+                k.snapshot(snap)
 
-            k2 = minimal_kernel()
-            k2.restore(snap)
+                k2 = minimal_kernel()
+                k2.restore(snap)
 
-            assert k2.L["task_id"] == "1"
-            assert issubclass(k2.L["TasksCls"], BaseSkill)
+                assert k2.L["task_id"] == "1"
+                assert issubclass(k2.L["TasksCls"], BaseSkill)
+        finally:
+            if vessal_src in sys.path:
+                sys.path.remove(vessal_src)
 
     def test_restore_cleans_sys_modules(self, tmp_path):
         """restore clears sys.modules cache; does not use stale in-process modules."""
         from vessal.skills._base import BaseSkill
-        skills_root = str(Path(__file__).resolve().parents[3] / "src" / "vessal" / "skills")
-        with patch.dict(sys.modules):
-            k = minimal_kernel()
-            sm = SkillLoader(skill_paths=[skills_root])
-            k.L["_builtin_names"] = []
+        vessal_src = str(Path(__file__).resolve().parents[3] / "src" / "vessal")
+        sys.modules.pop("skills", None)
+        sys.path.insert(0, vessal_src)
+        try:
+            with patch.dict(sys.modules):
+                k = minimal_kernel()
+                sm = SkillLoader()
+                k.L["_builtin_names"] = []
 
-            TasksCls = sm.load("tasks")
-            k.L["TasksCls"] = TasksCls
+                TasksCls = sm.load("tasks")
+                k.L["TasksCls"] = TasksCls
 
-            snap = str(tmp_path / "test.pkl")
-            k.snapshot(snap)
+                snap = str(tmp_path / "test.pkl")
+                k.snapshot(snap)
 
-            k2 = minimal_kernel()
-            k2.restore(snap)
+                k2 = minimal_kernel()
+                k2.restore(snap)
 
-            # Skill class should be usable after restore
-            assert issubclass(k2.L["TasksCls"], BaseSkill)
+                # Skill class should be usable after restore
+                assert issubclass(k2.L["TasksCls"], BaseSkill)
+        finally:
+            if vessal_src in sys.path:
+                sys.path.remove(vessal_src)
 
     def test_ns_direct_write_affects_exec(self):
         """Writing directly to kernel.L is visible to subsequent ping() calls."""
