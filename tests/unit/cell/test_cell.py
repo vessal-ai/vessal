@@ -499,25 +499,64 @@ class TestFreshPingPerFrame:
 
 
 # ============================================================
-# Real token data written to namespace
+# Telemetry: per-Cell cache_metrics.jsonl
 # ============================================================
 
 
-class TestRealTokenPassthrough:
-    """Cell.step() writes real token data returned by Core to namespace."""
+class TestTelemetryJsonl:
+    """Cell.step() appends one JSONL line per successful Core call."""
 
-    def test_actual_tokens_written_to_ns(self):
-        cell = _make_cell()
+    def test_jsonl_record_written_after_step(self, tmp_path):
+        import json
+        cell = _make_cell(data_dir=str(tmp_path))
         pong = _make_pong(_action("x = 1"))
-        cell._core.step = MagicMock(return_value=(pong, {"prompt_tokens": 5000, "completion_tokens": 200, "cached_tokens": 0, "elapsed_seconds": 0.0, "attempts": 1}))
+        cell._core.step = MagicMock(return_value=(
+            pong,
+            {"prompt_tokens": 5000, "completion_tokens": 200,
+             "cached_tokens": 1500, "elapsed_seconds": 0.42, "attempts": 1},
+        ))
         cell.step()
-        assert cell.L["_actual_tokens_in"] == 5000
-        assert cell.L["_actual_tokens_out"] == 200
 
-    def test_no_usage_leaves_estimated_context_pct(self):
-        cell = _make_cell()
+        jsonl_path = tmp_path / "cache_metrics.jsonl"
+        assert jsonl_path.exists()
+        line = jsonl_path.read_text(encoding="utf-8").splitlines()[0]
+        record = json.loads(line)
+        assert record["prompt_tokens"] == 5000
+        assert record["completion_tokens"] == 200
+        assert record["cached_tokens"] == 1500
+        assert record["elapsed_seconds"] == 0.42
+        assert record["attempts"] == 1
+        assert "ts" in record
+        assert "frame" in record
+
+    def test_no_jsonl_when_usage_empty(self, tmp_path):
+        cell = _make_cell(data_dir=str(tmp_path))
         pong = _make_pong(_action("x = 1"))
         cell._core.step = MagicMock(return_value=(pong, {}))
         cell.step()
-        assert cell.L.get("_actual_tokens_in") is None
+
+        jsonl_path = tmp_path / "cache_metrics.jsonl"
+        assert not jsonl_path.exists()
+
+    def test_no_actual_tokens_in_L_anymore(self, tmp_path):
+        cell = _make_cell(data_dir=str(tmp_path))
+        pong = _make_pong(_action("x = 1"))
+        cell._core.step = MagicMock(return_value=(
+            pong,
+            {"prompt_tokens": 1, "completion_tokens": 2,
+             "cached_tokens": 0, "elapsed_seconds": 0.0, "attempts": 1},
+        ))
+        cell.step()
+        assert "_actual_tokens_in" not in cell.L
+        assert "_actual_tokens_out" not in cell.L
+
+    def test_no_jsonl_when_data_dir_is_none(self):
+        cell = _make_cell()  # no data_dir
+        pong = _make_pong(_action("x = 1"))
+        cell._core.step = MagicMock(return_value=(
+            pong,
+            {"prompt_tokens": 5, "completion_tokens": 1,
+             "cached_tokens": 0, "elapsed_seconds": 0.0, "attempts": 1},
+        ))
+        cell.step()  # must not raise
 

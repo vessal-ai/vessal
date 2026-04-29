@@ -203,10 +203,14 @@ class Cell:
         except Exception as e:
             return StepResult(protocol_error=str(e))
 
-        if usage.get("prompt_tokens") is not None:
-            self._kernel.L["_actual_tokens_in"] = usage["prompt_tokens"]
-        if usage.get("completion_tokens") is not None:
-            self._kernel.L["_actual_tokens_out"] = usage["completion_tokens"]
+        if self._data_dir is not None and usage:
+            from datetime import datetime, timezone
+            from vessal.ark.shell.hull.cell.core.telemetry import append_usage
+            append_usage(
+                Path(self._data_dir) / "cache_metrics.jsonl",
+                {"frame": frame_number, **usage,
+                 "ts": datetime.now(timezone.utc).isoformat()},
+            )
 
         if self._check_action_gate(self._pong.action.operation) is None:
             self._pong = None  # do not execute next call
