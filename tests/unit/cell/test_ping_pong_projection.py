@@ -20,7 +20,7 @@ def _fixed_pong(code: str = "pass") -> Pong:
 
 
 def _stub_core(cell: Cell, pong: Pong) -> None:
-    cell._core.step = MagicMock(return_value=(pong, None, None))
+    cell._core.step = MagicMock(return_value=(pong, {}))
 
 
 def test_ping_is_from_previous_frame():

@@ -197,16 +197,16 @@ class Cell:
         frame_number = self._kernel.L["_frame"] + 1
 
         try:
-            self._pong, prompt_tokens, completion_tokens = self._core.step(
+            self._pong, usage = self._core.step(
                 self._ping, tracer, frame_number,
             )
         except Exception as e:
             return StepResult(protocol_error=str(e))
 
-        if prompt_tokens is not None:
-            self._kernel.L["_actual_tokens_in"] = prompt_tokens
-        if completion_tokens is not None:
-            self._kernel.L["_actual_tokens_out"] = completion_tokens
+        if usage.get("prompt_tokens") is not None:
+            self._kernel.L["_actual_tokens_in"] = usage["prompt_tokens"]
+        if usage.get("completion_tokens") is not None:
+            self._kernel.L["_actual_tokens_out"] = usage["completion_tokens"]
 
         if self._check_action_gate(self._pong.action.operation) is None:
             self._pong = None  # do not execute next call

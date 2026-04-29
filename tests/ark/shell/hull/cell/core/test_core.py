@@ -168,7 +168,7 @@ class TestCore:
 
         core = Core(api_params={"temperature": 0.5, "max_tokens": 2048})
         ping = _make_ping(system_prompt="sys", frame_stream="frames", signals="")
-        pong, _, _ = core.step(ping)
+        pong, _ = core.step(ping)
 
         call_args = mock_client.chat.completions.create.call_args
         assert call_args.kwargs["model"] == "test-model"
@@ -186,7 +186,7 @@ class TestCore:
         )
 
         core = Core()
-        pong, _, _ = core.step(_make_ping())
+        pong, _ = core.step(_make_ping())
         assert isinstance(pong, Pong)
         assert pong.action.operation == "y = 2 + 3"
 
@@ -354,7 +354,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=2)
-        pong, _, _ = core.step(_make_ping())
+        pong, _ = core.step(_make_ping())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "x = 1"
@@ -442,7 +442,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=1)
-        pong, _, _ = core.step(_make_ping())
+        pong, _ = core.step(_make_ping())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "pass"
@@ -459,7 +459,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=1)
-        pong, _, _ = core.step(_make_ping())
+        pong, _ = core.step(_make_ping())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "pass"
@@ -485,7 +485,7 @@ def test_core_step_accepts_ping(mock_openai_cls):
         system_prompt="You are an agent.",
         state=State(frame_stream=FrameStream(entries=[]), signals={}),
     )
-    pong, _, _ = core.step(ping)
+    pong, _ = core.step(ping)
     assert isinstance(pong, Pong)
     assert isinstance(pong.action, Action)
 
@@ -537,7 +537,7 @@ def test_core_step_pong_parsed_correctly(mock_openai_cls):
 
     core = Core()
     ping = Ping(system_prompt="sys", state=State(frame_stream=FrameStream(entries=[]), signals={}))
-    pong, _, _ = core.step(ping)
+    pong, _ = core.step(ping)
     assert pong.action.operation == "x = 42"
     assert pong.think == "analysis"
 
@@ -548,7 +548,7 @@ def test_core_step_pong_parsed_correctly(mock_openai_cls):
 
 
 class TestCoreUsageReturn:
-    """Core.step() returns (Pong, prompt_tokens, completion_tokens)."""
+    """Core.step() returns (Pong, usage: dict)."""
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_returns_usage_tuple(self, mock_openai_cls):
@@ -560,10 +560,10 @@ class TestCoreUsageReturn:
         mock_client.chat.completions.create.return_value = resp
 
         core = Core()
-        pong, pt, ct = core.step(_make_ping())
+        pong, usage = core.step(_make_ping())
         assert isinstance(pong, Pong)
-        assert pt == 5000
-        assert ct == 200
+        assert usage["prompt_tokens"] == 5000
+        assert usage["completion_tokens"] == 200
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_returns_none_when_no_usage(self, mock_openai_cls):
@@ -574,7 +574,94 @@ class TestCoreUsageReturn:
         mock_client.chat.completions.create.return_value = resp
 
         core = Core()
-        pong, pt, ct = core.step(_make_ping())
+        pong, usage = core.step(_make_ping())
         assert isinstance(pong, Pong)
-        assert pt is None
-        assert ct is None
+        assert usage == {}
+
+
+def test_core_step_returns_pong_and_usage_dict(monkeypatch):
+    """Core.step() must return (Pong, usage: dict). usage carries
+    prompt_tokens / completion_tokens / cached_tokens / elapsed_seconds / attempts.
+    """
+    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+        core = Core()
+
+    class _FakeUsage:
+        prompt_tokens = 1000
+        completion_tokens = 200
+        class prompt_tokens_details:
+            cached_tokens = 700
+
+    class _FakeChoice:
+        class message:
+            content = "<think>t</think><action>x = 1</action>"
+
+    class _FakeResponse:
+        choices = [_FakeChoice]
+        usage = _FakeUsage
+
+    monkeypatch.setattr(core._client.chat.completions, "create",
+                        lambda **kw: _FakeResponse)
+
+    ping = Ping(system_prompt="sys", state=State(
+        frame_stream=FrameStream(entries=[]), signals={}))
+
+    pong, usage = core.step(ping, tracer=None, frame=1)
+    assert isinstance(pong, Pong)
+    assert usage["prompt_tokens"] == 1000
+    assert usage["completion_tokens"] == 200
+    assert usage["cached_tokens"] == 700
+    assert usage["attempts"] == 1
+    assert isinstance(usage["elapsed_seconds"], float)
+    assert usage["elapsed_seconds"] >= 0
+
+
+def test_core_step_usage_empty_when_response_usage_is_none(monkeypatch):
+    """response.usage = None -> usage = {} (empty dict, not None)."""
+    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+        core = Core()
+
+    class _FakeChoice:
+        class message:
+            content = "<action>x = 1</action>"
+
+    class _FakeResponse:
+        choices = [_FakeChoice]
+        usage = None
+
+    monkeypatch.setattr(core._client.chat.completions, "create",
+                        lambda **kw: _FakeResponse)
+
+    ping = Ping(system_prompt="sys", state=State(
+        frame_stream=FrameStream(entries=[]), signals={}))
+
+    _, usage = core.step(ping, tracer=None, frame=1)
+    assert usage == {}
+
+
+def test_core_step_cached_tokens_defaults_to_zero(monkeypatch):
+    """Provider that doesn't return prompt_tokens_details -> cached_tokens=0."""
+    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+        core = Core()
+
+    class _FakeUsage:
+        prompt_tokens = 500
+        completion_tokens = 100
+        # no prompt_tokens_details attribute
+
+    class _FakeChoice:
+        class message:
+            content = "<action>y = 2</action>"
+
+    class _FakeResponse:
+        choices = [_FakeChoice]
+        usage = _FakeUsage
+
+    monkeypatch.setattr(core._client.chat.completions, "create",
+                        lambda **kw: _FakeResponse)
+
+    ping = Ping(system_prompt="sys", state=State(
+        frame_stream=FrameStream(entries=[]), signals={}))
+
+    _, usage = core.step(ping, tracer=None, frame=1)
+    assert usage["cached_tokens"] == 0
