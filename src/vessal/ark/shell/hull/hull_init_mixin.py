@@ -386,13 +386,13 @@ trace = false  # disable to reduce IO
         return [
             BootSkillEntry(
                 var_name="_system",
-                import_path="skills.system",
-                class_name="Skill",
+                import_path="skills.system.skill",  # avoids class_name collision with compaction
+                class_name="SystemSkill",
             ),
             BootSkillEntry(
                 var_name="compaction",
-                import_path="skills.compaction",
-                class_name="Skill",
+                import_path="skills.compaction._skill",
+                class_name="CompactionSkill",
                 kwargs_repr=f"main_db_path={main_db_path!r}",
             ),
         ]
