@@ -41,7 +41,7 @@ block-beta
 
 `action`: composed of `operation` (Python code) and `expect` (assertion code). Operation is the action the LLM intends to take; expect is the LLM's prediction of the outcome.
 
-Executing the action produces an **Observation**: stdout, diff (namespace changes), error, and verdict (the result of evaluating expect).
+Executing `operation` produces an **Observation**: stdout, stderr, diff (a structured list of namespace changes — each row is `{op, name, type}` where `op` is `+` for a new binding and `-` for a removed one), and error (the raw exception with `__traceback__` cleared, or null). Evaluating `expect` produces a sibling **Verdict**: total, passed, and a list of `failures` keyed by `kind` (`assertion_failed`, `expect_syntax_error`, `expect_unsafe_error`, `expect_runtime_error`). Observation and Verdict are siblings of the same frame, not nested; verdict is null when the frame's expect block was empty.
 
 ```mermaid
 graph TB
@@ -58,7 +58,8 @@ graph TB
     end
 
     ping -->|LLM| pong
-    pong -->|exec| OBS["Observation\nstdout · diff · error · verdict"]
+    pong -->|exec operation| OBS["Observation\nstdout · stderr · diff · error"]
+    pong -->|eval expect| VRD["Verdict\ntotal · passed · failures"]
 ```
 
 
@@ -74,7 +75,7 @@ A frame begins at the moment the namespace is at rest — all side effects from 
 
 **Phase 4: action_gate + Execution.** The action gate checks the operation code in the Pong for safety. Once it passes, the Kernel executes the code and produces an Observation.
 
-**Phase 5: Commit.** The frame record is committed to the frame log. A frame record contains only: **frame number, action (operation + expect), and observation (stdout + diff + error + verdict).** Think and wake_reason are excluded — think goes to the audit trace; wake_reason is set once at wake time and does not need to repeat in every frame. The namespace reaches a new resting point.
+**Phase 5: Commit.** The frame record is committed to the frame log. A frame record contains: **frame number, pong (`think` + action (`operation` + `expect`)), observation (stdout + stderr + diff + error), and verdict (`{total, passed, failures}` or null when expect was empty).** Wake_reason is not duplicated per frame — it is set once at wake time and lives on the `_system` Skill's signal. The namespace reaches a new resting point.
 
 ```mermaid
 sequenceDiagram

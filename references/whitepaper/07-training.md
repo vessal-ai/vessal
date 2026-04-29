@@ -109,7 +109,7 @@ This matters for training because it means trajectories from different sessions,
 
 The frame log is not a debug artifact. It is training data.
 
-Every frame produces a frame record containing: frame number, action (operation + expect), and observation (stdout + diff + error + verdict). The frame record is the (s, a, r, s') tuple of RL, recorded automatically, in a consistent structured format, for every step of every task the agent runs.
+Every frame produces a frame record containing: frame number, action (operation + expect), observation (stdout + stderr + diff + error), and verdict (the result of evaluating expect, or null when expect was empty). The frame record is the (s, a, r, s') tuple of RL, recorded automatically, in a consistent structured format, for every step of every task the agent runs.
 
 The consistency of this structure deserves emphasis. One of the hard problems in training on agent trajectories is that different environments, different agent architectures, and different task types produce wildly different log formats. A trajectory from a LangChain agent looks nothing like a trajectory from an AutoGen conversation. Neither looks like a trajectory from a ReAct loop. Merging these into a single training corpus requires schema normalization, semantic alignment, and often manual curation. The resulting datasets are small, expensive, and quickly outdated.
 

@@ -176,11 +176,10 @@ The `/frames` endpoint and the `frame` SSE event payload use a flat shape that m
 | `pong_operation` | str | Python code executed this frame. |
 | `pong_expect` | str | Assertion code verified after operation. |
 | `obs_stdout` | str | print() output + last expression value. |
-| `obs_stderr` | str | Currently always `""` (in-memory frames don't capture stderr separately). |
-| `obs_diff_json` | str | Namespace diff (git-style text; column name preserved despite text content). |
-| `obs_error` | str \| null | Operation traceback text, or null. |
-| `verdict_value` | object \| null | Verdict `{total, passed, failures}` dict, or null. |
-| `verdict_error` | str \| null | Expect-block traceback text, or null. |
+| `obs_stderr` | str | stderr captured during operation execution (via `io.StringIO` redirect). |
+| `obs_diff_json` | str | JSON-encoded namespace diff: a list of `{op, name, type}` rows. `op` is `+` (binding added) or `-` (binding removed); a rebind appears as adjacent `-`/`+` rows sharing `name`. |
+| `obs_error` | str \| null | Operation traceback text from the errors table, or null. |
+| `verdict_value` | object \| null | Verdict `{total, passed, failures}` dict, or null when the frame's expect was empty. Each failure carries `{kind, assertion, message}`; expect-block tracebacks are no longer projected as a separate wire field — failure detail lives inside `failures[]`. |
 | `signals` | array | Per-Skill signal rows. Empty `[]` until SQLite-direct sourcing (PR 4). |
 
 This is a clean break from the legacy nested shape (`pong.action.operation`, `observation.stdout`, `number`) — Hull no longer emits the old shape, and the Console no longer reads it. The flat shape is the contract.
