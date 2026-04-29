@@ -27,7 +27,7 @@ def test_main_cell_keeps_stepping_when_compaction_raises(tmp_path):
     _write_minimal_project(tmp_path)
     hull = Hull(project_dir=str(tmp_path))
 
-    main_step_return = (_good_main_pong(), None, None)
+    main_step_return = (_good_main_pong(), {})
 
     with patch.object(hull._main_cell._core, "step", return_value=main_step_return):
         for _ in range(8):  # well over k frames

@@ -45,8 +45,8 @@ def test_layer1_entry_lands_after_k_main_frames(tmp_path):
     _write_minimal_project(tmp_path)
     hull = Hull(project_dir=str(tmp_path))
 
-    main_step_return = (_canned_main_pong(), None, None)
-    compaction_step_return = (_canned_compaction_pong(), None, None)
+    main_step_return = (_canned_main_pong(), {})
+    compaction_step_return = (_canned_compaction_pong(), {})
 
     with patch.object(hull._main_cell._core, "step", return_value=main_step_return), \
          patch.object(hull._compaction_cell._core, "step", return_value=compaction_step_return):
