@@ -111,10 +111,9 @@ class HullRuntimeMixin:
                 "pong_expect": c.expect,
                 "obs_stdout": c.observation.get("stdout", ""),
                 "obs_stderr": c.observation.get("stderr", ""),
-                "obs_diff_json": json.dumps(c.observation.get("diff") or {}),
+                "obs_diff_json": json.dumps(c.observation.get("diff") or []),
                 "obs_error": c.observation.get("error"),
-                "verdict_value": c.verdict.get("value") if c.verdict else None,
-                "verdict_error": c.verdict.get("error") if c.verdict else None,
+                "verdict": c.verdict,
                 "signals": [
                     {"class_name": k[0], "var_name": k[1], "scope": k[2], "payload": v}
                     for k, v in c.signals.items()

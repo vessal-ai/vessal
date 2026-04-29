@@ -150,7 +150,7 @@ class Kernel:
             obs_diff_json=diff_json,
             operation_error=None,
             verdict_value="true",
-            verdict_error=None,
+            verdict_errors=[],
             signals=[],
         )
         self.frame_log.write_frame(spec)
@@ -466,6 +466,6 @@ class Kernel:
             obs_diff_json=diff_json,
             operation_error=operation_error,
             verdict_value=verdict_value,
-            verdict_error=None,
+            verdict_errors=[],
             signals=sig_rows,
         )
