@@ -157,21 +157,24 @@ class Kernel:
         self.L["_frame"] = n
 
     def _compute_boot_diff_json(self, l_before_restore: dict) -> str:
-        """Spec §7.6: diff(L_before_restore, L_after_restore) — only new/changed keys, each repr()'d.
+        """Spec §7.6: diff(L_before_restore, L_after_restore) as list[{op,name,type}].
 
-        For cold start (no restore), l_before_restore == self.L, so diff is empty → "{}".
-        For restart, diff contains every key that was loaded from the snapshot and differs from
-        the pre-restore defaults.
+        Cold start: l_before_restore == self.L → diff is `[]`.
+        Restart: every key newly present in self.L (not in l_before_restore)
+        appears as a `+` row. The type column carries the live `type().__name__`,
+        which for an `UnresolvedRef` is `"UnresolvedRef"` — that name plus the
+        ref's own `__repr__` self-disclose any restore failures (spec §7.6).
         """
         import json
-        diff: dict[str, str] = {}
-        for k, v in self.L.items():
+        diff: list[dict[str, str]] = []
+        for k in sorted(self.L.keys()):
             if k in l_before_restore:
                 continue
             try:
-                diff[k] = repr(v)
-            except Exception as e:
-                diff[k] = f"<unrepr: {type(v).__name__}: {type(e).__name__}>"
+                type_name = type(self.L[k]).__name__
+            except Exception as e:  # pragma: no cover — type() is total, defensive only
+                type_name = f"<untyped: {type(e).__name__}>"
+            diff.append({"op": "+", "name": k, "type": type_name})
         return json.dumps(diff, ensure_ascii=False)
 
     def ping(self, pong: "Pong | None", namespace: dict) -> Ping:
@@ -431,7 +434,7 @@ class Kernel:
         verdict = self.L.get("verdict")
         if verdict is not None:
             verdict_value = _json.dumps(verdict.to_dict())
-        diff_json = _json.dumps(obs.diff) if obs.diff else "{}"
+        diff_json = _json.dumps(obs.diff)
         sig_rows: list[SignalRow] = []
         for (cls_name, var_name, scope), payload in self.L.get("signals", {}).items():
             err_id = payload.get("_error_id") if isinstance(payload, dict) else None
