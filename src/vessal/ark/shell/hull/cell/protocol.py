@@ -200,7 +200,7 @@ class FrameContent:
     operation: str
     expect: str
     observation: dict        # {"stdout","stderr","diff","error"}
-    verdict: dict | None     # {"value","error"} or None
+    verdict: dict | None     # {"total","passed","failures"} or None
     signals: dict            # {(class_name, var_name, scope): payload}
 
 
