@@ -137,3 +137,4 @@ Run: `uv run pytest src/vessal/ark/shell/hull/cell/kernel/tests/`
 
 ### Active
 - 2026-04-28 (PR4 complete): Kernel.__init__ now takes `boot_script: str` as first positional arg. Hull synthesizes it via `compose_boot_script()`. Removed `_init_namespace` / `_init_L` / `_dropped_keys` / `_dropped_keys_context` surface. Boot frame (spec §7.6) written on every cold start and restart.
+- 2026-04-29: confirmed sweep complete — _dropped_keys / _signal_outputs / _protected_keys / _frame_stream / _actual_tokens_* all retired; only deletion-witness tests reference them.

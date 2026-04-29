@@ -19,8 +19,6 @@ def _make_main_cell_mock():
     cell = MagicMock()
     cell.L = fk.L
     cell.G = {"_system": sys_skill}
-    # Return no hot frame so print_frame_line is never called
-    cell.L["_frame_stream"] = None
 
     step_calls = {"n": 0}
 

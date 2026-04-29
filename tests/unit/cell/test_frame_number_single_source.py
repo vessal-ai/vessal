@@ -17,7 +17,7 @@ def _fixed_pong(code: str = "pass") -> Pong:
 
 def _stub_core(cell: Cell, pong: Pong) -> None:
     """Replace cell._core.step with a stub that returns a fixed Pong."""
-    cell._core.step = MagicMock(return_value=(pong, None, None))
+    cell._core.step = MagicMock(return_value=(pong, {}))
 
 
 def test_ns_frame_increments_exactly_once_per_step():
@@ -38,7 +38,7 @@ def test_ns_frame_increments_exactly_once_over_multiple_steps():
     _stub_core(cell, _fixed_pong("pass"))
 
     for step_n in range(1, 4):
-        cell._core.step = MagicMock(return_value=(_fixed_pong("pass"), None, None))
+        cell._core.step = MagicMock(return_value=(_fixed_pong("pass"), {}))
         result = cell.step()
         assert result.protocol_error is None
         assert cell.L["_frame"] == step_n
@@ -64,7 +64,7 @@ def test_frame_number_passed_to_core_equals_ns_frame_plus_one():
 
     def _capture_frame(ping, tracer, frame):
         received_frames.append(frame)
-        return (pong, None, None)
+        return (pong, {})
 
     cell._core.step = MagicMock(side_effect=_capture_frame)
 
@@ -87,7 +87,7 @@ def test_ns_frame_write_is_single_source_commit_frame():
 
     cell = _make_cell()
     pong = _fixed_pong("pass")
-    cell._core.step = MagicMock(return_value=(pong, None, None))
+    cell._core.step = MagicMock(return_value=(pong, {}))
 
     initial = cell.L["_frame"]
     frame_after_execute: list[int] = []

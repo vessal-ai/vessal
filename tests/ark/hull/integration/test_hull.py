@@ -49,7 +49,7 @@ def _make_hull(tmp_path, toml_content="", skills=None, env_content=None, soul_co
 
 
 def _set_responses(hull, responses):
-    """Set mock return values for Hull's internal Cell's _core.step ((Pong, None, None) triples).
+    """Set mock return values for Hull's internal Cell's _core.step ((Pong, {}) pairs).
 
     Bare Python strings are auto-wrapped in <action>...</action> format to pass parse_response.
     """
@@ -60,7 +60,7 @@ def _set_responses(hull, responses):
             # Wrap bare code in v4 protocol format (<action> tag required by parse_response)
             if "<action>" not in resp:
                 resp = f"<action>\n{resp}\n</action>"
-            return (parse_response(resp), None, None)
+            return (parse_response(resp), {})
         return resp
 
     hull._main_cell._core.step = MagicMock(side_effect=[make_result(r) for r in responses])
@@ -174,7 +174,7 @@ class TestRunLoop:
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = "<action>\npass\n</action>"
         hull._main_cell._core.step = MagicMock(
-            return_value=(parse_response(_raw), None, None)
+            return_value=(parse_response(_raw), {})
         )
         hull._main_cell.G["_system"].wake("user_message")
         hull._main_cell.G["_system"]._sleeping = False
@@ -197,7 +197,7 @@ class TestRunLoop:
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = '<action>\n_system.sleep()\n</action>'
         hull._main_cell._core.step = MagicMock(
-            return_value=(parse_response(_raw), None, None)
+            return_value=(parse_response(_raw), {})
         )
         hull._main_cell.G["_system"].wake("user_message")
         hull._main_cell.G["_system"]._sleeping = False
@@ -495,7 +495,7 @@ class TestWake:
         from vessal.ark.shell.hull.cell.core.parser import parse_response
         _raw = '<action>\n_system.sleep()\n</action>'
         hull._main_cell._core.step = MagicMock(
-            return_value=(parse_response(_raw), None, None)
+            return_value=(parse_response(_raw), {})
         )
         hull._main_cell.G["_system"].wake("user_message")
         hull._main_cell.G["_system"]._sleeping = False

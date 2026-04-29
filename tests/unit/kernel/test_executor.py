@@ -278,7 +278,7 @@ class TestExecuteThreeArg:
     def test_execute_writes_to_L_not_G(self):
         from vessal.ark.shell.hull.cell.kernel.executor import execute
         G = {}
-        L = {"_protected_keys": []}
+        L = {}
         result = execute("foo = 1", G, L, frame_number=1)
         assert L["foo"] == 1
         assert "foo" not in G
@@ -287,7 +287,7 @@ class TestExecuteThreeArg:
     def test_execute_reads_g_via_legb_fallback(self):
         from vessal.ark.shell.hull.cell.kernel.executor import execute
         G = {"helper": lambda: 7}
-        L = {"_protected_keys": []}
+        L = {}
         execute("result = helper()", G, L, frame_number=2)
         assert L["result"] == 7
         assert "helper" not in L

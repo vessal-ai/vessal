@@ -97,7 +97,7 @@ class Core:
         ping: Ping,
         tracer: TracerLike | None = None,
         frame: int = 0,
-    ) -> tuple[Pong, int | None, int | None]:
+    ) -> tuple[Pong, dict]:
         """Call the LLM, parse the response, and return a Pong.
 
         Constructs system + user messages, calls parse_response() internally,
@@ -109,7 +109,10 @@ class Core:
             frame:  Frame number, used for trace recording.
 
         Returns:
-            (Pong, prompt_tokens, completion_tokens) tuple.
+            (Pong, usage) where usage is {} when response.usage is None,
+            otherwise a dict with keys:
+              prompt_tokens / completion_tokens / cached_tokens /
+              elapsed_seconds / attempts.
 
         Raises:
             APITimeoutError: Timeout with retries exhausted
@@ -150,18 +153,30 @@ class Core:
                     f"attempts={attempt + 1}"
                 )
 
-                usage = response.usage
-                prompt_tokens = usage.prompt_tokens if usage else None
-                completion_tokens = usage.completion_tokens if usage else None
+                usage_obj = response.usage
+                if usage_obj is None:
+                    usage_dict: dict = {}
+                else:
+                    details_obj = getattr(usage_obj, "prompt_tokens_details", None)
+                    cached = getattr(details_obj, "cached_tokens", 0) if details_obj else 0
+                    usage_dict = {
+                        "prompt_tokens": usage_obj.prompt_tokens,
+                        "completion_tokens": usage_obj.completion_tokens,
+                        "cached_tokens": cached or 0,
+                        "elapsed_seconds": round(elapsed, 3),
+                        "attempts": attempt + 1,
+                    }
 
                 if tracer:
-                    details = f"attempts={attempt + 1}"
-                    if usage:
-                        details += f",tokens_in={prompt_tokens},tokens_out={completion_tokens}"
-                    tracer.end(frame, "core.api_call", details)
+                    details_str = f"attempts={attempt + 1}"
+                    if usage_obj is not None:
+                        details_str += (
+                            f",tokens_in={usage_obj.prompt_tokens}"
+                            f",tokens_out={usage_obj.completion_tokens}"
+                        )
+                    tracer.end(frame, "core.api_call", details_str)
 
-                pong = parse_response(raw_text)
-                return pong, prompt_tokens, completion_tokens
+                return parse_response(raw_text), usage_dict
 
             except Exception as exc:
                 elapsed = time.time() - start_time

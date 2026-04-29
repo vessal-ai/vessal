@@ -8,7 +8,7 @@ import time as _time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Callable
 
 from vessal.ark.shell.hull._compaction_trigger import should_compact
 from vessal.ark.util.logging import Tracer
@@ -121,33 +121,26 @@ class EventLoop:
         await asyncio.to_thread(self._run_wake_cycle)
 
     def _run_wake_cycle(self) -> None:
-        """One wake cycle: initialize logging → frame loop → close logging. Runs in a dedicated thread."""
-        from vessal.ark.util.logging import FrameLogger
+        """One wake cycle: initialize logging → frame loop → snapshot. Runs in a dedicated thread."""
         hooks = self._hooks
-        frame_logger = None
 
         log_dir = self._tracer._log_dir
         if str(log_dir) not in ("", "."):
             Path(str(log_dir)).mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             self._tracer.init(timestamp)
-            frame_logger = FrameLogger(log_dir)
-            frame_logger.open()
 
         try:
-            self._frame_loop(frame_logger)
+            self._frame_loop()
         finally:
-            if frame_logger is not None:
-                frame_logger.close()
             if hooks.snapshot is not None:
                 try:
                     hooks.snapshot()
                 except Exception as e:
                     logger.warning("auto-snapshot failed: %s", e)
 
-    def _frame_loop(self, frame_logger: Any = None) -> None:
+    def _frame_loop(self) -> None:
         """Synchronous frame loop. Runs in a dedicated thread."""
-        from vessal.ark.util.logging.console import print_frame_line
         hooks = self._hooks
         frame_count = 0
 
@@ -166,12 +159,6 @@ class EventLoop:
             result = self._cell.step(self._tracer)
 
             if result.protocol_error is None:
-                fs = self._cell.L.get("_frame_stream")
-                last_frame = fs.latest_hot_frame() if fs is not None else None
-                if last_frame is not None:
-                    if frame_logger is not None:
-                        frame_logger.write_frame(last_frame)
-                    print_frame_line(last_frame)
                 if hooks.after_frame is not None:
                     hooks.after_frame()
                 if should_compact(self._main_db_path):

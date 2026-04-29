@@ -38,11 +38,8 @@ def bare_ns() -> dict:
         "_stdout": "",
         "_error": None,
         "_diff": "",
-        "_context_budget": 128000,
-        "_token_budget": 4096,
         "_pins": set(),
         "_log_path": "",
-        "_context_pct": 0,
         "_ns_meta": {},
         "_progress": "",
     }

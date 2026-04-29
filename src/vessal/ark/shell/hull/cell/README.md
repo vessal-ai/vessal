@@ -45,7 +45,7 @@ sequenceDiagram
         Cell-->>Hull: protocol_error
     end
 
-    Cell->>Core: core.step(ping) → (Pong, prompt_tokens, completion_tokens)
+    Cell->>Core: core.step(ping) → (Pong, usage: dict)
     Cell->>ActionGate: check(pong.action.operation)
     alt action intercepted
         ActionGate-->>Cell: rejected
@@ -59,7 +59,7 @@ sequenceDiagram
 
 Two key internal decisions. First, step() calls kernel.ping(None, ns) once on bootstrap to generate the initial Ping (update_signals + render only, no exec, no commit). On every subsequent step it calls kernel.ping(pong, ns) once, which executes the Pong, commits the FrameRecord, and returns the next Ping in a single atomic call. Second, Gates are exposed to the outside via string properties (cell.action_gate = "safe"), so Hull does not need to know the concrete types of ActionGate/StateGate, reducing inter-layer coupling.
 
-Invariants: each successful step() call (protocol_error is None) produces exactly one FrameRecord committed by Kernel (schema version defined by `FRAME_SCHEMA_VERSION` in `protocol.py`); _ping is the output of the most recent kernel.ping() call; _pong always points to the current frame's LLM output (None before first LLM response); _actual_tokens_in/_actual_tokens_out are overwritten with real values when the API returns usage, otherwise remain None; on protocol exceptions _errors appends ErrorRecord("protocol", ...).
+Invariants: each successful step() call (protocol_error is None) produces exactly one FrameRecord committed by Kernel (schema version defined by `FRAME_SCHEMA_VERSION` in `protocol.py`); _ping is the output of the most recent kernel.ping() call; _pong always points to the current frame's LLM output (None before first LLM response); on protocol exceptions _errors appends ErrorRecord("protocol", ...). Per-LLM-call token / cache-hit telemetry is written to <data_dir>/cache_metrics.jsonl.
 
 Cell and Hull relationship: Hull creates Cell, operates it via public interfaces step(), G, L, snapshot(), restore(), and does not access Cell internals. Cell and Kernel relationship: Cell calls kernel.ping(pong, ns) (the single Kernel primitive), reads kernel.G and kernel.L, but does not directly operate on Kernel's internal Executor or Renderer. Cell and Core relationship: Cell calls core.step(ping), passes the resulting Pong directly to kernel.ping(); Core is stateless.
 
