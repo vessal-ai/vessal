@@ -73,12 +73,26 @@ def open_db(path: str) -> sqlite3.Connection:
     Returns:
         sqlite3.Connection ready for writes. Caller owns lifecycle (must close).
     """
-    conn = sqlite3.connect(path, isolation_level=None)
+    conn = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(DDL)
     _migrate_drop_verdict_error_id(conn)
     return conn
+
+
+def open_read_only(path: str) -> sqlite3.Connection:
+    """Open a per-call read-only connection on the calling thread.
+
+    Used by Kernel-external readers (Hull.frames, SystemSkill.signal_update,
+    etc.) so they never share a connection with Kernel's internal writer.
+    Callers must close the returned conn when done (use try/finally or
+    a `with` block).
+
+    The URI form `file:{path}?mode=ro` opens the database in SQLite's
+    read-only mode; INSERT/UPDATE/DELETE statements raise OperationalError.
+    """
+    return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
 
 
 def _migrate_drop_verdict_error_id(conn: sqlite3.Connection) -> None:
