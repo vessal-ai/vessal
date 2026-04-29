@@ -4,7 +4,6 @@ Verifies that Hull interacts with the outside world through a limited set of pub
 and does not expose internal state such as ns or event_queue.
 """
 import queue as queue_mod
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -78,11 +77,11 @@ class TestHullStatus:
         """status() values reflect the current state in namespace."""
         hull = _make_hull_with_mock_cell(tmp_path)
         # Manually set namespace values to verify
-        hull._cell.L["_sleeping"] = True
+        hull._cell.G["_system"]._sleeping = True
         hull._cell.L["_frame"] = 42
-        hull._cell.G["_system"].set_wake("heartbeat")
+        hull._cell.G["_system"].wake("heartbeat")
         result = hull.status()
-        assert result["idle"] is True
+        assert result["idle"] is False  # wake() cleared _sleeping
         assert result["frame"] == 42
         assert result["wake"] == "heartbeat"
 
@@ -91,7 +90,7 @@ class TestHullStatus:
         hull = _make_hull_with_mock_cell(tmp_path)
         result = hull.status()
         result["idle"] = "tampered"
-        assert hull._cell.L.get("_sleeping") != "tampered"
+        assert hull._cell.G["_system"]._sleeping != "tampered"
 
 
 class TestHullNextAlarm:
@@ -101,14 +100,6 @@ class TestHullNextAlarm:
         """Returns None when no alarm is set."""
         hull = _make_hull_with_mock_cell(tmp_path)
         assert hull.next_alarm() is None
-
-    def test_next_alarm_reads_from_namespace(self, tmp_path):
-        """After Agent sets _next_wake, next_alarm() returns that timestamp."""
-        hull = _make_hull_with_mock_cell(tmp_path)
-        future = time.time() + 3600
-        hull._cell.L["_next_wake"] = future
-        result = hull.next_alarm()
-        assert result == pytest.approx(future, abs=1.0)
 
 
 class TestHullRunMethods:

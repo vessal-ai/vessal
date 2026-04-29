@@ -10,8 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
-from vessal.ark.shell.hull.cell._errors_helper import append_error
-from vessal.ark.shell.hull.cell.protocol import ErrorRecord
 from vessal.ark.util.logging import Tracer
 
 if TYPE_CHECKING:
@@ -90,8 +88,7 @@ class EventLoop:
         reason = event.get("reason", "heartbeat")
         system_skill = self._cell.G.get("_system")
         if system_skill is not None:
-            system_skill.set_wake(reason)
-        self._cell.L["_sleeping"] = False
+            system_skill.wake(reason)
 
     async def run_forever(self) -> None:
         """Main event loop. Runs inside asyncio; frame execution happens in a thread."""
@@ -149,7 +146,9 @@ class EventLoop:
         hooks = self._hooks
         frame_count = 0
 
-        while not self._cell.L.get("_sleeping", False):
+        system = self._cell.G.get("_system")
+        # Hull is _system's only external consumer of _sleeping — direct access is intentional.
+        while not (system._sleeping if system is not None else False):
             if self._max_frames > 0 and frame_count >= self._max_frames:
                 logger.warning("max frames per wake reached (%d)", self._max_frames)
                 break
@@ -176,11 +175,8 @@ class EventLoop:
                     self._cell.L.get("_frame", -1),
                     result.protocol_error,
                 )
-                append_error(self._cell.L, ErrorRecord(
-                    "protocol", f"protocol error: {result.protocol_error}",
-                    self._cell.L.get("_frame", 0), _time.time(),
-                ))
-                self._cell.L["_sleeping"] = True
+                if system is not None:
+                    system.sleep()
                 break
 
     def stop(self) -> None:

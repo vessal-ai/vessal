@@ -160,16 +160,14 @@ class TestStepBasic:
         assert cell.L.get("step_result") == 42
 
     def test_step_does_not_modify_lifecycle_vars(self):
-        """step() does not modify _sleeping/_next_wake or G['_system']._wake."""
+        """step() does not modify G['_system']._sleeping or G['_system']._wake_reason."""
         cell = _make_cell()
         _set_responses(cell, [_action("x = 1")])
-        cell.L["_sleeping"] = False
-        cell.G["_system"].set_wake("test_wake")
-        cell.L["_next_wake"] = None
+        cell.G["_system"]._sleeping = False
+        cell.G["_system"].wake("test_wake")
         cell.step()
-        assert cell.L["_sleeping"] is False
-        assert cell.G["_system"]._wake == "test_wake"
-        assert cell.L["_next_wake"] is None
+        assert cell.G["_system"]._sleeping is False
+        assert cell.G["_system"]._wake_reason == "test_wake"
 
     def test_step_accepts_tracer_none(self):
         """step(tracer=None) runs normally without error."""
@@ -237,28 +235,12 @@ class TestProtocolErrors:
         result = cell.step()
         assert result.protocol_error is not None
 
-    def test_missing_action_tag_sets_error(self):
-        """Missing <action> tag → ns["_errors"] ring buffer has an entry."""
-        cell = _make_cell()
-        _set_responses(cell, ["no action tag here"])
-        cell.step()
-        assert len(cell.L.get("_errors", [])) > 0
-
     def test_core_exception_no_frame_committed(self):
         """Core raises exception → protocol_error is not None."""
         cell = _make_cell()
         _set_responses(cell, [Exception("API error")])
         result = cell.step()
         assert result.protocol_error is not None
-
-    def test_core_exception_sets_error(self):
-        """Core raises exception → ns["_errors"] ring buffer has an entry."""
-        cell = _make_cell()
-        _set_responses(cell, [Exception("API error")])
-        cell.step()
-        errors = cell.L.get("_errors", [])
-        assert len(errors) > 0
-        assert any("API error" in e.message for e in errors)
 
     def test_core_exception_no_frame_increment(self):
         """Core raises exception → frame number does not increment."""
@@ -269,13 +251,11 @@ class TestProtocolErrors:
         assert cell.L["_frame"] == before
 
     def test_action_gate_blocked_no_frame_committed(self):
-        """action gate block → _errors ring buffer has an entry."""
         cell = _make_cell(action_gate="safe")
-        # Inject a custom rule that always blocks
         cell._action_gate.add_rule("block_all", lambda a: "blocked for test")
         _set_responses(cell, [_action("x = 1")])
         result = cell.step()
-        assert len(cell.L.get("_errors", [])) > 0
+        assert result.protocol_error == "Action gate blocked"
 
     def test_action_gate_blocked_no_frame_increment(self):
         """action gate block → frame number does not increment."""
@@ -359,18 +339,18 @@ class TestGates:
     def test_step_applies_state_gate(self):
         """step() passes through state_gate internally (auto mode allows all)."""
         cell = _make_cell()
-        _set_responses(cell, [_action('sleep()')])
+        _set_responses(cell, [_action('_system.sleep()')])
         cell.state_gate = "auto"
         cell.step()
-        assert cell.L["_sleeping"] is True
+        assert cell.G["_system"]._sleeping is True
 
     def test_step_applies_action_gate(self):
         """step() passes through action_gate internally (auto mode allows all)."""
         cell = _make_cell()
-        _set_responses(cell, [_action('sleep()')])
+        _set_responses(cell, [_action('_system.sleep()')])
         cell.action_gate = "auto"
         cell.step()
-        assert cell.L["_sleeping"] is True
+        assert cell.G["_system"]._sleeping is True
 
 
 # ============================================================
@@ -536,42 +516,8 @@ class TestRealTokenPassthrough:
 
     def test_no_usage_leaves_estimated_context_pct(self):
         cell = _make_cell()
-        cell.L["_budget_total"] = 100000
         pong = _make_pong(_action("x = 1"))
         cell._core.step = MagicMock(return_value=(pong, None, None))
         cell.step()
         assert cell.L.get("_actual_tokens_in") is None
 
-
-# ============================================================
-# ErrorRecord written to _errors
-# ============================================================
-
-
-class TestErrorRecord:
-    """Cell.step() writes protocol errors to _errors."""
-
-    def test_protocol_error_recorded(self):
-        from vessal.ark.shell.hull.cell.protocol import ErrorRecord
-        cell = _make_cell()
-        cell.L["_errors"] = []
-        cell._core.step = MagicMock(side_effect=Exception("BadRequest"))
-        cell.step()
-        errors = cell.L["_errors"]
-        assert len(errors) == 1
-        assert isinstance(errors[0], ErrorRecord)
-        assert errors[0].type == "protocol"
-        assert "BadRequest" in errors[0].message
-
-    def test_errors_capped_at_configured_size(self):
-        from vessal.ark.shell.hull.cell.protocol import ErrorRecord
-        cell = _make_cell()
-        cell.L["_error_buffer_cap"] = 50
-        cell.L["_errors"] = [
-            ErrorRecord("runtime", f"err{i}", i, 0.0)
-            for i in range(50)
-        ]
-        cell._core.step = MagicMock(side_effect=Exception("overflow"))
-        cell.step()
-        assert len(cell.L["_errors"]) == 50
-        assert cell.L["_errors"][-1].type == "protocol"

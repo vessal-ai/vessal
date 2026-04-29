@@ -73,14 +73,6 @@ class Memory(BaseSkill):
             preview = str(v).replace('\n', '\\n')[:80]
             lines.append(f"  {k}: {preview}")
 
-        if self._ns is not None:
-            pct = self._ns.get("_context_pct", 0)
-            threshold = self._ns.get("_compress_threshold", 50)
-            if pct >= threshold:
-                lines.append("")
-                lines.append(f"⚠ Context {pct}% — consider summarizing old frames then memory.drop(n)")
-                lines.append("  print(memory.guide) to see how")
-
         self.signal = {"entries": "\n".join(lines)} if lines else {}
 
     def _persist(self) -> None:

@@ -21,6 +21,7 @@ def _make_hull_stub(soul_path: Path, cell: MagicMock):
 
     hull = object.__new__(Hull)
     hull._cell = cell
+    hull._cell.G = {}
     hull._soul_path = soul_path
     if soul_path.exists():
         hull._soul_text = soul_path.read_text(encoding="utf-8")
@@ -28,10 +29,6 @@ def _make_hull_stub(soul_path: Path, cell: MagicMock):
     else:
         hull._soul_text = ""
         hull._soul_mtime = 0.0
-    # _rewrite_runtime_owned also accesses these attributes (called by TestSoulHotReload)
-    hull._work_render_config = MagicMock()
-    hull._prompt_builder = MagicMock()
-    hull._prompt_builder.build.return_value = "system prompt"
     return hull
 
 
@@ -63,7 +60,7 @@ class TestSoulHotReload:
         soul_path, cell = soul_env
         hull = _make_hull_stub(soul_path, cell)
         hull._rewrite_runtime_owned()
-        assert cell.L["_soul"] == "original soul"
+        assert cell.G["_soul"] == "original soul"
 
     def test_modified_soul_detected_next_frame(self, soul_env):
         """After SOUL.md is modified, next _rewrite_runtime_owned picks up the change."""
@@ -71,7 +68,7 @@ class TestSoulHotReload:
         hull = _make_hull_stub(soul_path, cell)
 
         hull._rewrite_runtime_owned()
-        assert cell.L["_soul"] == "original soul"
+        assert cell.G["_soul"] == "original soul"
 
         # Simulate Agent modifying SOUL.md at runtime
         # Force mtime change by temporarily backdating the cached mtime
@@ -79,7 +76,7 @@ class TestSoulHotReload:
         soul_path.write_text("evolved soul", encoding="utf-8")
 
         hull._rewrite_runtime_owned()
-        assert cell.L["_soul"] == "evolved soul"
+        assert cell.G["_soul"] == "evolved soul"
         # mtime cache should be updated to the file's actual mtime (to avoid re-reading next frame)
         assert hull._soul_mtime == soul_path.stat().st_mtime
 
@@ -93,7 +90,7 @@ class TestSoulHotReload:
 
         hull._rewrite_runtime_owned()
         assert hull._soul_mtime == original_mtime
-        assert cell.L["_soul"] == "original soul"
+        assert cell.G["_soul"] == "original soul"
 
     def test_soul_deleted_at_runtime_keeps_last_value(self, soul_env):
         """If SOUL.md is deleted after initial load, ns['_soul'] keeps last known value."""
@@ -101,10 +98,10 @@ class TestSoulHotReload:
         hull = _make_hull_stub(soul_path, cell)
 
         hull._rewrite_runtime_owned()
-        assert cell.L["_soul"] == "original soul"
+        assert cell.G["_soul"] == "original soul"
 
         soul_path.unlink()
 
         hull._rewrite_runtime_owned()
         # File gone → exists() returns False → skip mtime check → keep cached text
-        assert cell.L["_soul"] == "original soul"
+        assert cell.G["_soul"] == "original soul"

@@ -119,12 +119,6 @@ class TestConfig:
         assert hull._cell.state_gate == "auto"
         assert hull._cell.action_gate == "auto"
 
-    def test_context_budget_set(self, tmp_path):
-        """[cell].context_budget is written to ns["_context_budget"]."""
-        toml = "[cell]\ncontext_budget = 64000"
-        hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._cell.L["_context_budget"] == 64000
-
     def test_core_timeout_forwarded(self, tmp_path):
         """[core].timeout is forwarded to Core."""
         toml = "[core]\ntimeout = 120.0"
@@ -158,19 +152,19 @@ class TestRunLoop:
     def test_frame_loop_sets_idle(self, tmp_path):
         """Agent calls sleep(); _frame_loop() stops after that frame."""
         hull = _make_hull(tmp_path)
-        _set_responses(hull, ['sleep()'])
-        hull._cell.G["_system"].set_wake("user_message")
-        hull._cell.L["_sleeping"] = False
+        _set_responses(hull, ['_system.sleep()'])
+        hull._cell.G["_system"].wake("user_message")
+        hull._cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
-        assert hull._cell.L["_sleeping"] is True
+        assert hull._cell.G["_system"]._sleeping is True
 
     def test_frame_loop_calls_step(self, tmp_path):
         """_frame_loop() calls cell.step()."""
         hull = _make_hull(tmp_path)
         assert not hasattr(hull._cell, "run")
-        _set_responses(hull, ['sleep()'])
-        hull._cell.G["_system"].set_wake("user_message")
-        hull._cell.L["_sleeping"] = False
+        _set_responses(hull, ['_system.sleep()'])
+        hull._cell.G["_system"].wake("user_message")
+        hull._cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)  # should not raise
 
     def test_frame_loop_max_frames_cutoff(self, tmp_path):
@@ -182,58 +176,58 @@ class TestRunLoop:
         hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].set_wake("user_message")
-        hull._cell.L["_sleeping"] = False
+        hull._cell.G["_system"].wake("user_message")
+        hull._cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
         # Frame limit reached; _sleeping was not set by Agent
-        assert hull._cell.L.get("_sleeping") is False
+        assert hull._cell.G["_system"]._sleeping is False
 
     def test_frame_loop_rewrite_runtime_owned_each_frame(self, tmp_path):
-        """_frame_type is reset to "work" before each frame's step()."""
+        """_rewrite_runtime_owned runs before each frame; G['_soul'] is present when step() is called."""
         hull = _make_hull(tmp_path)
-        frame_types_seen = []
+        soul_seen = []
 
         original_step = hull._cell.step
 
         def capturing_step(tracer=None):
-            frame_types_seen.append(hull._cell.L.get("_frame_type"))
+            soul_seen.append(hull._cell.G.get("_soul"))
             return original_step(tracer)
 
         hull._cell.step = capturing_step
         from vessal.ark.shell.hull.cell.core.parser import parse_response
-        _raw = '<action>\nsleep()\n</action>'
+        _raw = '<action>\n_system.sleep()\n</action>'
         hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].set_wake("user_message")
-        hull._cell.L["_sleeping"] = False
+        hull._cell.G["_system"].wake("user_message")
+        hull._cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
 
-        assert all(ft == "work" for ft in frame_types_seen)
+        assert all(s is not None for s in soul_seen)
 
     def test_frame_loop_preserves_namespace_across_runs(self, tmp_path):
         """Namespace is preserved between multiple _frame_loop() calls."""
         hull = _make_hull(tmp_path)
         _set_responses(hull, [
-            'x = 42\nsleep()',
+            'x = 42\n_system.sleep()',
         ])
-        hull._cell.G["_system"].set_wake("user_message")
-        hull._cell.L["_sleeping"] = False
+        hull._cell.G["_system"].wake("user_message")
+        hull._cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
         assert hull._cell.L.get("x") == 42
 
-        _set_responses(hull, ['result_val = x\nsleep()'])
-        hull._cell.L["_sleeping"] = False
-        hull._cell.G["_system"].set_wake("user_message")
+        _set_responses(hull, ['result_val = x\n_system.sleep()'])
+        hull._cell.G["_system"]._sleeping = False
+        hull._cell.G["_system"].wake("user_message")
         _run_frame_loop(hull)
         assert hull._cell.L.get("result_val") == 42
 
     def test_frame_loop_snapshot_not_auto(self, tmp_path):
         """_frame_loop() does not automatically snapshot (snapshots triggered manually by Hull.snapshot())."""
         hull = _make_hull(tmp_path)
-        _set_responses(hull, ['sleep()'])
-        hull._cell.G["_system"].set_wake("user_message")
-        hull._cell.L["_sleeping"] = False
+        _set_responses(hull, ['_system.sleep()'])
+        hull._cell.G["_system"].wake("user_message")
+        hull._cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
         snapshots = list((tmp_path / "snapshots").glob("*.pkl")) if (tmp_path / "snapshots").exists() else []
         assert len(snapshots) == 0
@@ -372,9 +366,9 @@ class TestNamespaceAccess:
         """Variables injected via hull._cell.L are visible during _frame_loop()."""
         hull = _make_hull(tmp_path)
         hull._cell.L["custom_var"] = "test_value"
-        _set_responses(hull, ['result_val = custom_var\nsleep()'])
-        hull._cell.G["_system"].set_wake("user_message")
-        hull._cell.L["_sleeping"] = False
+        _set_responses(hull, ['result_val = custom_var\n_system.sleep()'])
+        hull._cell.G["_system"].wake("user_message")
+        hull._cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
         assert hull._cell.L.get("result_val") == "test_value"
 
@@ -384,22 +378,23 @@ class TestNamespaceAccess:
 # ============================================================
 
 
-class TestFrameType:
-    def test_frame_type_default_is_work(self, tmp_path):
-        """_frame_type is "work" after Hull initialization."""
+class TestRuntimeOwned:
+    def test_soul_in_g_after_init(self, tmp_path):
+        """G['_soul'] is set after Hull initialization."""
         hull = _make_hull(tmp_path)
-        assert hull._cell.L["_frame_type"] == "work"
+        assert "_soul" in hull._cell.G
 
-    def test_frame_type_in_ns(self, tmp_path):
-        """_frame_type exists in namespace."""
+    def test_system_prompt_in_g_after_init(self, tmp_path):
+        """G['_system_prompt'] is set after Hull initialization and not in L."""
         hull = _make_hull(tmp_path)
-        assert "_frame_type" in hull._cell.L
+        assert "_system_prompt" in hull._cell.G
+        assert "_system_prompt" not in hull._cell.L
 
-    def test_rewrite_runtime_owned_sets_frame_type(self, tmp_path):
-        """_rewrite_runtime_owned always sets _frame_type to "work"."""
+    def test_rewrite_runtime_owned_updates_soul_in_g(self, tmp_path):
+        """_rewrite_runtime_owned writes _soul to G."""
         hull = _make_hull(tmp_path)
         hull._rewrite_runtime_owned()
-        assert hull._cell.L["_frame_type"] == "work"
+        assert "_soul" in hull._cell.G
 
 
 # ============================================================
@@ -435,18 +430,17 @@ class TestSkills:
 
 class TestSoulMd:
     def test_soul_loaded_from_file(self, tmp_path):
-        """SOUL.md content is loaded into _soul when present (no longer placed in _system_prompt)."""
+        """SOUL.md content is loaded into G['_soul'] when present."""
         soul_content = "# Agent Identity\nYou are a data analysis expert."
         hull = _make_hull(tmp_path, soul_content=soul_content)
-        # _soul holds the raw SOUL.md text; _system_prompt contains only kernel protocol
-        assert soul_content == hull._cell.L["_soul"]
-        assert "Execution Model" in hull._cell.L["_system_prompt"]
+        assert soul_content == hull._cell.G["_soul"]
+        assert "Execution Model" in hull._cell.G["_system_prompt"]
 
     def test_soul_empty_when_no_file(self, tmp_path):
-        """_soul is empty string when SOUL.md does not exist; _system_prompt contains only runtime protocol."""
+        """_soul is empty string in G when SOUL.md does not exist."""
         hull = _make_hull(tmp_path)
-        assert hull._cell.L["_soul"] == ""
-        assert "Execution Model" in hull._cell.L["_system_prompt"]
+        assert hull._cell.G["_soul"] == ""
+        assert "Execution Model" in hull._cell.G["_system_prompt"]
 
     def test_soul_shown_in_rendered_state(self, tmp_path):
         """SOUL.md content appears in the rendered Ping via three-part renderer concatenation."""
@@ -482,29 +476,29 @@ class TestVenvActivation:
 
 class TestWake:
     def test_wake_default_empty(self, tmp_path):
-        """SystemSkill wake is empty string after Hull initialization."""
+        """SystemSkill wake_reason is empty string after Hull initialization."""
         from vessal.skills.system import SystemSkill
         hull = _make_hull(tmp_path)
         system = hull._cell.G.get("_system")
         assert isinstance(system, SystemSkill)
-        assert system._wake == ""
+        assert system._wake_reason == ""
 
     def test_wake_set_before_frame_loop(self, tmp_path):
-        """_wake retains its injected value during _frame_loop() execution."""
+        """_wake_reason retains its injected value during _frame_loop() execution."""
         hull = _make_hull(tmp_path)
         wake_seen = []
         original_step = hull._cell.step
         def capturing_step(tracer=None):
-            wake_seen.append(hull._cell.G["_system"]._wake)
+            wake_seen.append(hull._cell.G["_system"]._wake_reason)
             return original_step(tracer)
         hull._cell.step = capturing_step
         from vessal.ark.shell.hull.cell.core.parser import parse_response
-        _raw = '<action>\nsleep()\n</action>'
+        _raw = '<action>\n_system.sleep()\n</action>'
         hull._cell._core.step = MagicMock(
             return_value=(parse_response(_raw), None, None)
         )
-        hull._cell.G["_system"].set_wake("user_message")
-        hull._cell.L["_sleeping"] = False
+        hull._cell.G["_system"].wake("user_message")
+        hull._cell.G["_system"]._sleeping = False
         _run_frame_loop(hull)
         assert all(w == "user_message" for w in wake_seen)
 

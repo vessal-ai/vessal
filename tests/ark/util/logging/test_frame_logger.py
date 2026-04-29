@@ -36,9 +36,9 @@ def _make_frame(number: int = 1) -> FrameRecord:
         pong=Pong(think="", action=Action(operation="pass", expect="")),
         observation=Observation(
             stdout="",
+            stderr="",
             diff="+my_var = 42",
             error=None,
-            verdict=None,
         ),
     )
 

@@ -3,7 +3,6 @@
 # Test coverage:
 #   TestIsUserVar       is_user_var helper function
 #   TestExecute         execute() — execute code, side effects written to ns
-#   TestCompressTraceback  _compress_traceback() — long traceback compression
 #   TestKernel          Kernel class integration tests (including ns exposure, render method)
 import inspect
 import os
@@ -16,7 +15,7 @@ import pytest
 
 from vessal.ark.shell.hull.cell.kernel import Kernel
 
-from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, execute, _compress_traceback, _maybe_capture_last_expr
+from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, execute, _maybe_capture_last_expr
 from vessal.ark.shell.hull.skill_loader import SkillLoader
 
 
@@ -41,7 +40,6 @@ def bare_ns() -> dict:
         "_diff": "",
         "_context_budget": 128000,
         "_token_budget": 4096,
-        "_system_prompt": "",
         "_pins": set(),
         "_log_path": "",
         "_context_pct": 0,
@@ -148,19 +146,17 @@ class TestExecute:
     def test_runtime_error_captured(self):
         ns = bare_ns()
         result = execute("1 / 0", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "ZeroDivisionError" in result.error
+        assert isinstance(result.error, ZeroDivisionError)
 
     def test_syntax_error_captured(self):
         ns = bare_ns()
         result = execute("def foo(:\n    pass", {}, ns, frame_number=1)
-        assert result.error is not None
+        assert isinstance(result.error, SyntaxError)
 
     def test_name_error_captured(self):
         ns = bare_ns()
         result = execute("y = undefined_var", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "NameError" in result.error
+        assert isinstance(result.error, NameError)
 
     def test_error_none_on_success(self):
         ns = bare_ns()
@@ -264,15 +260,13 @@ class TestExecute:
         """LLM calling sys.exit() should not terminate the process; it should be captured in ExecResult.error."""
         ns = bare_ns()
         result = execute("import sys; sys.exit(0)", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "SystemExit" in result.error
+        assert isinstance(result.error, SystemExit)
 
     def test_exit_builtin_captured_as_error(self):
         """LLM calling builtin exit() should not terminate the process; it should be captured in ExecResult.error."""
         ns = bare_ns()
         result = execute("exit(0)", {}, ns, frame_number=1)
-        assert result.error is not None
-        assert "SystemExit" in result.error
+        assert isinstance(result.error, SystemExit)
 
     def test_redefine_to_builtin_no_crash(self):
         """When a function is reassigned to a builtin object, execute does not crash."""
@@ -287,83 +281,6 @@ class TestExecute:
         initial = ns.get("_frame", 0)
         execute("x = 1", {}, ns, frame_number=5)
         assert ns.get("_frame", 0) == initial
-
-
-# ─────────────────────────────────────────────
-# _compress_traceback
-# ─────────────────────────────────────────────
-
-class TestCompressTraceback:
-    """_compress_traceback internal function: compresses long tracebacks."""
-
-    def _make_tb(self, n_lib_frames: int, has_user_frame: bool = True) -> str:
-        """Construct a traceback with n_lib_frames library frames + optional user frame + exception line."""
-        lines = ["Traceback (most recent call last):"]
-        for i in range(n_lib_frames):
-            lines.append(f'  File "/lib/mod_{i}.py", line {i + 1}, in func_{i}')
-            lines.append(f"    call_{i}()")
-        if has_user_frame:
-            lines.append('  File "<frame-1>", line 5, in <module>')
-            lines.append("    result = bad_function()")
-        lines.append("ValueError: something went wrong")
-        return "\n".join(lines)
-
-    def test_short_traceback_unchanged(self):
-        """Returned unchanged when <= 20 lines; no compression."""
-        tb = self._make_tb(3)  # 1 + 6 + 2 + 1 = 10 lines
-        assert _compress_traceback(tb) == tb
-
-    def test_long_traceback_compressed(self):
-        """> 20 lines: compressed; first line, user frame, and exception line are retained."""
-        tb = self._make_tb(15)  # 1 + 30 + 2 + 1 = 34 lines
-        result = _compress_traceback(tb)
-        assert len(result) < len(tb)
-        assert result.startswith("Traceback (most recent call last):")
-        assert "lines omitted" in result
-        assert 'File "<frame-1>"' in result
-        assert "ValueError: something went wrong" in result
-
-    def test_omitted_count_accurate(self):
-        """Omitted line count equals (total lines - first line - user frame lines - exception line)."""
-        tb = self._make_tb(15)  # total 34 lines: first 1 + lib frames 30 + user frame 2 + exception 1
-        result = _compress_traceback(tb)
-        # Retained: first line + user frame 2 lines + exception 1 line = 4 (plus omission notice)
-        # Omitted: 34 - 1 - 2 - 1 = 30
-        assert "30 lines omitted" in result
-
-    def test_no_user_frame_still_shows_exception(self):
-        """Without a File \"<string>\" frame, compression still works and retains the exception line."""
-        tb = self._make_tb(15, has_user_frame=False)  # pure library frames
-        result = _compress_traceback(tb)
-        assert "ValueError: something went wrong" in result
-        assert "lines omitted" in result
-
-    def test_execute_compresses_deep_traceback(self):
-        """execute() compresses exceptions from deep call stacks."""
-        ns = bare_ns()
-        # Python 3.12 exec traceback has 1 line per frame (no code line); need > _TRACEBACK_COMPRESS_THRESHOLD
-        # frames to trigger compression. range(20) produces f0-f19, plus f20 (raises) = 21 function frames
-        # + 2 module frames + first line + exception = 25 lines.
-        funcs = "\n".join(
-            f"def f{i}(): return f{i+1}()" for i in range(20)
-        )
-        code = f"{funcs}\ndef f20(): return 1/0\nf0()"
-        # Pass ns as both G and L so cross-function calls resolve via ns
-        result = execute(code, ns, ns, frame_number=1)
-        error = result.error
-        assert error is not None
-        assert "ZeroDivisionError" in error
-        # After compression there should be an omission notice (call chain is deep enough, > 20 lines)
-        assert "lines omitted" in error
-
-    def test_execute_short_error_not_compressed(self):
-        """Simple exceptions in execute() are not compressed; full traceback is retained."""
-        ns = bare_ns()
-        result = execute("1 / 0", {}, ns, frame_number=1)
-        error = result.error
-        assert error is not None
-        # Short traceback does not contain omission notice
-        assert "lines omitted" not in error
 
 
 # ─────────────────────────────────────────────
@@ -410,12 +327,12 @@ class TestRenderIntegration:
         assert "_context_pct" not in k.L
 
     def test_auxiliary_section_in_output(self):
-        """Signals dict contains system signal key with 'context' payload key."""
+        """Signals dict contains at least one system signal key with a dict payload."""
         k = minimal_kernel()
         pong = k.ping(None, _ns(k))
         assert isinstance(pong.state.signals, dict)
         assert any(
-            isinstance(payload, dict) and "context" in payload
+            isinstance(payload, dict)
             for payload in pong.state.signals.values()
         )
 
@@ -429,21 +346,13 @@ class TestKernel:
         """After init, ns contains all required system variables (v5 format)."""
         k = minimal_kernel()
         assert k.L.get("_frame") == 0
-        # v5 vars
-        assert k.L.get("_system_prompt") == ""
+        # _system_prompt lives in G (written by boot script, never in L)
+        assert "_system_prompt" not in k.L
         # _frame_stream removed from L in PR 5 (reads from SQLite each ping)
         assert "_frame_stream" not in k.L
         # _history and _history_depth removed in v3
         assert "_history" not in k.L
         assert "_history_depth" not in k.L
-
-    def test_init_creates_lifecycle_vars(self):
-        """After init, ns contains _sleeping/_next_wake lifecycle variables."""
-        k = minimal_kernel()
-        assert k.L["_sleeping"] is False
-        assert k.L["_next_wake"] is None
-        # _wake moved to G["_system"].set_wake() in PR 3
-        assert "_wake" not in k.L
 
     def test_init_from_snapshot(self):
         """snapshot_path parameter: restore namespace from file to continue a previous session."""
@@ -503,7 +412,7 @@ class TestKernel:
     def test_kernel_ping_returns_ping(self, tmp_path):
         from vessal.ark.shell.hull.cell.protocol import Ping
         kernel = minimal_kernel()
-        kernel.L["_system_prompt"] = "You are an agent."
+        kernel.G["_system_prompt"] = "You are an agent."
         ping = kernel.ping(None, _ns(kernel))
         assert isinstance(ping, Ping)
         assert ping.system_prompt == "You are an agent."
@@ -536,11 +445,10 @@ class TestKernel:
         assert "hello from kernel" in k.L["observation"].stdout
 
     def test_error_in_observation_after_exec(self):
-        """Exception is captured into observation.error."""
+        """observation.error is the raw exception when execution raises."""
         k = minimal_kernel()
         _exec(k, "1 / 0")
-        assert k.L["observation"].error is not None
-        assert "ZeroDivisionError" in k.L["observation"].error
+        assert isinstance(k.L["observation"].error, ZeroDivisionError)
 
     def test_diff_in_observation_after_exec(self):
         """New variables appear in observation.diff."""
@@ -677,22 +585,6 @@ class TestKernel:
         k.L["injected"] = 42
         _exec(k, "answer = injected + 1")
         assert k.L["answer"] == 43
-
-    def test_sleeping_lifecycle_var(self):
-        """_sleeping is a lifecycle variable in namespace; Agent can set it via sleep()."""
-        k = minimal_kernel()
-        assert k.L["_sleeping"] is False
-        _exec(k, "sleep()")
-        assert k.L["_sleeping"] is True
-
-    def test_wake_driven_exec(self):
-        """Simulate event-driven execution: write _wake, execute, then call sleep()."""
-        k = minimal_kernel()
-        k.L["_wake"] = "user_message: compute 1+2+3"
-        _exec(k, "total = 1 + 2 + 3")
-        _exec(k, "sleep()")
-        assert k.L["total"] == 6
-        assert k.L["_sleeping"] is True
 
     def test_eval_expect_returns_verdict(self):
         """ping with expect returns Verdict in L['verdict']."""
@@ -863,7 +755,7 @@ class TestPingReturnsPing:
         from vessal.ark.shell.hull.cell.protocol import Action, Ping, Pong
 
         k = minimal_kernel()
-        k.L["_system_prompt"] = "test"
+        k.G["_system_prompt"] = "test"
         pong = Pong(think="t", action=Action(operation="x = 1", expect=""))
         result = k.ping(pong, _ns(k))
         assert isinstance(result, Ping), f"Expected Ping, got {type(result)}"

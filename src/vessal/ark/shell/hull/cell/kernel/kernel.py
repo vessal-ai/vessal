@@ -14,8 +14,6 @@
 #   ② exec(boot_script, G, G) — capture stdout/stderr
 #   ③ (restart only) LenientUnpickler.load(restore_path) → self.L
 #   ④ write boot frame at n = n_prev + 1
-# Kernel has no state outside of G and L — no Gate, no counters, no config attributes.
-
 from __future__ import annotations
 
 import cloudpickle
@@ -23,8 +21,10 @@ import contextlib
 import io
 import logging
 
+from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
 from vessal.ark.shell.hull.cell.kernel.executor import execute
 from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
+from vessal.ark.shell.hull.cell.kernel.transient import is_transient_value
 from vessal.ark.shell.hull.cell.protocol import (
     FRAME_SCHEMA_VERSION,
     FrameRecord,
@@ -78,15 +78,9 @@ class Kernel:
         self.G: dict = {}
         # ① empty L — seed system defaults that every agent needs from frame 0
         self.L: dict = {
-            "_system_prompt": "",
             "_frame": 0,
             "signals": {},
-            "_errors": [],
-            "_error_buffer_cap": 50,
-            "_sleeping": False,
-            "_next_wake": None,
         }
-        self.L["sleep"] = self.sleep
 
         # ② boot script — captures Skill __init__ prints into stdout/stderr
         boot_stdout = io.StringIO()
@@ -103,6 +97,7 @@ class Kernel:
             if callable(bind):
                 bind(self)
 
+        self._transient_names: set[str] = set()
         self._signal_errors_this_frame: list[tuple[str, str, Exception]] = []
         self.frame_log: FrameLog | None = None
         if db_path is not None:
@@ -211,9 +206,9 @@ class Kernel:
             exec_result = execute(pong.action.operation, G, L, frame_n)
             L["observation"] = Observation(
                 stdout=exec_result.stdout,
+                stderr="",
                 diff=exec_result.diff,
                 error=exec_result.error,
-                verdict=None,
             )
             # ③ eval
             if exec_result.error is None and pong.action.expect.strip():
@@ -224,13 +219,6 @@ class Kernel:
                 L["verdict"] = None
             # ④ signal_scan
             self._signal_scan()
-            # commit frame N (uses self._last_ping as the FrameRecord.ping field)
-            L["observation"] = Observation(
-                stdout=L["observation"].stdout,
-                diff=L["observation"].diff,
-                error=L["observation"].error,
-                verdict=L["verdict"],   # FrameRecord still nests verdict inside observation in v7
-            )
             self._commit(pong, L["observation"], frame_n, ping_for_record=self._last_ping)
         else:
             # First call after boot: signal_scan only (no exec/eval, no commit)
@@ -243,22 +231,56 @@ class Kernel:
         else:
             fs = FrameStream(entries=[])
         self._last_ping = Ping(
-            system_prompt=self.L.get("_system_prompt", ""),
+            system_prompt=self.G.get("_system_prompt", ""),
             state=State(frame_stream=fs, signals=dict(self.L.get("signals", {}))),
         )
         return self._last_ping
 
+    def mark_transient(self, name: str) -> None:
+        self._transient_names.add(name)
+
     def snapshot(self, path: str) -> None:
-        """Serialize L to file. Excludes 'sleep' (re-injected by restore/init)."""
-        import os, tempfile
+        """Serialise L to disk; per-key fallback to DeadHandle on cloudpickle failure."""
+        import os
+        import tempfile
+
         path = str(path)
-        snapshot_l = {k: v for k, v in self.L.items() if k != "sleep"}
-        body_bytes = cloudpickle.dumps(snapshot_l)
+        from vessal.ark.shell.hull.cell.kernel.hibernate import call_hibernate, has_hibernate
+
+        to_dump: dict = {}
+        for key, value in self.L.items():
+            if key in self._transient_names:
+                continue
+            if is_transient_value(value):
+                continue
+            if has_hibernate(value):
+                try:
+                    to_dump[key] = call_hibernate(value)
+                    continue
+                except Exception as exc:
+                    to_dump[key] = DeadHandle(
+                        kind=type(value).__name__,
+                        origin=key,
+                        reason=f"hibernate raised: {exc}",
+                    )
+                    continue
+            try:
+                cloudpickle.dumps(value)
+            except Exception as exc:
+                to_dump[key] = DeadHandle(
+                    kind=type(value).__name__,
+                    origin=key,
+                    reason=f"{type(exc).__name__}: {exc}",
+                )
+                continue
+            to_dump[key] = value
+
+        body = cloudpickle.dumps(to_dump)
         dir_name = os.path.dirname(path) or "."
         fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as f:
-                f.write(body_bytes)
+                f.write(body)
             os.replace(tmp_path, path)
         except Exception:
             try:
@@ -269,14 +291,24 @@ class Kernel:
 
     def restore(self, path: str) -> None:
         """Restore L from file. sys.modules populated by boot script before this runs."""
+        from vessal.ark.shell.hull.cell.kernel.hibernate import call_wake, is_hibernated_tuple
+        from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
+
         with open(path, "rb") as f:
             raw = f.read()
-        self.L = LenientUnpickler(io.BytesIO(raw)).load()
-        self.L["sleep"] = self.sleep
+        loaded = LenientUnpickler(io.BytesIO(raw)).load()
 
-    def sleep(self) -> None:
-        """Mark agent as sleeping. Pauses the frame loop until Shell wakes it."""
-        self.L["_sleeping"] = True
+        for key, value in list(loaded.items()):
+            if is_hibernated_tuple(value):
+                try:
+                    loaded[key] = call_wake(value)
+                except Exception as exc:
+                    cls = value[1]
+                    loaded[key] = UnresolvedRef(
+                        cls.__module__, cls.__qualname__,
+                        f"wake raised: {exc}",
+                    )
+        self.L = loaded
 
     # ------------------------------------------------------------------ Private helpers
 
@@ -387,14 +419,18 @@ class Kernel:
         from vessal.ark.shell.hull.cell.kernel.frame_log.types import ErrorOnSource, FrameWriteSpec, SignalRow
 
         obs = record.observation
-        operation_error = (
-            ErrorOnSource("operation", None, obs.error)
-            if obs.error is not None
-            else None
-        )
+        operation_error_text: str | None
+        if obs.error is not None:
+            operation_error_text = "".join(
+                _tb.TracebackException.from_exception(obs.error).format()
+            )
+            operation_error = ErrorOnSource("operation", None, operation_error_text)
+        else:
+            operation_error = None
         verdict_value: str | None = None
-        if obs.verdict is not None:
-            verdict_value = _json.dumps(obs.verdict.to_dict())
+        verdict = self.L.get("verdict")
+        if verdict is not None:
+            verdict_value = _json.dumps(verdict.to_dict())
         diff_json = _json.dumps(obs.diff) if obs.diff else "{}"
         sig_rows: list[SignalRow] = []
         for (cls_name, var_name, scope), payload in self.L.get("signals", {}).items():

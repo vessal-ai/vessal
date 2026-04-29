@@ -1,7 +1,7 @@
 """test_create_wizard — unit tests for wizard finalize + env template logic."""
 from __future__ import annotations
 
-from vessal.ark.shell.tui.create_wizard import _build_env_content, finalize_answers
+from vessal.ark.shell.tui.create_wizard import DEFAULT_ANSWERS, _build_env_content, finalize_answers
 
 
 def test_build_env_content_all_values_provided():
@@ -43,6 +43,17 @@ def test_finalize_answers_defaults_applied():
     merged = finalize_answers({"name": "my-agent"})
     assert merged["name"] == "my-agent"
     assert merged["dockerize"] is False
+
+
+def test_defaults_include_all_keys():
+    assert set(DEFAULT_ANSWERS.keys()) == {"name", "api_key", "base_url", "model", "dockerize"}
+
+
+def test_finalize_fills_missing_with_defaults():
+    merged = finalize_answers({"name": "hello"})
+    assert set(merged.keys()) == set(DEFAULT_ANSWERS.keys())
+    for key in ("api_key", "base_url", "model", "dockerize"):
+        assert merged[key] == DEFAULT_ANSWERS[key]
 
 
 def test_validate_project_name_rejects_existing_dir(tmp_path):

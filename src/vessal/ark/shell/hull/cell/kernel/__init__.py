@@ -4,6 +4,8 @@ from vessal.ark.shell.hull.cell.kernel.executor import ExecResult
 from vessal.ark.shell.hull.cell.kernel.describe import render_value
 from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
 from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
+from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
+from vessal.ark.shell.hull.cell.kernel.transient import transient
 
 __all__ = [
     "Kernel",
@@ -12,4 +14,6 @@ __all__ = [
     "UnresolvedRef",
     "compose_boot_script",
     "BootSkillEntry",
+    "DeadHandle",
+    "transient",
 ]

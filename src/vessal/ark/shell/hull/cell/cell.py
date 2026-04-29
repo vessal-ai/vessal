@@ -16,16 +16,17 @@
 
 from __future__ import annotations
 
-import time as _time
+import logging
 from pathlib import Path
 from typing import Any
 
-from vessal.ark.shell.hull.cell._errors_helper import append_error
 from vessal.ark.shell.hull.cell.core import Core
 from vessal.ark.shell.hull.cell.gate import ActionGate, StateGate
 from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import ErrorRecord, Ping, Pong, StepResult
+from vessal.ark.shell.hull.cell.protocol import Ping, Pong, StepResult
 from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
+
+logger = logging.getLogger(__name__)
 
 
 class Cell:
@@ -34,8 +35,9 @@ class Cell:
     Encapsulates Kernel (execution) and Core (reasoning), providing a single-frame step() interface.
     Does not auto-loop, does not hold logs, and does not manage the Tracer lifecycle — these are Hull's responsibility.
 
-    Hull injects system variables (_system_prompt, _memories, etc.) via cell.L;
-    the L dict itself is the injection interface, no dedicated channel is needed.
+    Hull writes `_system_prompt` into G after boot via `cell.G["_system_prompt"]`.
+    Other per-frame state (_memories, etc.) lives in L; the L dict is the injection
+    interface for mutable agent state, no dedicated channel is needed.
 
     gate attributes take values "auto" | "safe" | "human"; reads and writes go through ActionGate/StateGate instances.
     Hull can switch modes via cell.action_gate = "safe" without knowing about internal Gate objects.
@@ -199,20 +201,10 @@ class Cell:
                 self._ping, tracer, frame_number,
             )
         except Exception as e:
-            append_error(self._kernel.L, ErrorRecord(
-                "protocol", str(e),
-                self._kernel.L.get("_frame", 0), _time.time(),
-            ))
             return StepResult(protocol_error=str(e))
 
-        # Real-token bookkeeping (deferred to PR 5; kept for now)
         if prompt_tokens is not None:
             self._kernel.L["_actual_tokens_in"] = prompt_tokens
-            budget_total = self._kernel.L.get("_budget_total", 0)
-            if budget_total > 0:
-                self._kernel.L["_context_pct"] = round(
-                    prompt_tokens / budget_total * 100
-                )
         if completion_tokens is not None:
             self._kernel.L["_actual_tokens_out"] = completion_tokens
 
@@ -266,21 +258,13 @@ class Cell:
     # ------------------------------------------------------------------ Gates
 
     def _check_state_gate(self, ping: Ping) -> None:
-        """State gating before the LLM sees Ping. Blocks logged to _errors ring."""
         result = self._state_gate.check(ping.state.frame_stream)
         if not result.allowed:
-            append_error(self._kernel.L, ErrorRecord(
-                "protocol", f"State gate blocked: {result.reason}",
-                self._kernel.L.get("_frame", 0), _time.time(),
-            ))
+            logger.warning("state gate blocked: %s", result.reason)
 
     def _check_action_gate(self, action: str) -> str | None:
-        """Action gating before exec. Returns None when blocked."""
         result = self._action_gate.check(action)
         if not result.allowed:
-            append_error(self._kernel.L, ErrorRecord(
-                "protocol", f"Action gate blocked: {result.reason}",
-                self._kernel.L.get("_frame", 0), _time.time(),
-            ))
+            logger.warning("action gate blocked: %s", result.reason)
             return None
         return action

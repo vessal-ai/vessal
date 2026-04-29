@@ -38,13 +38,12 @@ Cell is a leaf: execution engine only. These constraints are executable — see 
 - `Core._DEFAULT_API_PARAMS` — private to Core; Cell passes `api_params=None` and reads `cell.max_tokens`
 - `fs._hot[...]` — use `FrameStream.latest_hot_frame()` / `hot_head_len()` / `find_creation()`
 - `gate._rules.clear()` — use `gate.replace_rules([])`
-- `ns["_max_tokens"]` — banned; use `cell.max_tokens` or `ns["_token_budget"]`
+- `ns["_max_tokens"]` — banned; use `cell.max_tokens`
 
 ## Invariants
 
 - `ns["_frame"]` increments exactly once per frame, inside `_commit` (the private helper). The in-progress frame number is an explicit parameter passed through the call chain.
 - `ns["sleep"]` is `Kernel.sleep` bound method. Re-bound by `_migrate_snapshot()` after restore so closures do not capture stale state.
-- `ns["_errors"]` capped by `ns["_error_buffer_cap"]` (default 200) via `append_error()` in `_errors_helper.py`.
 - `cell.ping` / `cell.pong` are projections from `FrameStream.latest_hot_frame()`, updated at the end of each `step()`.
 - Compaction defaults K=16 / N=8 are defined once in `Kernel.__init__`; no other site sets them.
 - Single-frame execution method: `Kernel.ping`, `Core.step`. Long-running loop: `run_forever` (Hull EventLoop). These names are enforced by `tests/architecture/vessal/test_cell_dependency_tree.py`.
@@ -106,5 +105,5 @@ None.
 
 ### Active
 - 2026-04-09: FrameRecord schema v6 landed, added ping field (Ping.to_dict/from_dict), from_dict is compatible with v5.
-- 2026-04-13: Core.step() returns (Pong, prompt_tokens, completion_tokens) tuple; Cell.step() overwrites _context_pct with real API token data (_actual_tokens_in/_actual_tokens_out); protocol exceptions written to _errors (ErrorRecord).
+- 2026-04-13: Core.step() returns (Pong, prompt_tokens, completion_tokens) tuple; Cell.step() stores real API token data in _actual_tokens_in/_actual_tokens_out; protocol exceptions written to _errors (ErrorRecord).
 - 2026-04-28: Cell.step() uses kernel.ping(None, ns) for bootstrap (render-only, first call once) and kernel.ping(pong, ns) for every subsequent frame (exec+commit+render); kernel.prepare() and kernel.step() are deleted. Frame outputs land in L["observation"] (Observation dataclass) and L["verdict"] (Verdict | None).

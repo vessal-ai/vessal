@@ -13,8 +13,6 @@ from vessal.ark.shell.hull.cell.protocol import (
     Ping,
     Pong,
     State,
-    Verdict,
-    VerdictFailure,
     flatten_frame_dict,
 )
 
@@ -26,14 +24,13 @@ def _make_record_dict(
     expect: str = "assert x == 1",
     stdout: str = "out",
     diff: str = "[+x]",
-    error: str | None = None,
-    verdict: Verdict | None = None,
+    error: BaseException | None = None,
 ) -> dict:
     record = FrameRecord(
         number=number,
         ping=Ping(system_prompt="", state=State(frame_stream=FrameStream(entries=[]), signals={})),
         pong=Pong(think=think, action=Action(operation=operation, expect=expect)),
-        observation=Observation(stdout=stdout, diff=diff, error=error, verdict=verdict),
+        observation=Observation(stdout=stdout, stderr="", diff=diff, error=error),
     )
     return record.to_dict()
 
@@ -65,26 +62,16 @@ def test_flatten_promotes_observation_fields_to_top_level() -> None:
 
 
 def test_flatten_carries_observation_error_text() -> None:
-    flat = flatten_frame_dict(_make_record_dict(error="Traceback...\nFooError"))
-    assert flat["obs_error"] == "Traceback...\nFooError"
+    exc = RuntimeError("FooError")
+    flat = flatten_frame_dict(_make_record_dict(error=exc))
+    assert flat["obs_error"] is not None
+    assert "FooError" in flat["obs_error"]
 
 
 def test_flatten_verdict_value_when_none() -> None:
-    flat = flatten_frame_dict(_make_record_dict(verdict=None))
+    flat = flatten_frame_dict(_make_record_dict())
     assert flat["verdict_value"] is None
     assert flat["verdict_error"] is None
-
-
-def test_flatten_verdict_value_serializes_to_dict() -> None:
-    v = Verdict(total=2, passed=1, failures=(
-        VerdictFailure(kind="assertion_failed", assertion="assert x", message="x was 0"),
-    ))
-    flat = flatten_frame_dict(_make_record_dict(verdict=v))
-    assert flat["verdict_value"] == {
-        "total": 2,
-        "passed": 1,
-        "failures": [{"kind": "assertion_failed", "assertion": "assert x", "message": "x was 0"}],
-    }
 
 
 def test_flatten_emits_entry_model_fields() -> None:

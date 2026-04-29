@@ -13,10 +13,7 @@ def mock_cell():
     class _FakeKernel:
         def __init__(self):
             self.L = {
-                "_sleeping": False,
-                "_next_wake": None,
                 "_frame": 0,
-                "_errors": [],
                 "signals": {},
             }
 
@@ -33,22 +30,22 @@ def test_inject_wake_sets_namespace(mock_cell):
     """inject_wake writes the wake reason onto _system Skill."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "user_message"})
-    assert mock_cell.G["_system"]._wake == "user_message"
+    assert mock_cell.G["_system"]._wake_reason == "user_message"
 
 
 def test_inject_wake_clears_idle(mock_cell):
-    """inject_wake clears the _sleeping flag."""
-    mock_cell.L["_sleeping"] = True
+    """inject_wake clears the _sleeping flag on the _system Skill."""
+    mock_cell.G["_system"]._sleeping = True
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "heartbeat"})
-    assert mock_cell.L["_sleeping"] is False
+    assert mock_cell.G["_system"]._sleeping is False
 
 
 def test_inject_wake_default_reason(mock_cell):
     """Uses heartbeat when the event has no reason field."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({})
-    assert mock_cell.G["_system"]._wake == "heartbeat"
+    assert mock_cell.G["_system"]._wake_reason == "heartbeat"
 
 
 def test_inject_wake_does_not_touch_skills(mock_cell):
@@ -67,8 +64,7 @@ def test_run_wake_cycle_skips_frame_logger_without_log_dir(mock_cell):
     from vessal.ark.shell.hull.event_loop import FrameHooks
     from vessal.ark.util.logging import Tracer
 
-    after_step_calls = []
-    mock_cell.L["_sleeping"] = True  # sleep immediately, zero frame loop
+    mock_cell.G["_system"]._sleeping = True  # sleep immediately, zero frame loop
 
     loop = EventLoop(
         cell=mock_cell,
@@ -79,10 +75,10 @@ def test_run_wake_cycle_skips_frame_logger_without_log_dir(mock_cell):
 
 
 def test_inject_wake_alarm_reason(mock_cell):
-    """alarm wake writes _system._wake = 'alarm'."""
+    """alarm wake writes _system._wake_reason = 'alarm'."""
     loop = EventLoop(cell=mock_cell)
     loop.inject_wake({"reason": "alarm"})
-    assert mock_cell.G["_system"]._wake == "alarm"
+    assert mock_cell.G["_system"]._wake_reason == "alarm"
 
 
 def test_frame_loop_calls_before_frame_hook(mock_cell):
@@ -98,12 +94,12 @@ def test_frame_loop_calls_before_frame_hook(mock_cell):
 
     # Agent sleeps immediately after one frame
     def step_then_idle(tracer=None):
-        mock_cell.L["_sleeping"] = True
+        mock_cell.G["_system"]._sleeping = True
         r = MagicMock()
         r.protocol_error = None
         return r
 
-    mock_cell.L["_sleeping"] = False
+    mock_cell.G["_system"]._sleeping = False
     mock_cell.step = step_then_idle
 
     loop = EventLoop(cell=mock_cell, hooks=hooks)
@@ -147,12 +143,12 @@ def test_after_frame_hook_fires(mock_cell):
     hooks = FrameHooks(after_frame=after)
 
     def step_then_idle(tracer=None):
-        mock_cell.L["_sleeping"] = True
+        mock_cell.G["_system"]._sleeping = True
         r = MagicMock()
         r.protocol_error = None
         return r
 
-    mock_cell.L["_sleeping"] = False
+    mock_cell.G["_system"]._sleeping = False
     mock_cell.step = step_then_idle
 
     loop = EventLoop(cell=mock_cell, hooks=hooks)
@@ -177,8 +173,4 @@ def test_frame_loop_breaks_on_protocol_error(mock_cell):
     loop._frame_loop()
 
     assert call_count == 1, f"expected 1 call, got {call_count}"
-    assert mock_cell.L["_sleeping"] is True
-    errors = mock_cell.L.get("_errors", [])
-    assert len(errors) == 1
-    assert errors[0].type == "protocol"
-    assert "protocol error" in errors[0].message
+    assert mock_cell.G["_system"]._sleeping is True

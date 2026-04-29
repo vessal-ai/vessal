@@ -128,49 +128,33 @@ class Verdict:
 
 @dataclass(frozen=True, slots=True)
 class Observation:
-    """The world's response to an action — all observable effects of an operation on the namespace.
+    """Spec §3 — the world's response to an action.
 
-    Attributes:
-        stdout: print() output + the value of the last non-None expression (Jupyter style).
-        diff: Namespace change record (+ appeared, - disappeared), git style.
-        error: Traceback string if the operation raised an exception. None means no exception.
-        verdict: Prediction verification result. None means no expect or the operation failed.
+    `error` is the raw exception with `__traceback__` cleared so the value
+    survives cloudpickle. The textual traceback for the errors table is
+    formatted at write-time from this exception, not stored here.
     """
 
     stdout: str
+    stderr: str
     diff: str
-    error: str | None
-    verdict: Verdict | None
+    error: BaseException | None
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to a dict.
-
-        Returns:
-            Dict with keys: stdout, diff, error, verdict (verdict value is null when None).
-        """
         return {
             "stdout": self.stdout,
+            "stderr": self.stderr,
             "diff": self.diff,
-            "error": self.error,
-            "verdict": self.verdict.to_dict() if self.verdict is not None else None,
+            "error": repr(self.error) if self.error is not None else None,
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Observation":
-        """Deserialize from a dict.
-
-        Args:
-            d: Dict with keys: stdout, diff, error, verdict.
-
-        Returns:
-            Observation instance.
-        """
-        verdict_data = d["verdict"]
         return cls(
-            stdout=d["stdout"],
-            diff=d["diff"],
-            error=d["error"],
-            verdict=Verdict.from_dict(verdict_data) if verdict_data is not None else None,
+            stdout=d.get("stdout", ""),
+            stderr=d.get("stderr", ""),
+            diff=d.get("diff", ""),
+            error=None,
         )
 
 
@@ -493,50 +477,13 @@ def flatten_frame_dict(d: dict) -> dict:
         "pong_operation": action.get("operation", ""),
         "pong_expect": action.get("expect", ""),
         "obs_stdout": obs.get("stdout", ""),
-        "obs_stderr": "",
+        "obs_stderr": obs.get("stderr", ""),
         "obs_diff_json": obs.get("diff", ""),
         "obs_error": obs.get("error"),
-        "verdict_value": obs.get("verdict"),
+        "verdict_value": None,
         "verdict_error": None,
         "signals": [],
     }
-
-
-# ─────────────────────────────────────────────
-# ErrorRecord
-# ─────────────────────────────────────────────
-
-
-@dataclass(frozen=True, slots=True)
-class ErrorRecord:
-    """System error record. An element of the namespace `_errors` list.
-
-    Attributes:
-        type: Error type — "protocol" (API/parse failure), "runtime" (agent code exception),
-              "builtin_restored" (protected key deleted then restored).
-        message: Full error message.
-        frame: Frame number when the error occurred.
-        timestamp: time.time() when the error occurred.
-    """
-
-    type: str
-    message: str
-    frame: int
-    timestamp: float
-
-    def summary(self, max_len: int = 200) -> str:
-        """Generate an error summary.
-
-        Args:
-            max_len: Truncation length for message.
-
-        Returns:
-            Formatted single-line summary.
-        """
-        msg = self.message[:max_len]
-        if len(self.message) > max_len:
-            msg += "..."
-        return f"[F{self.frame}|{self.type}] {msg}"
 
 
 # ─────────────────────────────────────────────
@@ -561,7 +508,6 @@ __all__ = [
     "Action", "State",
     "Ping", "Pong", "Observation", "FrameRecord", "StepResult",
     "Verdict", "VerdictFailure",
-    "ErrorRecord",
     "flatten_frame_dict",
     "FrameContent", "SummaryContent", "Entry", "FrameStream",
 ]

@@ -7,8 +7,6 @@
 #       and writing L["observation"].
 #       Does NOT write ns["_frame"] — that is Kernel._commit()'s responsibility.
 #       Does NOT write _frame_log or construct FrameRecord — that is Cell's responsibility.
-#       Exception tracebacks are intelligently compressed — user code frames and exception
-#       info are retained while library-internal frames are folded.
 #       Bare expressions (e.g. x, data.head()) have their value appended to captured stdout
 #       (Jupyter-style).
 #   is_user_var(name) -> bool
@@ -17,45 +15,39 @@
 #
 # This is the mechanism layer (fixed, unchanging); it has no dependencies on
 # other Kernel modules, only on describe.
+# ExecResult.error is the raw exception with __traceback__ cleared.
+# Textual traceback formatting is the caller's responsibility (kernel.py, Task 4).
 
 from __future__ import annotations
 
 import ast
 import io
 import sys
-import time as _time
-import traceback
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from typing import Any
 
-from vessal.ark.shell.hull.cell._errors_helper import append_error
 from vessal.ark.shell.hull.cell.kernel import source_cache
 from vessal.ark.shell.hull.cell.kernel.describe import render_value
-from vessal.ark.shell.hull.cell.protocol import ErrorRecord
 
 
 # Maximum length for bare expression repr. Truncated with "..." when exceeded.
 _EXPR_REPR_MAX_LEN = 2000
-
-# Traceback line count threshold. Returned as-is when <= this value; longer
-# tracebacks have library-internal frames folded.
-_TRACEBACK_COMPRESS_THRESHOLD = 20
 
 
 @dataclass(frozen=True, slots=True)
 class ExecResult:
     """Operation execution result.
 
-    Attributes:
-        stdout: print() output + the last non-None expression value.
-        diff: Namespace change record.
-        error: Exception info. None when no exception occurred.
+    `error` is the raw exception (`__traceback__` cleared) so that L can be
+    cloudpickle'd and Agent can `isinstance(error, SomeExceptionClass)`.
+    The errors-table textual format is computed by the caller from this
+    exception via `traceback.TracebackException.from_exception(...)`.
     """
 
     stdout: str
     diff: str
-    error: str | None
+    error: BaseException | None
 
 
 def is_user_var(name: str) -> bool:
@@ -82,7 +74,7 @@ def execute(
 ) -> ExecResult:
     """Execute operation code in the namespace.
 
-    frame_number: passed in by Cell via Kernel; used for ErrorRecord and _ns_meta tracking.
+    frame_number: passed in by Cell via Kernel; used for _ns_meta tracking.
     execute() must NOT write L["_frame"] — that is Kernel._commit()'s responsibility.
     execute() must NOT write _frame_log or construct FrameRecord.
 
@@ -90,7 +82,7 @@ def execute(
         operation: Python code string to execute. None or whitespace-only is treated as a no-op.
         G: Preset assets dict (Skills, boot globals); read-only by convention. Globals for exec().
         L: Agent state dict; only _ns_meta and user-bound variables are written.
-        frame_number: Current frame number; used for ErrorRecord and _ns_meta, not written to L["_frame"].
+        frame_number: Current frame number; used for _ns_meta, not written to L["_frame"].
 
     Returns:
         ExecResult containing stdout, diff, and error fields.
@@ -117,7 +109,7 @@ def execute(
 
     # Step 5: execute code, capture stdout and exceptions
     stdout_buffer = io.StringIO()
-    error = None
+    error: BaseException | None = None
 
     try:
         # SyntaxError from compile() is a user error; catch it here so the
@@ -129,15 +121,13 @@ def execute(
         with redirect_stdout(stdout_buffer):
             exec(code, G, L)  # noqa: S102
     except KeyboardInterrupt:
-        raise  # User interrupt (Ctrl+C); do not catch; allow Agent to be stopped
-    except BaseException:
-        # SystemExit (exit()/sys.exit()) and all regular exceptions are captured as
-        # strings and do not propagate
-        try:
-            error = _compress_traceback(traceback.format_exc())
-        except Exception:
-            error = traceback.format_exc()  # use raw traceback if compression itself fails
-        append_error(L, ErrorRecord("runtime", error, frame_number, _time.time()))
+        raise
+    except BaseException as exc:
+        # Detach traceback so cloudpickle can serialise the exception object.
+        # The traceback frame chain holds references to live frame locals,
+        # which often contain unpicklable objects.
+        exc.__traceback__ = None
+        error = exc
 
     # Step 5.5: if there is a bare expression result, append it to stdout
     expr_result = L.pop("_expr_result", None)
@@ -213,57 +203,6 @@ def _maybe_capture_last_expr(action: str) -> str:
 
     replacement = f"_expr_result = ({expr_text})\n"
     return before + replacement + after_same + after_rest
-
-
-def _compress_traceback(tb_text: str) -> str:
-    """Compress traceback: retain user code frames and exception info, fold library-internal frames.
-
-    Returns unchanged when <= _TRACEBACK_COMPRESS_THRESHOLD lines — shallow call
-    stacks need no compression. For longer tracebacks, retains:
-      1. First line "Traceback (most recent call last):"
-      2. Last File "<frame-*>" frame (user code error location) and its code line
-      3. Last line (exception type and message)
-    Intermediate library-internal frames are folded as "... (N lines omitted)".
-
-    Args:
-        tb_text: Output string from traceback.format_exc().
-
-    Returns:
-        Compressed traceback string.
-    """
-    lines = tb_text.splitlines()
-    if len(lines) <= _TRACEBACK_COMPRESS_THRESHOLD:
-        return tb_text
-
-    # Last user code frame (LLM's code executes under "<frame-N>" filenames
-    # registered into linecache by source_cache.register).
-    user_frame_idx = -1
-    for i, line in enumerate(lines):
-        if 'File "<frame-' in line:
-            user_frame_idx = i
-
-    # Last line is the exception type and message (skip trailing blank lines)
-    exc_idx = len(lines) - 1
-    while exc_idx > 0 and not lines[exc_idx].strip():
-        exc_idx -= 1
-
-    # Set of lines to keep (excluding the first line)
-    kept = set()
-    if user_frame_idx >= 0:
-        kept.add(user_frame_idx)
-        # The code line immediately following the frame header (if not the exception line itself)
-        if user_frame_idx + 1 < len(lines) and user_frame_idx + 1 != exc_idx:
-            kept.add(user_frame_idx + 1)
-    kept.add(exc_idx)
-
-    omitted = len(lines) - 1 - len(kept)  # -1 for the first line
-
-    result = [lines[0]]
-    if omitted > 0:
-        result.append(f"  ... ({omitted} lines omitted)")
-    for i in sorted(kept):
-        result.append(lines[i])
-    return "\n".join(result)
 
 
 def _update_ns_meta(L: dict[str, Any], before_keys: set, before_ids: dict, frame: int) -> dict[str, Any]:

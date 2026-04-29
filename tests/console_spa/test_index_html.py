@@ -6,7 +6,7 @@ grep can catch. If either side drifts, the Console renders blank silently.
 """
 from pathlib import Path
 
-SPA = Path(__file__).parents[1]
+SPA = Path(__file__).resolve().parents[2] / "src" / "vessal" / "console_spa"
 INDEX_HTML = SPA / "index.html"
 APP_JS = SPA / "assets" / "app.js"
 

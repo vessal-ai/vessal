@@ -34,9 +34,12 @@ _HEADER = "import importlib, copy, json\n"
 def compose_boot_script(entries: list[BootSkillEntry]) -> str:
     """Return the Python source for one boot run.
 
-    Spec §7.4 layout: `import importlib, copy, json` first, then per-Skill
+    Spec §7.4 layout: `import importlib, copy, json`, then per-Skill
     `from <import_path> import <class_name>`, then per-Skill
     `<var_name> = <class_name>(<kwargs_repr>)`.
+
+    Hull writes `_system_prompt` directly into G via `cell.G["_system_prompt"]`
+    after boot; it is never injected through the boot script.
 
     Args:
         entries: ordered Skill list.
@@ -44,13 +47,12 @@ def compose_boot_script(entries: list[BootSkillEntry]) -> str:
     Returns:
         A complete Python source string ending with a trailing newline.
     """
-    if not entries:
-        return _HEADER
-
-    imports = "\n".join(
-        f"from {e.import_path} import {e.class_name}" for e in entries
-    )
-    constructions = "\n".join(
-        f"{e.var_name} = {e.class_name}({e.kwargs_repr})" for e in entries
-    )
-    return f"{_HEADER}{imports}\n\n{constructions}\n"
+    lines: list[str] = []
+    lines.append(_HEADER.rstrip())
+    for entry in entries:
+        lines.append(f"from {entry.import_path} import {entry.class_name}")
+    if entries:
+        lines.append("")
+        for entry in entries:
+            lines.append(f"{entry.var_name} = {entry.class_name}({entry.kwargs_repr})")
+    return "\n".join(lines) + "\n"

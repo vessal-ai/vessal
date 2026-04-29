@@ -40,7 +40,7 @@ graph LR
     EL -->|"FrameHooks callbacks"| Hull
 ```
 
-There are three key internal decisions. First, runtime-owned variables (`_frame_type`, `_render_config`, `_system_prompt`, `_soul`) are backfilled by Hull before each frame via `_rewrite_runtime_owned()`, rather than being maintained by Cell or the LLM. This ensures the Agent cannot change its own perspective by writing to these variables. `_soul` is special: each frame checks SOUL.md's mtime, and if the file has changed, it is re-read, so changes the Agent makes to SOUL.md take effect in the next frame. Second, Skills are loaded in two phases: first load the class, instantiate it, and inject into the namespace, then start the server; if the server fails to start, the first phase is rolled back to avoid leaving Skill instances without server support in the namespace. Third, heartbeat was moved out of Shell into the heartbeat Skill, making the ShellServer after Hull initialization a stateless HTTP proxy, simplifying testing and lifecycle management.
+There are three key internal decisions. First, runtime-owned variables (`_system_prompt`, `_soul`) are backfilled by Hull before each frame via `_rewrite_runtime_owned()`, rather than being maintained by Cell or the LLM. This ensures the Agent cannot change its own perspective by writing to these variables. `_soul` is special: each frame checks SOUL.md's mtime, and if the file has changed, it is re-read, so changes the Agent makes to SOUL.md take effect in the next frame. Second, Skills are loaded in two phases: first load the class, instantiate it, and inject into the namespace, then start the server; if the server fails to start, the first phase is rolled back to avoid leaving Skill instances without server support in the namespace. Third, heartbeat was moved out of Shell into the heartbeat Skill, making the ShellServer after Hull initialization a stateless HTTP proxy, simplifying testing and lifecycle management.
 
 ```mermaid
 sequenceDiagram
@@ -70,13 +70,11 @@ sequenceDiagram
 ```mermaid
 graph LR
     Hull["Hull._rewrite_runtime_owned()"]
-    Hull -->|"backfill each frame"| FT["_frame_type"]
-    Hull -->|"backfill each frame"| RC["_render_config"]
     Hull -->|"backfill each frame"| SP["_system_prompt"]
     Hull -->|"check mtime each frame\nre-read on change"| SOUL["_soul"]
 ```
 
-Invariants: Each `wake()` call ultimately produces a complete frame cycle — inject_wake, frame loop until `_sleeping` is set, snapshot save. EventLoop guarantees this process is not interrupted (unless max_frames_per_wake is exceeded). Hull.handle() returns 404 for all unknown routes without throwing exceptions, ensuring the Shell layer always receives a valid response.
+Invariants: Each `wake()` call ultimately produces a complete frame cycle — inject_wake, frame loop until the agent sleeps, snapshot save. EventLoop guarantees this process is not interrupted (unless max_frames_per_wake is exceeded). Hull.handle() returns 404 for all unknown routes without throwing exceptions, ensuring the Shell layer always receives a valid response.
 
 **Snapshot management.** Hull owns `<snap>.skills.json`. Written atomically alongside `cell.snapshot()` to record active Skill paths and names; read before `cell.restore()` to prime `sys.path`/`sys.modules` before cloudpickle resolves Skill classes. Cell is unaware of this file — Cell serializes namespace bytes only. This is the only place `sys.path`/`sys.modules` are mutated for Skill restoration.
 

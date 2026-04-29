@@ -91,8 +91,6 @@ def test_ping_skips_eval_when_operation_errors(k):
     k.ping(None, namespace)
     pong = Pong(think="", action=Action(operation="1/0", expect="assert True"))
     k.ping(pong, namespace)
-    obs = k.L["observation"]
-    assert obs.error is not None
     assert k.L["verdict"] is None
 
 
