@@ -3,7 +3,7 @@ import importlib
 import pytest
 
 
-BUILTIN_SKILLS = ["chat", "pin", "tasks", "memory", "heartbeat", "pip", "skill_creator", "skills"]
+BUILTIN_SKILLS = ["chat", "pin", "tasks", "memory", "heartbeat", "pip", "skill_creator", "skill_manager"]
 
 # Forbidden method name patterns in signal output
 FORBIDDEN_IN_SIGNAL = [
@@ -11,7 +11,7 @@ FORBIDDEN_IN_SIGNAL = [
     "pin.pin(", "pin.unpin(",
     "tasks.add_task(", "tasks.update_task(", "tasks.get_task(", "tasks.current_task(",
     "memory.save(", "memory.get(", "memory.delete(",
-    "skills.load(", "skills.unload(", "skills.list(",
+    "skill_manager.load(", "skill_manager.unload(", "skill_manager.list(",
     "_meta.load_skill(", "_meta.unload_skill(",
 ]
 

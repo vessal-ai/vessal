@@ -76,7 +76,7 @@ def _write_hull_toml(project_dir: Path, project_name: str) -> None:
         f'# top_k = 40\n'
         f'\n'
         f'[hull]\n'
-        f'skills = ["tasks", "pin", "chat", "heartbeat", "skills"]\n'
+        f'skills = ["tasks", "pin", "chat", "heartbeat", "skill_manager"]\n'
         f'skill_paths = ["skills/bundled", "skills/hub", "skills/local"]\n'
         f'# compress_threshold = 50  # Context pressure signal threshold (default 50%, read by Memory skill)\n'
         f'\n'

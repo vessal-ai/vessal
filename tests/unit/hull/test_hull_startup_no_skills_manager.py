@@ -33,5 +33,5 @@ def test_hull_skills_absent_from_ns_when_not_configured(tmp_path, monkeypatch):
     )
     from vessal.ark.shell.hull.hull import Hull
     hull = Hull(str(tmp_path))
-    assert "skills" not in hull._main_cell.L, \
-        "'skills' should not be pre-injected; it must come from [hull].skills config"
+    assert "skill_manager" not in hull._main_cell.L, \
+        "'skill_manager' should not be pre-injected; it must come from [hull].skills config"

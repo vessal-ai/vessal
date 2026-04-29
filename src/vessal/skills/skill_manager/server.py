@@ -1,6 +1,6 @@
-"""skills Skill HTTP routes — mounts the Console inventory UI.
+"""skill_manager Skill HTTP routes — mounts the Console inventory UI.
 
-Registers static routes under /skills/skills/ui/<file>. The UI's app.js fetches skill data
+Registers static routes under /skills/skill_manager/ui/<file>. The UI's app.js fetches skill data
 from Hull's /skills/list directly; this server does not proxy data calls.
 """
 from __future__ import annotations
