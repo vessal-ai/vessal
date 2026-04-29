@@ -28,7 +28,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from vessal.ark.shell.hull.cell.kernel import source_cache
-from vessal.ark.shell.hull.cell.kernel.describe import render_value
 
 
 # Maximum length for bare expression repr. Truncated with "..." when exceeded.
@@ -47,7 +46,7 @@ class ExecResult:
 
     stdout: str
     stderr: str
-    diff: str
+    diff: list[dict[str, str]]
     error: BaseException | None
 
 
@@ -90,7 +89,7 @@ def execute(
     """
     # Step 1: return immediately for empty code
     if not operation or not operation.strip():
-        return ExecResult(stdout="", stderr="", diff="", error=None)
+        return ExecResult(stdout="", stderr="", diff=[], error=None)
 
     # Step 3: before-snapshot — record keys, id()s, and value references before execution
     # id(v) is the object's memory address; unchanged for the same object; changes when value is replaced
@@ -272,37 +271,22 @@ def _update_ns_meta(L: dict[str, Any], before_keys: set, before_ids: dict, frame
 
 def _compute_diff(
     L: dict, before_keys: set, before_ids: dict, before_values: dict
-) -> str:
-    """Return git-style diff string of namespace changes since before_keys/before_ids snapshot.
+) -> list[dict[str, str]]:
+    """Spec §3.4: structured namespace diff — list of {op, name, type}.
 
-    Format (git-style, only + and - symbols):
-    - New variable:      +name = preview
-    - Modified variable: -name = old_preview  (old value)
-                         +name = new_preview  (new value, immediately following)
-    - Deleted variable:  -name = old_preview
-    Lines are sorted alphabetically by variable name; modified -old and +new
-    are kept consecutive.
-
-    Args:
-        L:              Agent state dict (after execute)
-        before_keys:    Set of keys before execution
-        before_ids:     id() mapping for each variable before execution
-        before_values:  Value references for each user variable before execution
-                        (references only, no deep copy)
+    `op` is `'+'` (new binding) or `'-'` (removed binding). Rebind = one
+    minus row immediately followed by one plus row, sharing `name`.
     """
     after_keys = set(L.keys())
-    lines = []
+    out: list[dict[str, str]] = []
     for k in sorted(after_keys - before_keys):
         if is_user_var(k):
-            lines.append(f"+{k} = {render_value(L[k], 'diff')}")
+            out.append({"op": "+", "name": k, "type": type(L[k]).__name__})
     for k in sorted(after_keys & before_keys):
         if is_user_var(k) and id(L[k]) != before_ids.get(k):
-            old_preview = render_value(before_values[k], "diff")
-            new_preview = render_value(L[k], "diff")
-            lines.append(f"-{k} = {old_preview}")
-            lines.append(f"+{k} = {new_preview}")
+            out.append({"op": "-", "name": k, "type": type(before_values[k]).__name__})
+            out.append({"op": "+", "name": k, "type": type(L[k]).__name__})
     for k in sorted(before_keys - after_keys):
         if is_user_var(k):
-            old_preview = render_value(before_values[k], "diff")
-            lines.append(f"-{k} = {old_preview}")
-    return "\n".join(lines)
+            out.append({"op": "-", "name": k, "type": type(before_values[k]).__name__})
+    return out
