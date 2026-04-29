@@ -1,5 +1,3 @@
-"""test_frame_log_thread_locality — verifies open_read_only opens a fresh
-read-only conn that disallows writes and is safe to call cross-thread."""
 from __future__ import annotations
 
 import sqlite3
@@ -39,15 +37,15 @@ def test_open_read_only_rejects_writes(tmp_path: Path):
 
 
 def test_open_db_allows_cross_thread_use(tmp_path: Path):
-    """Kernel's writer conn opens on init thread, used from worker thread.
-    With check_same_thread=False, this no longer raises ProgrammingError."""
     db = tmp_path / "frame_log.sqlite"
     conn = open_db(str(db))
     errors: list[Exception] = []
 
     def worker():
         try:
-            conn.execute("SELECT 1").fetchall()
+            conn.execute(
+                "INSERT INTO entries(layer, n_start, n_end) VALUES (0, 1, 1)"
+            )
         except Exception as exc:
             errors.append(exc)
 
@@ -60,6 +58,5 @@ def test_open_db_allows_cross_thread_use(tmp_path: Path):
 
 
 def test_open_read_only_exported_from_package():
-    """The helper must be importable as vessal.ark.shell.hull.cell.kernel.frame_log.open_read_only."""
     from vessal.ark.shell.hull.cell.kernel import frame_log
     assert hasattr(frame_log, "open_read_only")
