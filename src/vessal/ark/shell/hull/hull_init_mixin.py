@@ -284,7 +284,9 @@ class HullInitMixin:
         )
 
         self._event_loop = EventLoop(
-            cell=self._main_cell,
+            main_cell=self._main_cell,
+            compaction_cell=self._compaction_cell,
+            main_db_path=self._main_db_path,
             max_frames_per_wake=self._max_frames,
             tracer=self._tracer,
             hooks=hooks,

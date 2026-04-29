@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
+from vessal.ark.shell.hull._compaction_trigger import should_compact
 from vessal.ark.util.logging import Tracer
 
 if TYPE_CHECKING:
@@ -61,13 +62,17 @@ class EventLoop:
 
     def __init__(
         self,
-        cell: "Cell",
+        main_cell: "Cell",
+        compaction_cell: "Cell",
+        main_db_path: str,
         event_queue: "queue_mod.Queue | None" = None,
         max_frames_per_wake: int = 100,
         tracer: Tracer | None = None,
         hooks: "FrameHooks | None" = None,
     ):
-        self._cell = cell
+        self._cell = main_cell  # frame loop reads self._cell
+        self._compaction_cell = compaction_cell
+        self._main_db_path = main_db_path
         self._queue: queue_mod.Queue = event_queue or queue_mod.Queue()
         self._max_frames = max_frames_per_wake
         self._tracer = tracer or Tracer("", enabled=False)
@@ -169,6 +174,11 @@ class EventLoop:
                     print_frame_line(last_frame)
                 if hooks.after_frame is not None:
                     hooks.after_frame()
+                if should_compact(self._main_db_path):
+                    try:
+                        self._compaction_cell.step(self._tracer)
+                    except Exception as e:
+                        logger.warning("compaction step failed: %s", e)
             else:
                 logger.error(
                     "protocol error at frame %d: %s",
