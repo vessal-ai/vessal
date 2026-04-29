@@ -46,13 +46,23 @@ def _make_stub_cell(responses=None) -> MagicMock:
     return cell
 
 
+def _make_loop(cell: MagicMock, **kwargs) -> EventLoop:
+    """Construct EventLoop with the dual-cell signature for test use."""
+    return EventLoop(
+        main_cell=cell,
+        compaction_cell=MagicMock(),
+        main_db_path="",
+        **kwargs,
+    )
+
+
 class TestWakeInjection:
     """inject_wake() correctly records wake reason on G['_system']._wake_reason (spec §6.2)."""
 
     def test_inject_wake_sets_user_message(self):
         """inject_wake() records 'user_message' on _system._wake_reason."""
         cell = _make_stub_cell()
-        loop = EventLoop(cell=cell)
+        loop = _make_loop(cell)
         loop.inject_wake({"reason": "user_message"})
         assert cell.G["_system"]._wake_reason == "user_message"
 
@@ -68,7 +78,7 @@ class TestWakeInjection:
             return original_step(tracer)
 
         cell.step = capturing_step
-        loop = EventLoop(cell=cell, max_frames_per_wake=10)
+        loop = _make_loop(cell, max_frames_per_wake=10)
         loop.inject_wake({"reason": "user_request"})
         loop._frame_loop()
 
@@ -79,13 +89,13 @@ class TestWakeInjection:
         """inject_wake() clears the _sleeping flag on the _system Skill."""
         cell = _make_stub_cell()
         cell.G["_system"]._sleeping = True
-        loop = EventLoop(cell=cell)
+        loop = _make_loop(cell)
         loop.inject_wake({"reason": "heartbeat"})
         assert cell.G["_system"]._sleeping is False
 
     def test_inject_wake_default_reason(self):
         """Uses heartbeat when the event has no reason field."""
         cell = _make_stub_cell()
-        loop = EventLoop(cell=cell)
+        loop = _make_loop(cell)
         loop.inject_wake({})
         assert cell.G["_system"]._wake_reason == "heartbeat"

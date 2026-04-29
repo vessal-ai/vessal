@@ -20,8 +20,8 @@ def _make_hull_stub(soul_path: Path, cell: MagicMock):
     from vessal.ark.shell.hull.hull import Hull
 
     hull = object.__new__(Hull)
-    hull._cell = cell
-    hull._cell.G = {}
+    hull._main_cell = cell
+    hull._main_cell.G = {}
     hull._soul_path = soul_path
     if soul_path.exists():
         hull._soul_text = soul_path.read_text(encoding="utf-8")

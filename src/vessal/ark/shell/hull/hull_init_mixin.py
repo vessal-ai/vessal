@@ -163,7 +163,7 @@ class HullInitMixin:
             "temperature": cell_cfg.get("temperature", 0.7),
             "max_tokens": cell_cfg.get("max_tokens", 4096),
         })
-        self._cell = Cell(
+        self._main_cell = Cell(
             boot_script=boot_script,
             timeout=core_cfg.get("timeout", 60.0),
             core_max_retries=core_cfg.get("max_retries", 3),
@@ -180,7 +180,35 @@ class HullInitMixin:
         self._ensure_log_readme()
 
         if "language" in agent_cfg:
-            self._cell.L["language"] = agent_cfg["language"]
+            self._main_cell.L["language"] = agent_cfg["language"]
+
+        # --- Compaction Cell ---
+        compaction_cfg = cells_cfg.get("compaction", {})
+        compaction_data_dir_rel = compaction_cfg.get("data_dir", "data/compaction")
+        compaction_data_dir_abs = (self._project_dir / compaction_data_dir_rel).resolve()
+        compaction_data_dir_abs.mkdir(parents=True, exist_ok=True)
+
+        main_db_path = str(data_dir_abs / "frame_log.sqlite")
+
+        compaction_boot_entries = list(self._compaction_preset_entries(main_db_path))
+        compaction_boot_script = compose_boot_script(compaction_boot_entries)
+
+        compaction_snapshots_dir = compaction_data_dir_abs / "snapshots"
+        compaction_restore = None
+        if compaction_snapshots_dir.exists():
+            snaps = sorted(compaction_snapshots_dir.glob("*.pkl"))
+            compaction_restore = str(snaps[-1]) if snaps else None
+
+        self._compaction_cell = Cell(
+            boot_script=compaction_boot_script,
+            timeout=core_cfg.get("timeout", 60.0),
+            core_max_retries=core_cfg.get("max_retries", 3),
+            api_params=compaction_cfg.get("api_params", api_params),
+            cell_name="compaction",
+            data_dir=str(compaction_data_dir_abs),
+            restore_path=compaction_restore,
+        )
+        self._main_db_path = main_db_path
 
     def _init_skills(self, hull_cfg: dict) -> None:
         """Phase 3: route table, bind hull to G skills, start servers."""
@@ -189,9 +217,9 @@ class HullInitMixin:
         skill_paths = hull_cfg.get("skill_paths", [])
         resolved_paths = [str(self._project_dir / p) for p in skill_paths] if skill_paths else []
 
-        self._cell.L["_builtin_names"] = []
-        self._cell.L["skill_paths"] = resolved_paths
-        self._cell.L["_data_dir"] = str(self._project_dir / "data")
+        self._main_cell.L["_builtin_names"] = []
+        self._main_cell.L["skill_paths"] = resolved_paths
+        self._main_cell.L["_data_dir"] = str(self._project_dir / "data")
 
         self._routes: dict[tuple[str, str], object] = {}
         self._running_servers: dict[str, object] = {}
@@ -202,7 +230,7 @@ class HullInitMixin:
 
         # Bind skills that need hull reference
         for skill_name in list(hull_cfg.get("skills", [])):
-            skill_inst = self._cell.G.get(skill_name)
+            skill_inst = self._main_cell.G.get(skill_name)
             if skill_inst is not None:
                 bind = getattr(skill_inst, "_bind_hull", None)
                 if callable(bind):
@@ -238,13 +266,16 @@ class HullInitMixin:
         from vessal.ark.shell.hull.event_loop import EventLoop, FrameHooks
 
         if "state_gate" in gates_cfg:
-            self._cell.state_gate = gates_cfg["state_gate"]
+            self._main_cell.state_gate = gates_cfg["state_gate"]
         if "action_gate" in gates_cfg:
-            self._cell.action_gate = gates_cfg["action_gate"]
+            self._main_cell.action_gate = gates_cfg["action_gate"]
         self._load_gate_files()
 
         self._rewrite_runtime_owned()
-        self._cell.G["_system_prompt"] = self._prompt_builder.build(self._cell.G)
+        self._main_cell.G["_system_prompt"] = self._prompt_builder.build(self._main_cell.G)
+
+        from vessal.ark.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
+        self._compaction_cell.G["_system_prompt"] = COMPACTION_SYSTEM_PROMPT
 
         hooks = FrameHooks(
             before_frame=self._rewrite_runtime_owned,
@@ -253,13 +284,15 @@ class HullInitMixin:
         )
 
         self._event_loop = EventLoop(
-            cell=self._cell,
+            main_cell=self._main_cell,
+            compaction_cell=self._compaction_cell,
+            main_db_path=self._main_db_path,
             max_frames_per_wake=self._max_frames,
             tracer=self._tracer,
             hooks=hooks,
         )
 
-        self._cell.G["_inject_wake"] = lambda reason="user_message": self.wake(reason)
+        self._main_cell.G["_inject_wake"] = lambda reason="user_message": self.wake(reason)
 
     def _ensure_log_readme(self) -> None:
         """Ensure the logs directory has a README.md file."""
@@ -348,7 +381,24 @@ trace = false  # disable to reduce IO
                     logger.warning("gates/%s.py missing check() function, skipping", gate_type)
                     continue
 
-                self._cell.set_gate(gate_type.replace("_gate", ""), check_fn)
+                self._main_cell.set_gate(gate_type.replace("_gate", ""), check_fn)
                 logger.info("Loaded custom gate: %s", gate_type)
             except Exception as e:
                 logger.warning("Failed to load gates/%s.py: %s", gate_type, e)
+
+    def _compaction_preset_entries(self, main_db_path: str):
+        """Boot Skill entries for the compaction Cell — _system + CompactionSkill."""
+        from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
+        return [
+            BootSkillEntry(
+                var_name="_system",
+                import_path="vessal.skills.system",
+                class_name="SystemSkill",
+            ),
+            BootSkillEntry(
+                var_name="compaction",
+                import_path="vessal.skills.compaction",
+                class_name="CompactionSkill",
+                kwargs_repr=f"main_db_path={main_db_path!r}",
+            ),
+        ]

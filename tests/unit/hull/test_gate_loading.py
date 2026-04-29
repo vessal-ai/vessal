@@ -30,7 +30,7 @@ def test_hull_loads_action_gate_from_file(tmp_path):
     os.chdir(tmp_path)
     hull = Hull(str(tmp_path))
 
-    result = hull._cell._action_gate.check('x = "dangerous"')
+    result = hull._main_cell._action_gate.check('x = "dangerous"')
     assert not result.allowed
 
 

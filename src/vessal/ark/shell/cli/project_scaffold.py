@@ -46,6 +46,7 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
     _write_example_skill(local_dir)
     _write_gates(project_dir)
     _write_main_cell_data_dir(project_dir)
+    _write_compaction_cell_data_dir(project_dir)
 
     if install_venv:
         _install_dependencies(project_dir)
@@ -268,6 +269,16 @@ def _write_main_cell_data_dir(project_dir: Path) -> None:
     (main_data / ".gitkeep").write_text(
         "# Placeholder so the directory is committed even when empty.\n"
         "# Kernel writes frame_log.sqlite here at runtime.\n",
+        encoding="utf-8",
+    )
+
+
+def _write_compaction_cell_data_dir(project_dir: Path) -> None:
+    compaction_data = project_dir / "data" / "compaction"
+    compaction_data.mkdir(parents=True, exist_ok=True)
+    (compaction_data / ".gitkeep").write_text(
+        "# Placeholder so the directory is committed even when empty.\n"
+        "# Kernel writes compaction snapshots here at runtime.\n",
         encoding="utf-8",
     )
 

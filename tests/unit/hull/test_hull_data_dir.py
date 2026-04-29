@@ -30,9 +30,9 @@ def test_hull_creates_default_data_dir_for_main_cell(tmp_path):
 
     expected = tmp_path / "data" / "main"
     assert expected.is_dir(), f"Hull did not create {expected}"
-    assert hull._cell._data_dir == str(expected)
-    assert hull._cell.cell_name == "main"
-    assert hull._cell._kernel.frame_log is not None
+    assert hull._main_cell._data_dir == str(expected)
+    assert hull._main_cell.cell_name == "main"
+    assert hull._main_cell._kernel.frame_log is not None
     assert (expected / "frame_log.sqlite").exists()
 
 
@@ -47,7 +47,7 @@ def test_hull_honors_explicit_cells_main_data_dir(tmp_path):
 
     expected = tmp_path / "custom" / "cells" / "primary"
     assert expected.is_dir()
-    assert hull._cell._data_dir == str(expected)
+    assert hull._main_cell._data_dir == str(expected)
     assert (expected / "frame_log.sqlite").exists()
 
 

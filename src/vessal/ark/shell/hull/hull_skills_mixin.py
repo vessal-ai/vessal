@@ -64,7 +64,7 @@ class HullSkillsMixin:
         try:
             skill_cls = self._skill_manager.load(name)
             instance = skill_cls()
-            self._cell.L[name] = instance
+            self._main_cell.L[name] = instance
             bind = getattr(instance, "_bind_hull", None)
             if callable(bind):
                 bind(self)
@@ -90,7 +90,7 @@ class HullSkillsMixin:
         import inspect
         start_params = inspect.signature(mod.start).parameters
         if "skill" in start_params:
-            skill_instance = self._cell.G.get(name) or self._cell.L.get(name)
+            skill_instance = self._main_cell.G.get(name) or self._main_cell.L.get(name)
             if skill_instance is not None:
                 kwargs["skill"] = skill_instance
         mod.start(scoped_api, **kwargs)

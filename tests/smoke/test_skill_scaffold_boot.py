@@ -58,8 +58,8 @@ def test_scaffold_module_imports(tmp_path):
 def test_hull_loads_scaffolded_skill(hull_from_scaffold):
     hull, skill_name = hull_from_scaffold
     # Skills are instantiated by boot_script in G (exec(boot_script, G, G)).
-    assert skill_name in hull._cell.G
-    instance = hull._cell.G[skill_name]
+    assert skill_name in hull._main_cell.G
+    instance = hull._main_cell.G[skill_name]
     instance.signal_update()
     assert isinstance(instance.signal, dict)
     assert instance._prompt() is None or isinstance(instance._prompt(), tuple)
