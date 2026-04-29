@@ -385,7 +385,7 @@ trace = false  # disable to reduce IO
                 logger.warning("Failed to load gates/%s.py: %s", gate_type, e)
 
     def _compaction_preset_entries(self, main_db_path: str):
-        """Yield BootSkillEntry list for the compaction Cell's boot script."""
+        """Boot Skill entries for the compaction Cell — _system + CompactionSkill."""
         from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
         return [
             BootSkillEntry(
