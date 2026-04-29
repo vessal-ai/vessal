@@ -57,9 +57,14 @@ class SystemSkill(BaseSkill):
         if self._wake_reason:
             sig["wake_reason"] = self._wake_reason
 
-        if self._kernel.frame_log is not None:
+        if self._kernel.db_path is not None:
+            from vessal.ark.shell.hull.cell.kernel.frame_log import open_read_only
             from vessal.ark.shell.hull.cell.kernel.frame_log.reader import recent_errors
-            entries = recent_errors(self._kernel.frame_log.conn, limit=3)
+            conn = open_read_only(self._kernel.db_path)
+            try:
+                entries = recent_errors(conn, limit=3)
+            finally:
+                conn.close()
             if entries:
                 sig["recent_errors"] = [
                     f"frame {e['n_start']} {e['source']}: "
