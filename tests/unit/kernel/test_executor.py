@@ -39,6 +39,7 @@ class TestExecuteSideEffects:
         ns = _ns()
         result = execute("x = 1", {}, ns, frame_number=1)
         assert result.stdout == ""
+        assert result.stderr == ""
         assert result.diff != ""  # x = 1 produces a diff
         assert result.error is None
 
