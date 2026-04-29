@@ -206,7 +206,7 @@ class Kernel:
             exec_result = execute(pong.action.operation, G, L, frame_n)
             L["observation"] = Observation(
                 stdout=exec_result.stdout,
-                stderr="",
+                stderr=exec_result.stderr,
                 diff=exec_result.diff,
                 error=exec_result.error,
             )
@@ -459,7 +459,7 @@ class Kernel:
             pong_operation=record.pong.action.operation,
             pong_expect=record.pong.action.expect,
             obs_stdout=obs.stdout or "",
-            obs_stderr="",
+            obs_stderr=obs.stderr or "",
             obs_diff_json=diff_json,
             operation_error=operation_error,
             verdict_value=verdict_value,
