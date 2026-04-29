@@ -57,3 +57,9 @@ def test_open_db_allows_cross_thread_use(tmp_path: Path):
     conn.close()
 
     assert errors == []
+
+
+def test_open_read_only_exported_from_package():
+    """The helper must be importable as vessal.ark.shell.hull.cell.kernel.frame_log.open_read_only."""
+    from vessal.ark.shell.hull.cell.kernel import frame_log
+    assert hasattr(frame_log, "open_read_only")
