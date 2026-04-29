@@ -3,6 +3,7 @@ CompactionSkill.read_pending(). See docs/architecture/cell/06-compaction.md §6.
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,3 +30,24 @@ class PendingGroup:
 class PendingView:
     """Snapshot of all pending groups across all layers, returned by read_pending."""
     groups: list[PendingGroup]
+
+
+K = 4
+MAX_LAYER = 32
+
+UNCOVERED_SQL = """
+SELECT n_start, n_end
+FROM entries e
+WHERE e.layer = ?
+  AND NOT EXISTS (
+    SELECT 1 FROM entries u
+    WHERE u.layer > e.layer
+      AND u.n_start <= e.n_start
+      AND u.n_end   >= e.n_end
+  )
+ORDER BY n_start ASC
+"""
+
+
+def fetch_uncovered_on_layer(conn: sqlite3.Connection, layer: int) -> list[tuple[int, int]]:
+    return [tuple(row) for row in conn.execute(UNCOVERED_SQL, (layer,))]

@@ -79,3 +79,87 @@ def test_write_summary_rolls_back_on_pk_conflict(main_db):
     finally:
         conn.close()
     assert rows == [("first",)]
+
+
+def test_read_pending_returns_no_groups_when_below_k(main_db):
+    import sqlite3
+    from vessal.skills.compaction import CompactionSkill
+
+    conn = sqlite3.connect(main_db)
+    try:
+        for n in range(1, 4):  # 3 frames < k=4
+            conn.execute("INSERT INTO entries(layer, n_start, n_end) VALUES (0, ?, ?)", (n, n))
+            conn.execute(
+                "INSERT INTO frame_content(n, pong_think, pong_operation, pong_expect, "
+                "obs_stdout, obs_stderr, obs_diff_json, obs_error_id, verdict_value) "
+                "VALUES (?, '', '', '', '', '', '[]', NULL, NULL)",
+                (n,),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    skill = CompactionSkill(main_db_path=main_db)
+    view = skill.read_pending()
+
+    assert view.groups == []
+
+
+def test_read_pending_returns_one_group_at_k(main_db):
+    import sqlite3
+    from vessal.skills.compaction import CompactionSkill
+
+    conn = sqlite3.connect(main_db)
+    try:
+        for n in range(1, 5):  # 4 frames == k
+            conn.execute("INSERT INTO entries(layer, n_start, n_end) VALUES (0, ?, ?)", (n, n))
+            conn.execute(
+                "INSERT INTO frame_content(n, pong_think, pong_operation, pong_expect, "
+                "obs_stdout, obs_stderr, obs_diff_json, obs_error_id, verdict_value) "
+                "VALUES (?, ?, ?, '', ?, '', '[]', NULL, NULL)",
+                (n, f"think{n}", f"op{n}", f"out{n}"),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    skill = CompactionSkill(main_db_path=main_db)
+    view = skill.read_pending()
+
+    assert len(view.groups) == 1
+    g = view.groups[0]
+    assert g.layer == 0
+    assert g.n_start == 1
+    assert g.n_end == 4
+    assert len(g.items) == 4
+    assert g.items[0]["n"] == 1
+    assert g.items[0]["operation"] == "op1"
+
+
+def test_read_pending_skips_layers_already_covered(main_db):
+    import sqlite3
+    from vessal.skills.compaction import CompactionSkill
+
+    conn = sqlite3.connect(main_db)
+    try:
+        for n in range(1, 5):
+            conn.execute("INSERT INTO entries(layer, n_start, n_end) VALUES (0, ?, ?)", (n, n))
+            conn.execute(
+                "INSERT INTO frame_content(n, pong_think, pong_operation, pong_expect, "
+                "obs_stdout, obs_stderr, obs_diff_json, obs_error_id, verdict_value) "
+                "VALUES (?, '', '', '', '', '', '[]', NULL, NULL)",
+                (n,),
+            )
+        # Insert a covering layer-1 entry over n=1..4
+        conn.execute("INSERT INTO entries(layer, n_start, n_end) VALUES (1, 1, 4)")
+        conn.execute(
+            "INSERT INTO summary_content(layer, n_start, schema_version, body) VALUES (1, 1, 1, 'stub')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    skill = CompactionSkill(main_db_path=main_db)
+    view = skill.read_pending()
+    # layer 0 has no uncovered entries; layer 1 has 1 entry < k; nothing pending
+    assert view.groups == []
