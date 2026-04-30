@@ -18,7 +18,7 @@ from openai import (
 
 from vessal.ark.shell.hull.cell.core.parser import ParseError, parse_response
 from vessal.ark.shell.hull.cell.core import Core
-from vessal.ark.shell.hull.cell.protocol import FrameStream, Ping, Pong, State, Action
+from vessal.ark.shell.hull.cell.protocol import FrameStream, Ping, Pong, State, Action, LLMConfig
 
 
 # ============================================================
@@ -152,6 +152,97 @@ def _make_ping(**kwargs) -> Ping:
         system_prompt=system_prompt,
         state=State(frame_stream=FrameStream(entries=[]), signals={}),
     )
+
+
+def _make_llm_config(**overrides) -> "LLMConfig":
+    from vessal.ark.shell.hull.cell.protocol import LLMConfig
+    base = dict(
+        api_key="sk-test",
+        base_url="http://localhost:9999/v1",
+        model="test-model",
+        api_params={"temperature": 0.5, "max_tokens": 2048},
+    )
+    base.update(overrides)
+    return LLMConfig(**base)
+
+
+@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+def test_core_step_takes_llm_config_per_call(mock_openai_cls):
+    mock_client = MagicMock()
+    mock_openai_cls.return_value = mock_client
+    mock_client.chat.completions.create.return_value = _make_mock_response(
+        "<action>x = 1</action>"
+    )
+    core = Core()
+    cfg = _make_llm_config()
+    pong, _ = core.step(_make_ping(), cfg)
+
+    call_args = mock_client.chat.completions.create.call_args
+    assert call_args.kwargs["model"] == "test-model"
+    assert call_args.kwargs["temperature"] == 0.5
+    assert call_args.kwargs["max_tokens"] == 2048
+    assert isinstance(pong, Pong)
+
+
+@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+def test_core_constructs_client_with_explicit_credentials(mock_openai_cls):
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = _make_mock_response("<action>pass</action>")
+    mock_openai_cls.return_value = mock_client
+    core = Core(timeout=42.0)
+    cfg = _make_llm_config(api_key="sk-explicit", base_url="http://x/v1")
+    core.step(_make_ping(), cfg)
+
+    mock_openai_cls.assert_called_once_with(
+        api_key="sk-explicit",
+        base_url="http://x/v1",
+        timeout=42.0,
+    )
+
+
+@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+def test_core_does_not_touch_environ(mock_openai_cls, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "WRONG_KEY_FROM_ENV")
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://wrong.example.com/v1")
+    monkeypatch.setenv("OPENAI_MODEL", "WRONG_MODEL_FROM_ENV")
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = _make_mock_response("<action>pass</action>")
+    mock_openai_cls.return_value = mock_client
+    core = Core()
+    cfg = _make_llm_config(api_key="sk-correct", base_url="http://right/v1", model="right-model")
+    core.step(_make_ping(), cfg)
+
+    mock_openai_cls.assert_called_once_with(
+        api_key="sk-correct", base_url="http://right/v1", timeout=60.0,
+    )
+    create_kwargs = mock_openai_cls.return_value.chat.completions.create.call_args.kwargs
+    assert create_kwargs["model"] == "right-model"
+
+
+@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+def test_core_caches_client_per_credentials(mock_openai_cls):
+    mock_openai_cls.return_value = MagicMock()
+    mock_openai_cls.return_value.chat.completions.create.return_value = _make_mock_response(
+        "<action>pass</action>"
+    )
+    core = Core()
+    cfg = _make_llm_config()
+    core.step(_make_ping(), cfg)
+    core.step(_make_ping(), cfg)
+    assert mock_openai_cls.call_count == 1
+
+
+@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+def test_core_creates_distinct_clients_for_distinct_configs(mock_openai_cls):
+    mock_openai_cls.return_value = MagicMock()
+    mock_openai_cls.return_value.chat.completions.create.return_value = _make_mock_response(
+        "<action>pass</action>"
+    )
+    core = Core()
+    core.step(_make_ping(), _make_llm_config(api_key="sk-a", base_url="http://a/v1"))
+    core.step(_make_ping(), _make_llm_config(api_key="sk-b", base_url="http://b/v1"))
+    assert mock_openai_cls.call_count == 2
 
 
 class TestCore:
