@@ -3,7 +3,6 @@
 # parser tests: pure functions, tested directly.
 # core tests: mock openai.OpenAI, verify call arguments and return value handling.
 
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -248,7 +247,6 @@ def test_core_creates_distinct_clients_for_distinct_configs(mock_openai_cls):
 class TestCore:
     """Core class tests with mocked OpenAI API."""
 
-    @patch.dict(os.environ, {"OPENAI_MODEL": "test-model"})
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_step_calls_api_correctly(self, mock_openai_cls):
         mock_client = MagicMock()
@@ -257,9 +255,9 @@ class TestCore:
             "<think>thinking</think>\n<action>\nx = 1\n</action>"
         )
 
-        core = Core(api_params={"temperature": 0.5, "max_tokens": 2048})
-        ping = _make_ping(system_prompt="sys", frame_stream="frames", signals="")
-        pong, _ = core.step(ping)
+        core = Core()
+        ping = _make_ping(system_prompt="sys")
+        pong, _ = core.step(ping, _make_llm_config())
 
         call_args = mock_client.chat.completions.create.call_args
         assert call_args.kwargs["model"] == "test-model"
@@ -277,7 +275,7 @@ class TestCore:
         )
 
         core = Core()
-        pong, _ = core.step(_make_ping())
+        pong, _ = core.step(_make_ping(), _make_llm_config())
         assert isinstance(pong, Pong)
         assert pong.action.operation == "y = 2 + 3"
 
@@ -299,34 +297,35 @@ class TestCore:
 
         core = Core()
         with pytest.raises(ValueError):
-            core.step(_make_ping())
+            core.step(_make_ping(), _make_llm_config())
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_client_created_with_timeout(self, mock_openai_cls):
-        """OpenAI() is passed the timeout parameter; other config comes from env vars."""
-        Core()
-        mock_openai_cls.assert_called_once_with(timeout=60.0)
+        """OpenAI() is passed the timeout and credential parameters."""
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = _make_mock_response("<action>pass</action>")
+        core = Core()
+        core.step(_make_ping(), _make_llm_config())
+        mock_openai_cls.assert_called_once_with(
+            api_key="sk-test",
+            base_url="http://localhost:9999/v1",
+            timeout=60.0,
+        )
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_client_created_with_custom_timeout(self, mock_openai_cls):
         """Custom timeout parameter is forwarded to the OpenAI client."""
-        Core(timeout=120.0)
-        mock_openai_cls.assert_called_once_with(timeout=120.0)
-
-    @patch.dict(os.environ, {"OPENAI_MODEL": "custom-model"})
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
-    def test_model_from_env(self, mock_openai_cls):
-        core = Core()
-        assert core._model == "custom-model"
-
-    @patch.dict(os.environ, {}, clear=False)
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
-    def test_default_parameters(self, mock_openai_cls):
-        os.environ.pop("OPENAI_MODEL", None)
-        core = Core()
-        assert core._model == "gpt-4o"
-        assert core._api_params["temperature"] == 0.7
-        assert core._api_params["max_tokens"] == 4096
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = _make_mock_response("<action>pass</action>")
+        core = Core(timeout=120.0)
+        core.step(_make_ping(), _make_llm_config())
+        mock_openai_cls.assert_called_once_with(
+            api_key="sk-test",
+            base_url="http://localhost:9999/v1",
+            timeout=120.0,
+        )
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_system_and_user_messages_sent(self, mock_openai_cls):
@@ -352,7 +351,7 @@ class TestCore:
                 signals={("GoalSkill", "goal", "L"): {"text": "test"}},
             ),
         )
-        core.step(ping)
+        core.step(ping, _make_llm_config())
 
         call_args = mock_client.chat.completions.create.call_args
         messages = call_args.kwargs["messages"]
@@ -390,8 +389,8 @@ class TestCore:
             )
 
         core = Core()
-        core.step(_ping_with_frame(1))
-        core.step(_ping_with_frame(2))
+        core.step(_ping_with_frame(1), _make_llm_config())
+        core.step(_ping_with_frame(2), _make_llm_config())
 
         for call in mock_client.chat.completions.create.call_args_list:
             messages = call.kwargs["messages"]
@@ -411,14 +410,30 @@ class TestCoreResilience:
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_default_timeout(self, mock_openai_cls):
         """Default timeout is 60.0."""
-        Core()
-        mock_openai_cls.assert_called_once_with(timeout=60.0)
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = _make_mock_response("<action>pass</action>")
+        core = Core()
+        core.step(_make_ping(), _make_llm_config())
+        mock_openai_cls.assert_called_once_with(
+            api_key="sk-test",
+            base_url="http://localhost:9999/v1",
+            timeout=60.0,
+        )
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_custom_timeout(self, mock_openai_cls):
         """Custom timeout is forwarded to the OpenAI client."""
-        Core(timeout=120.0)
-        mock_openai_cls.assert_called_once_with(timeout=120.0)
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = _make_mock_response("<action>pass</action>")
+        core = Core(timeout=120.0)
+        core.step(_make_ping(), _make_llm_config())
+        mock_openai_cls.assert_called_once_with(
+            api_key="sk-test",
+            base_url="http://localhost:9999/v1",
+            timeout=120.0,
+        )
 
     @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
     def test_default_max_retries(self, mock_openai_cls):
@@ -445,7 +460,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=2)
-        pong, _ = core.step(_make_ping())
+        pong, _ = core.step(_make_ping(), _make_llm_config())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "x = 1"
@@ -460,7 +475,7 @@ class TestCoreResilience:
 
         core = Core(max_retries=2)
         with pytest.raises(APITimeoutError):
-            core.step(_make_ping())
+            core.step(_make_ping(), _make_llm_config())
 
         # Initial attempt + 2 retries = 3 total calls
         assert mock_client.chat.completions.create.call_count == 3
@@ -482,7 +497,7 @@ class TestCoreResilience:
 
         core = Core(max_retries=3)
         with pytest.raises(AuthenticationError):
-            core.step(_make_ping())
+            core.step(_make_ping(), _make_llm_config())
 
         # Called only once, no retries
         assert mock_client.chat.completions.create.call_count == 1
@@ -498,7 +513,7 @@ class TestCoreResilience:
 
         core = Core(max_retries=3)
         with pytest.raises(PermissionDeniedError):
-            core.step(_make_ping())
+            core.step(_make_ping(), _make_llm_config())
 
         assert mock_client.chat.completions.create.call_count == 1
 
@@ -513,7 +528,7 @@ class TestCoreResilience:
 
         core = Core(max_retries=3)
         with pytest.raises(BadRequestError):
-            core.step(_make_ping())
+            core.step(_make_ping(), _make_llm_config())
 
         assert mock_client.chat.completions.create.call_count == 1
 
@@ -533,7 +548,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=1)
-        pong, _ = core.step(_make_ping())
+        pong, _ = core.step(_make_ping(), _make_llm_config())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "pass"
@@ -550,7 +565,7 @@ class TestCoreResilience:
         ]
 
         core = Core(max_retries=1)
-        pong, _ = core.step(_make_ping())
+        pong, _ = core.step(_make_ping(), _make_llm_config())
 
         assert isinstance(pong, Pong)
         assert pong.action.operation == "pass"
@@ -576,7 +591,7 @@ def test_core_step_accepts_ping(mock_openai_cls):
         system_prompt="You are an agent.",
         state=State(frame_stream=FrameStream(entries=[]), signals={}),
     )
-    pong, _ = core.step(ping)
+    pong, _ = core.step(ping, _make_llm_config())
     assert isinstance(pong, Pong)
     assert isinstance(pong.action, Action)
 
@@ -605,7 +620,7 @@ def test_core_step_ping_builds_system_and_user_messages(mock_openai_cls):
             signals={("GoalSkill", "goal", "L"): {"text": "test"}},
         ),
     )
-    core.step(ping)
+    core.step(ping, _make_llm_config())
 
     call_args = mock_client.chat.completions.create.call_args
     messages = call_args.kwargs["messages"]
@@ -628,7 +643,7 @@ def test_core_step_pong_parsed_correctly(mock_openai_cls):
 
     core = Core()
     ping = Ping(system_prompt="sys", state=State(frame_stream=FrameStream(entries=[]), signals={}))
-    pong, _ = core.step(ping)
+    pong, _ = core.step(ping, _make_llm_config())
     assert pong.action.operation == "x = 42"
     assert pong.think == "analysis"
 
@@ -651,7 +666,7 @@ class TestCoreUsageReturn:
         mock_client.chat.completions.create.return_value = resp
 
         core = Core()
-        pong, usage = core.step(_make_ping())
+        pong, usage = core.step(_make_ping(), _make_llm_config())
         assert isinstance(pong, Pong)
         assert usage["prompt_tokens"] == 5000
         assert usage["completion_tokens"] == 200
@@ -665,18 +680,15 @@ class TestCoreUsageReturn:
         mock_client.chat.completions.create.return_value = resp
 
         core = Core()
-        pong, usage = core.step(_make_ping())
+        pong, usage = core.step(_make_ping(), _make_llm_config())
         assert isinstance(pong, Pong)
         assert usage == {}
 
 
-def test_core_step_returns_pong_and_usage_dict(monkeypatch):
+def test_core_step_returns_pong_and_usage_dict():
     """Core.step() must return (Pong, usage: dict). usage carries
     prompt_tokens / completion_tokens / cached_tokens / elapsed_seconds / attempts.
     """
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
-        core = Core()
-
     class _FakeUsage:
         prompt_tokens = 1000
         completion_tokens = 200
@@ -691,13 +703,15 @@ def test_core_step_returns_pong_and_usage_dict(monkeypatch):
         choices = [_FakeChoice]
         usage = _FakeUsage
 
-    monkeypatch.setattr(core._client.chat.completions, "create",
-                        lambda **kw: _FakeResponse)
+    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = _FakeResponse
+        core = Core()
+        ping = Ping(system_prompt="sys", state=State(
+            frame_stream=FrameStream(entries=[]), signals={}))
+        pong, usage = core.step(ping, _make_llm_config(), tracer=None, frame=1)
 
-    ping = Ping(system_prompt="sys", state=State(
-        frame_stream=FrameStream(entries=[]), signals={}))
-
-    pong, usage = core.step(ping, tracer=None, frame=1)
     assert isinstance(pong, Pong)
     assert usage["prompt_tokens"] == 1000
     assert usage["completion_tokens"] == 200
@@ -707,11 +721,8 @@ def test_core_step_returns_pong_and_usage_dict(monkeypatch):
     assert usage["elapsed_seconds"] >= 0
 
 
-def test_core_step_usage_empty_when_response_usage_is_none(monkeypatch):
+def test_core_step_usage_empty_when_response_usage_is_none():
     """response.usage = None -> usage = {} (empty dict, not None)."""
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
-        core = Core()
-
     class _FakeChoice:
         class message:
             content = "<action>x = 1</action>"
@@ -720,21 +731,20 @@ def test_core_step_usage_empty_when_response_usage_is_none(monkeypatch):
         choices = [_FakeChoice]
         usage = None
 
-    monkeypatch.setattr(core._client.chat.completions, "create",
-                        lambda **kw: _FakeResponse)
+    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = _FakeResponse
+        core = Core()
+        ping = Ping(system_prompt="sys", state=State(
+            frame_stream=FrameStream(entries=[]), signals={}))
+        _, usage = core.step(ping, _make_llm_config(), tracer=None, frame=1)
 
-    ping = Ping(system_prompt="sys", state=State(
-        frame_stream=FrameStream(entries=[]), signals={}))
-
-    _, usage = core.step(ping, tracer=None, frame=1)
     assert usage == {}
 
 
-def test_core_step_cached_tokens_defaults_to_zero(monkeypatch):
+def test_core_step_cached_tokens_defaults_to_zero():
     """Provider that doesn't return prompt_tokens_details -> cached_tokens=0."""
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
-        core = Core()
-
     class _FakeUsage:
         prompt_tokens = 500
         completion_tokens = 100
@@ -748,11 +758,13 @@ def test_core_step_cached_tokens_defaults_to_zero(monkeypatch):
         choices = [_FakeChoice]
         usage = _FakeUsage
 
-    monkeypatch.setattr(core._client.chat.completions, "create",
-                        lambda **kw: _FakeResponse)
+    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = _FakeResponse
+        core = Core()
+        ping = Ping(system_prompt="sys", state=State(
+            frame_stream=FrameStream(entries=[]), signals={}))
+        _, usage = core.step(ping, _make_llm_config(), tracer=None, frame=1)
 
-    ping = Ping(system_prompt="sys", state=State(
-        frame_stream=FrameStream(entries=[]), signals={}))
-
-    _, usage = core.step(ping, tracer=None, frame=1)
     assert usage["cached_tokens"] == 0
