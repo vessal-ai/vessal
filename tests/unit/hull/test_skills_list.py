@@ -13,7 +13,7 @@ def hull(tmp_path):
     )
     (tmp_path / ".env").write_text("OPENAI_API_KEY=test-key\n")
     os.chdir(tmp_path)
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     return Hull(str(tmp_path))
 
 

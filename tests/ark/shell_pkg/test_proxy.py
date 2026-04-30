@@ -46,7 +46,7 @@ def backend_port():
 
 def test_proxy_forwards_get(backend_port):
     """_ProxyHandler forwards GET to backend and returns the response."""
-    from vessal.ark.shell.server import _ProxyHandler
+    from vessal.shell.server import _ProxyHandler
 
     server = http.server.HTTPServer(("127.0.0.1", 0), _ProxyHandler)
     server.internal_port = backend_port
@@ -65,7 +65,7 @@ def test_proxy_forwards_get(backend_port):
 
 def test_proxy_forwards_post(backend_port):
     """_ProxyHandler forwards POST body to backend."""
-    from vessal.ark.shell.server import _ProxyHandler
+    from vessal.shell.server import _ProxyHandler
 
     server = http.server.HTTPServer(("127.0.0.1", 0), _ProxyHandler)
     server.internal_port = backend_port
@@ -89,7 +89,7 @@ def test_proxy_forwards_post(backend_port):
 
 def test_proxy_returns_503_when_hull_down():
     """_ProxyHandler returns 503 when Hull is unavailable."""
-    from vessal.ark.shell.server import _ProxyHandler
+    from vessal.shell.server import _ProxyHandler
 
     server = http.server.HTTPServer(("127.0.0.1", 0), _ProxyHandler)
     server.internal_port = 1  # non-existent port
@@ -127,7 +127,7 @@ def test_proxy_forwards_error_status(backend_port):
     import threading as _t
     _t.Thread(target=err_server.serve_forever, daemon=True).start()
 
-    from vessal.ark.shell.server import _ProxyHandler
+    from vessal.shell.server import _ProxyHandler
     proxy = _hs.HTTPServer(("127.0.0.1", 0), _ProxyHandler)
     proxy.internal_port = err_port
     proxy.hull_alive = True

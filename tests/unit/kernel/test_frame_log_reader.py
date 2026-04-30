@@ -5,11 +5,11 @@ import sqlite3
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.frame_log import open_db
-from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
-from vessal.ark.shell.hull.cell.kernel.frame_log.types import FrameWriteSpec, SignalRow
-from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.kernel.frame_log import open_db
+from vessal.cell.kernel.frame_log.reader import render_frame_stream
+from vessal.cell.kernel.frame_log.types import FrameWriteSpec, SignalRow
+from vessal.cell.kernel.frame_log import FrameLog
+from vessal.cell.protocol import (
     Entry, FrameContent, FrameStream, SummaryContent,
 )
 
@@ -131,9 +131,9 @@ class TestReaderShapeAlignedWithSpec:
     """reader returns Verdict.to_dict() shape for verdict and list for diff."""
 
     def _seed_one_frame(self, db_path, *, verdict_json: str | None, diff_json: str):
-        from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
-        from vessal.ark.shell.hull.cell.kernel.frame_log.types import FrameWriteSpec
-        from vessal.ark.shell.hull.cell.kernel.frame_log.writer import FrameLog
+        from vessal.cell.kernel.frame_log.schema import open_db
+        from vessal.cell.kernel.frame_log.types import FrameWriteSpec
+        from vessal.cell.kernel.frame_log.writer import FrameLog
         conn = open_db(str(db_path))
         FrameLog(conn).write_frame(FrameWriteSpec(
             n=1,
@@ -146,7 +146,7 @@ class TestReaderShapeAlignedWithSpec:
         return conn
 
     def test_reader_observation_diff_is_list(self, tmp_path):
-        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        from vessal.cell.kernel.frame_log.reader import render_frame_stream
         conn = self._seed_one_frame(
             tmp_path / "fl.sqlite",
             verdict_json=None,
@@ -157,7 +157,7 @@ class TestReaderShapeAlignedWithSpec:
         assert fc.observation["diff"] == [{"op": "+", "name": "x", "type": "int"}]
 
     def test_reader_verdict_is_total_passed_failures(self, tmp_path):
-        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        from vessal.cell.kernel.frame_log.reader import render_frame_stream
         conn = self._seed_one_frame(
             tmp_path / "fl.sqlite",
             verdict_json='{"total": 2, "passed": 1, "failures": [{"kind":"assertion_failed","assertion":"assert y","message":"y is False"}]}',
@@ -172,7 +172,7 @@ class TestReaderShapeAlignedWithSpec:
         }
 
     def test_reader_verdict_is_none_when_value_is_null(self, tmp_path):
-        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        from vessal.cell.kernel.frame_log.reader import render_frame_stream
         conn = self._seed_one_frame(
             tmp_path / "fl.sqlite",
             verdict_json=None,

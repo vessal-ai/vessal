@@ -1,8 +1,8 @@
 """test_composer.py — Core composer flattens dataclass Ping to LLM messages."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.core.composer import compose
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.core.composer import compose
+from vessal.cell.protocol import (
     Entry, FrameContent, FrameStream, Ping, State, SummaryContent,
 )
 
@@ -122,7 +122,7 @@ class TestComposerDiffList:
     """Composer renders diff list[{op,name,type}] (spec §3.4)."""
 
     def test_format_diff_renders_list(self):
-        from vessal.ark.shell.hull.cell.core.composer import _format_diff
+        from vessal.cell.core.composer import _format_diff
         diff = [
             {"op": "+", "name": "x", "type": "int"},
             {"op": "-", "name": "y", "type": "str"},
@@ -132,7 +132,7 @@ class TestComposerDiffList:
         assert "- y: str" in out
 
     def test_format_diff_empty_list_is_empty_string(self):
-        from vessal.ark.shell.hull.cell.core.composer import _format_diff
+        from vessal.cell.core.composer import _format_diff
         assert _format_diff([]) == ""
 
 
@@ -140,12 +140,12 @@ class TestComposerVerdictShape:
     """Composer renders Verdict.to_dict() = {total, passed, failures} (spec §3.5)."""
 
     def test_format_verdict_all_passed(self):
-        from vessal.ark.shell.hull.cell.core.composer import _format_verdict
+        from vessal.cell.core.composer import _format_verdict
         out = _format_verdict({"total": 3, "passed": 3, "failures": []})
         assert "3/3" in out
 
     def test_format_verdict_with_failures(self):
-        from vessal.ark.shell.hull.cell.core.composer import _format_verdict
+        from vessal.cell.core.composer import _format_verdict
         out = _format_verdict({
             "total": 2, "passed": 1,
             "failures": [{"kind": "assertion_failed", "assertion": "assert x == 1", "message": "x is 0"}],

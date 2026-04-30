@@ -17,7 +17,7 @@ def _write_minimal_project(path: Path) -> None:
 
 def test_hull_has_both_cells(tmp_path):
     _write_minimal_project(tmp_path)
-    from vessal.ark.shell.hull import Hull
+    from vessal.hull import Hull
 
     os.chdir(tmp_path)
     hull = Hull(project_dir=str(tmp_path))
@@ -29,7 +29,7 @@ def test_hull_has_both_cells(tmp_path):
 
 def test_snapshot_writes_both_cells(tmp_path):
     _write_minimal_project(tmp_path)
-    from vessal.ark.shell.hull import Hull
+    from vessal.hull import Hull
 
     os.chdir(tmp_path)
     hull = Hull(project_dir=str(tmp_path))

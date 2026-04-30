@@ -24,7 +24,7 @@ def test_hull_creates_default_data_dir_for_main_cell(tmp_path):
     """No [cells.main] in hull.toml → Hull defaults to project/data/main and creates it."""
     _write_minimal_project(tmp_path)
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     os.chdir(tmp_path)
     hull = Hull(str(tmp_path))
 
@@ -41,7 +41,7 @@ def test_hull_honors_explicit_cells_main_data_dir(tmp_path):
     cells_table = '[cells.main]\ndata_dir = "custom/cells/primary"\n'
     _write_minimal_project(tmp_path, cells_table=cells_table)
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     os.chdir(tmp_path)
     hull = Hull(str(tmp_path))
 
@@ -56,7 +56,7 @@ def test_hull_rejects_absolute_data_dir(tmp_path):
     cells_table = f'[cells.main]\ndata_dir = "{tmp_path / "outside"}"\n'
     _write_minimal_project(tmp_path, cells_table=cells_table)
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     import pytest
     os.chdir(tmp_path)
     with pytest.raises(ValueError) as exc:

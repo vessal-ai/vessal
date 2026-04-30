@@ -2,7 +2,7 @@
 L never carries _system_prompt."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+from vessal.cell.kernel.kernel import Kernel
 
 
 def test_system_prompt_in_g_not_l() -> None:

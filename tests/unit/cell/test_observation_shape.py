@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from vessal.ark.shell.hull.cell.protocol import Observation
+from vessal.cell.protocol import Observation
 
 
 def test_observation_has_only_four_fields() -> None:

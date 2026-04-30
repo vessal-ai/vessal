@@ -29,7 +29,7 @@ def test_init_prints_self_introduction(tmp_path, capsys):
 @pytest.fixture
 def main_db(tmp_path):
     """Create a fresh frame_log SQLite using the production schema."""
-    from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
+    from vessal.cell.kernel.frame_log.schema import open_db
     path = tmp_path / "main_frame_log.sqlite"
     conn = open_db(str(path))
     conn.close()
@@ -166,7 +166,7 @@ def test_read_pending_skips_layers_already_covered(main_db):
 
 
 def test_system_prompt_loads_and_is_nonempty():
-    from vessal.ark.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
+    from vessal.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
 
     assert isinstance(COMPACTION_SYSTEM_PROMPT, str)
     assert "compaction" in COMPACTION_SYSTEM_PROMPT.lower()

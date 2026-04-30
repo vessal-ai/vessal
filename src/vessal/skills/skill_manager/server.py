@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.hull.skill_static import StaticRouter
+from vessal.hull.skill_static import StaticRouter
 
 
 _static: StaticRouter | None = None

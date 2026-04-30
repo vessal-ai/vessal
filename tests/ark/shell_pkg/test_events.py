@@ -3,7 +3,7 @@ import json
 import threading
 import time
 
-from vessal.ark.shell.events import EventBus
+from vessal.shell.events import EventBus
 
 
 def test_subscribe_receives_published_event():
@@ -51,8 +51,8 @@ def test_multiple_subscribers_each_get_event():
 def test_frame_publisher_emits_new_frames(monkeypatch, tmp_path):
     """FramePublisher polls Hull and publishes delta as 'frame' events."""
     import time
-    from vessal.ark.shell.events import EventBus
-    from vessal.ark.shell.server import FramePublisher
+    from vessal.shell.events import EventBus
+    from vessal.shell.server import FramePublisher
 
     bus = EventBus()
     frames_returned = [
@@ -97,7 +97,7 @@ def test_sse_endpoint_streams_events(tmp_path, monkeypatch):
     import urllib.request
 
     (tmp_path / "hull.toml").write_text("[agent]\nname = 'x'\n")
-    from vessal.ark.shell.server import ShellServer
+    from vessal.shell.server import ShellServer
 
     server = ShellServer(project_dir=str(tmp_path), port=0)
     monkeypatch.setattr(server, "_spawn_hull", lambda: setattr(server, "_internal_port", 9999))

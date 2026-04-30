@@ -7,7 +7,7 @@ import urllib.request
 
 def test_subprocess_handler_forwards_get():
     """SubprocessHullHandler forwards GET requests to hull.handle()."""
-    from vessal.ark.shell.runtime.subprocess_mode import SubprocessHullHandler
+    from vessal.shell.runtime.subprocess_mode import SubprocessHullHandler
 
     class FakeHull:
         def handle(self, method, path, body):
@@ -29,7 +29,7 @@ def test_subprocess_handler_forwards_get():
 
 def test_subprocess_handler_forwards_post():
     """SubprocessHullHandler forwards POST requests to hull.handle()."""
-    from vessal.ark.shell.runtime.subprocess_mode import SubprocessHullHandler
+    from vessal.shell.runtime.subprocess_mode import SubprocessHullHandler
 
     class FakeHull:
         def handle(self, method, path, body):
@@ -56,8 +56,8 @@ def test_subprocess_handler_forwards_post():
 
 def test_subprocess_handler_static_response():
     """SubprocessHullHandler correctly handles StaticResponse return values."""
-    from vessal.ark.shell.hull.hull_api import StaticResponse
-    from vessal.ark.shell.runtime.subprocess_mode import SubprocessHullHandler
+    from vessal.hull.hull_api import StaticResponse
+    from vessal.shell.runtime.subprocess_mode import SubprocessHullHandler
 
     class FakeHull:
         def handle(self, method, path, body):

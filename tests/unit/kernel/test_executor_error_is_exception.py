@@ -1,7 +1,7 @@
 """Spec §3.3: executor returns raw exception (with __traceback__ cleared)."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.kernel.executor import execute
+from vessal.cell.kernel.executor import execute
 
 
 def test_clean_run_returns_no_error() -> None:
@@ -40,8 +40,8 @@ def test_exception_message_preserved() -> None:
 def test_runtime_error_format_text_lands_in_errors_table(tmp_path) -> None:
     """SQLite errors table receives format_text derived from the exception object."""
     import sqlite3
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-    from vessal.ark.shell.hull.cell.protocol import Action, Pong
+    from vessal.cell.kernel.kernel import Kernel
+    from vessal.cell.protocol import Action, Pong
 
     db = str(tmp_path / "fl.sqlite")
     k = Kernel(boot_script="", db_path=db)

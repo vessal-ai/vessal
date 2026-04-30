@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vessal.ark.shell.hull.cell.protocol import LLMConfig
+from vessal.cell.protocol import LLMConfig
 
 
 def _make_minimal_project(tmp_path: Path) -> Path:
@@ -30,11 +30,11 @@ def _make_minimal_project(tmp_path: Path) -> Path:
 
 
 def test_hull_logs_redacted_llm_config_at_boot(tmp_path, caplog):
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     project = _make_minimal_project(tmp_path)
 
     with caplog.at_level(logging.INFO):
-        with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+        with patch("vessal.cell.core.core.openai.OpenAI"):
             Hull(project_dir=str(project))
 
     log_text = "\n".join(r.message for r in caplog.records)
@@ -48,10 +48,10 @@ def test_hull_logs_redacted_llm_config_at_boot(tmp_path, caplog):
 
 
 def test_hull_passes_llm_config_to_main_cell(tmp_path):
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     project = _make_minimal_project(tmp_path)
 
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+    with patch("vessal.cell.core.core.openai.OpenAI"):
         hull = Hull(project_dir=str(project))
 
     cfg = hull._main_cell._default_llm_config
@@ -64,7 +64,7 @@ def test_hull_passes_llm_config_to_main_cell(tmp_path):
 
 
 def test_redact_api_key_masks_middle():
-    from vessal.ark.shell.hull.hull_init_mixin import HullInitMixin
+    from vessal.hull.hull_init_mixin import HullInitMixin
     assert HullInitMixin._redact_api_key("sk-test123456789abcdef") == "sk-***f"
     assert HullInitMixin._redact_api_key("short") == "***"
     assert HullInitMixin._redact_api_key("sk-12345") == "***"

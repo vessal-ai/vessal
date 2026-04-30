@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.cli.scaffold import write_skill_scaffold
+from vessal.shell.cli.scaffold import write_skill_scaffold
 from vessal.skills._base import BaseSkill
 
 
@@ -28,7 +28,7 @@ class SkillCreator(BaseSkill):
             return f"Creation failed: {name} already exists at {base}"
         write_skill_scaffold(base, name)
 
-        from vessal.ark.shell.cli.skills_init_writer import add as _register
+        from vessal.shell.cli.skills_init_writer import add as _register
         _register(target_dir, name)
 
         return (

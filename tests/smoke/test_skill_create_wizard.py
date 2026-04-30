@@ -12,10 +12,10 @@ def test_skill_create_wizard_produces_full_scaffold(tmp_path, monkeypatch):
     # Patch the underlying prompt_toolkit prompt used by ask_text / ask_yes_no.
     # Answers in order: name, tutorial (y), ui (y), server (y).
     with patch(
-        "vessal.ark.shell.tui.inline_prompt._prompt",
+        "vessal.shell.tui.inline_prompt._prompt",
         side_effect=["demo_skill", "y", "y", "y"],
     ):
-        from vessal.ark.shell.cli.skill_cmds import _cmd_skill_create
+        from vessal.shell.cli.skill_cmds import _cmd_skill_create
         _cmd_skill_create(argparse.Namespace())
 
     skill_dir = tmp_path / "demo_skill"
@@ -35,10 +35,10 @@ def test_skill_create_wizard_respects_no_flags(tmp_path, monkeypatch):
 
     # Answers: name, tutorial (n), ui (n), server (n).
     with patch(
-        "vessal.ark.shell.tui.inline_prompt._prompt",
+        "vessal.shell.tui.inline_prompt._prompt",
         side_effect=["lean_skill", "n", "n", "n"],
     ):
-        from vessal.ark.shell.cli.skill_cmds import _cmd_skill_create
+        from vessal.shell.cli.skill_cmds import _cmd_skill_create
         _cmd_skill_create(argparse.Namespace())
 
     skill_dir = tmp_path / "lean_skill"

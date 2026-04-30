@@ -2,7 +2,7 @@
 import socket
 import threading
 
-from vessal.ark.shell.server import ShellServer
+from vessal.shell.server import ShellServer
 
 
 def _occupy_port(port: int) -> socket.socket:

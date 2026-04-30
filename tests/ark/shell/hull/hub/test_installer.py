@@ -1,10 +1,10 @@
-# src/vessal/ark/shell/hub/tests/test_installer.py
+# src/vessal/shell/hub/tests/test_installer.py
 """Tests for skill installer."""
 from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.hub.installer import locate_skill_in_repo, copy_skill
+from vessal.hull.hub.installer import locate_skill_in_repo, copy_skill
 
 
 def _make_single_skill(repo_dir: Path, name: str = "my_skill") -> None:

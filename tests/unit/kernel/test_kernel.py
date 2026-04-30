@@ -13,10 +13,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel import Kernel
+from vessal.cell.kernel import Kernel
 
-from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, is_user_var, execute, _maybe_capture_last_expr
-from vessal.ark.shell.hull.skill_loader import SkillLoader
+from vessal.cell.kernel.executor import ExecResult, is_user_var, execute, _maybe_capture_last_expr
+from vessal.hull.skill_loader import SkillLoader
 
 
 from tests.unit.kernel._ping_helpers import _ns, _exec, minimal_kernel
@@ -288,7 +288,7 @@ class TestRenderIntegration:
     """Kernel.render/ping integration tests with the v3 renderer."""
 
     def test_render_returns_str(self):
-        from vessal.ark.shell.hull.cell.protocol import Ping
+        from vessal.cell.protocol import Ping
         k = minimal_kernel()
         result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
@@ -299,7 +299,7 @@ class TestRenderIntegration:
 
     def test_exec_operation_result_affects_render(self):
         """render reflects state changes after exec via ping."""
-        from vessal.ark.shell.hull.cell.protocol import Ping
+        from vessal.cell.protocol import Ping
         k = minimal_kernel()
         state = _exec(k, "print('hi')\nx = 1")
         assert isinstance(state, Ping)
@@ -312,7 +312,7 @@ class TestRenderIntegration:
 
     def test_frame_stream_in_state(self):
         """State.frame_stream is a FrameStream dataclass (not a rendered string)."""
-        from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION, FrameStream as ProtocolFrameStream
+        from vessal.cell.protocol import FRAME_SCHEMA_VERSION, FrameStream as ProtocolFrameStream
         k = minimal_kernel()
         ping = k.ping(None, _ns(k))
         assert isinstance(ping.state.frame_stream, ProtocolFrameStream)
@@ -377,14 +377,14 @@ class TestKernel:
 
     def test_exec_via_ping_returns_ping(self):
         """ping(pong, ns) returns Ping after executing code."""
-        from vessal.ark.shell.hull.cell.protocol import Ping
+        from vessal.cell.protocol import Ping
         k = minimal_kernel()
         result = _exec(k, "x = 1")
         assert isinstance(result, Ping)
 
     def test_ping_none_returns_ping(self):
         """ping(None, ns) returns Ping (boot call)."""
-        from vessal.ark.shell.hull.cell.protocol import Ping
+        from vessal.cell.protocol import Ping
         k = minimal_kernel()
         result = k.ping(None, _ns(k))
         assert isinstance(result, Ping)
@@ -407,7 +407,7 @@ class TestKernel:
         assert k.L["_frame"] == frame_before
 
     def test_kernel_ping_returns_ping(self, tmp_path):
-        from vessal.ark.shell.hull.cell.protocol import Ping
+        from vessal.cell.protocol import Ping
         kernel = minimal_kernel()
         kernel.G["_system_prompt"] = "You are an agent."
         ping = kernel.ping(None, _ns(kernel))
@@ -603,7 +603,7 @@ class TestKernel:
 
     def test_eval_expect_returns_verdict(self):
         """ping with expect returns Verdict in L['verdict']."""
-        from vessal.ark.shell.hull.cell.protocol import Verdict
+        from vessal.cell.protocol import Verdict
         k = minimal_kernel()
         _exec(k, "x = 1")
         _exec(k, "pass", expect="assert x == 1")
@@ -643,7 +643,7 @@ class TestKernel:
 
     def test_ping_commits_frame_and_increments(self):
         """ping(pong, ns) commits one frame; _frame increments by 1."""
-        from vessal.ark.shell.hull.cell.protocol import Action, Pong
+        from vessal.cell.protocol import Action, Pong
 
         k = minimal_kernel()
         frame_before = k.L["_frame"]
@@ -766,8 +766,8 @@ class TestPingReturnsPing:
 
     def test_ping_returns_ping(self):
         """ping() returns a Ping object."""
-        from vessal.ark.shell.hull.cell.kernel import Kernel
-        from vessal.ark.shell.hull.cell.protocol import Action, Ping, Pong
+        from vessal.cell.kernel import Kernel
+        from vessal.cell.protocol import Action, Ping, Pong
 
         k = minimal_kernel()
         k.G["_system_prompt"] = "test"
@@ -795,7 +795,7 @@ class TestInspectGetSource:
     """
 
     def test_inspect_getsource_function_after_execute(self):
-        from vessal.ark.shell.hull.cell.kernel import Kernel
+        from vessal.cell.kernel import Kernel
         k = minimal_kernel()
         _exec(k, "def add(a, b):\n    return a + b")
         src = inspect.getsource(k.L["add"])
@@ -803,7 +803,7 @@ class TestInspectGetSource:
         assert "return a + b" in src
 
     def test_inspect_getsource_class_after_execute(self):
-        from vessal.ark.shell.hull.cell.kernel import Kernel
+        from vessal.cell.kernel import Kernel
         k = minimal_kernel()
         _exec(k, "class Bar:\n    def m(self):\n        return 1")
         src = inspect.getsource(k.L["Bar"])
@@ -811,14 +811,14 @@ class TestInspectGetSource:
         assert "def m(self):" in src
 
     def test_inspect_getsource_async_function(self):
-        from vessal.ark.shell.hull.cell.kernel import Kernel
+        from vessal.cell.kernel import Kernel
         k = minimal_kernel()
         _exec(k, "async def waiter():\n    return 42")
         src = inspect.getsource(k.L["waiter"])
         assert "async def waiter" in src
 
     def test_inspect_getsource_decorated_function_includes_decorator(self):
-        from vessal.ark.shell.hull.cell.kernel import Kernel
+        from vessal.cell.kernel import Kernel
         k = minimal_kernel()
         code = (
             "def my_decorator(fn):\n"
@@ -837,7 +837,7 @@ class TestInspectGetSource:
         """Two functions defined in the same operation each map to the
         single shared <frame-N> source; inspect.getsource returns the
         function's own definition span via the function's lineno."""
-        from vessal.ark.shell.hull.cell.kernel import Kernel
+        from vessal.cell.kernel import Kernel
         k = minimal_kernel()
         code = "def foo():\n    return 1\n\ndef bar():\n    return 2"
         _exec(k, code)

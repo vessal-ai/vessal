@@ -2,15 +2,15 @@
 
 After the 2026-04-20 Shell/Hull layering refactor (P1), `hub/` physically lives
 under `hull/hub/`. This test prevents regression: any reappearance of the old
-`from vessal.ark.shell.hub` path under the shell/ subtree is a layering violation.
+`from vessal.shell.hub` path under the shell/ subtree is a layering violation.
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-_SHELL_ROOT = Path(__file__).resolve().parents[2] / "src" / "vessal" / "ark" / "shell"
-_FORBIDDEN = re.compile(r"\bvessal\.ark\.shell\.hub\b")
+_SHELL_ROOT = Path(__file__).resolve().parents[2] / "src" / "vessal" / "shell"
+_FORBIDDEN = re.compile(r"\bvessal\.shell\.hub\b")
 
 
 def test_shell_does_not_import_retired_hub_path() -> None:

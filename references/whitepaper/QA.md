@@ -18,9 +18,9 @@ Yes. exec'd code can spin up a persistent service with `threading.Thread(...).st
 
 `handle(method, path, body) → (int, dict)`. The int is an HTTP status code; the dict is a JSON-serializable response body. Shell serializes the dict to JSON and returns it.
 
-### Q: Nested directories vs flat layout?
+### Q: Why is the layout flat rather than nested?
 
-`ark/shell/hull/cell/` nesting reflects the containment relationship. Import paths are mitigated through re-exports. Reversible decision.
+The architectural layering — Shell wraps Hull wraps Cell — is enforced by `tests/architecture/vessal/test_cell_dependency_tree.py` and `tests/architecture/test_dependency_direction.py`, not by directory nesting. The earlier deep-nested layout (`ark/shell/hull/cell/`) was reverted in PR-2 (2026-04-30): conceptual layering is a property of the import graph, not of the filesystem. The flat layout `src/vessal/{cell,hull,shell,util,console,skills}/` matches Pythonic norms (Django, Flask, FastAPI, CPython stdlib) and reduces navigation cost. Re-exports at `vessal/__init__.py` keep the public API stable (`from vessal import Cell, Core, Hull` still works).
 
 ---
 

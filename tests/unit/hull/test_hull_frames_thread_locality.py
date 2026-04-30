@@ -8,8 +8,8 @@ import pytest
 
 @pytest.fixture
 def hull(tmp_path: Path):
-    from vessal.ark.shell.hull.hull import Hull
-    from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+    from vessal.hull.hull import Hull
+    from vessal.shell.cli.project_scaffold import write_project_scaffold
 
     project = tmp_path / "agent"
     write_project_scaffold(project, install_venv=False)

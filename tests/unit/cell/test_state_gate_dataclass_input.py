@@ -1,8 +1,8 @@
 """test_state_gate_dataclass_input.py — StateGate consumes FrameStream dataclass."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.gate.state_gate import StateGate
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.gate.state_gate import StateGate
+from vessal.cell.protocol import (
     Entry, FrameContent, FrameStream,
 )
 

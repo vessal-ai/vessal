@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+from vessal.shell.cli.project_scaffold import write_project_scaffold
 
 
 def test_init_default_skills_list(tmp_path):

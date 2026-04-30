@@ -2,12 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
-from vessal.ark.shell.hull.cell import Cell
-from vessal.ark.shell.hull.cell.protocol import Action, Ping, Pong, State
+from vessal.cell import Cell
+from vessal.cell.protocol import Action, Ping, Pong, State
 
 
 def _make_cell(**kwargs) -> Cell:
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+    with patch("vessal.cell.core.core.openai.OpenAI"):
         return Cell(**kwargs)
 
 
@@ -82,8 +82,8 @@ def test_ns_frame_write_is_single_source_commit_frame():
     Verifies that ns["_frame"] is still equal to initial immediately after the
     executor returns — before _commit_frame runs.
     """
-    import vessal.ark.shell.hull.cell.kernel.kernel as kernel_mod
-    from vessal.ark.shell.hull.cell.kernel.executor import execute as real_execute
+    import vessal.cell.kernel.kernel as kernel_mod
+    from vessal.cell.kernel.executor import execute as real_execute
 
     cell = _make_cell()
     pong = _fixed_pong("pass")

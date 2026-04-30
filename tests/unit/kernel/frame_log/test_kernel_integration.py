@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+from vessal.cell.kernel.kernel import Kernel
 from tests.unit.kernel._ping_helpers import minimal_kernel
 
 
@@ -24,7 +24,7 @@ def test_kernel_step_writes_to_frame_log(tmp_path: Path) -> None:
     """After Kernel.ping() commits a frame, frame_log has a boot entry and a ping entry."""
     import sqlite3
 
-    from vessal.ark.shell.hull.cell.protocol import Action, Pong
+    from vessal.cell.protocol import Action, Pong
 
     db_file = tmp_path / "fl.sqlite"
     k = minimal_kernel(db_path=str(db_file))

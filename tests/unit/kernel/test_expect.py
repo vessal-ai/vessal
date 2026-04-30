@@ -10,8 +10,8 @@ import sys
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.expect import ExpectValidationError, evaluate_expect, validate_expect_ast
-from vessal.ark.shell.hull.cell.protocol import Verdict, VerdictFailure
+from vessal.cell.kernel.expect import ExpectValidationError, evaluate_expect, validate_expect_ast
+from vessal.cell.protocol import Verdict, VerdictFailure
 
 
 # ─────────────────────────────────────────────
@@ -369,7 +369,7 @@ class TestExpectLinecacheRegistration:
 
 class TestEvaluateExpectThreeArg:
     def test_g_name_readable_in_expect(self):
-        from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
+        from vessal.cell.kernel.expect import evaluate_expect
         G = {"threshold": 10}
         L = {"value": 5}
         verdict = evaluate_expect("assert value < threshold", G, L, frame_number=99)
@@ -377,7 +377,7 @@ class TestEvaluateExpectThreeArg:
         assert verdict.passed == 1
 
     def test_l_not_mutated_by_expect(self):
-        from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
+        from vessal.cell.kernel.expect import evaluate_expect
         G = {}
         L = {"x": 1}
         evaluate_expect("assert x == 1", G, L, frame_number=100)

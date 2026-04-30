@@ -1,8 +1,8 @@
 """Spec §5.5.2 part 2: @transient + kernel.mark_transient skip keys at snapshot."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.kernel.transient import transient
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.kernel.transient import transient
 
 
 def test_transient_class_instance_not_in_restored_l(tmp_path) -> None:

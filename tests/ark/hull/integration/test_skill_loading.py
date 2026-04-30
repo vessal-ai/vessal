@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.skill_loader import SkillLoader
+from vessal.hull.skill_loader import SkillLoader
 from vessal.skills._base import BaseSkill
 
 

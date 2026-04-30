@@ -1,9 +1,9 @@
 import pytest
 
-from vessal.ark.shell.hull.cell.cell import Cell
-from vessal.ark.shell.hull.cell.gate import ActionGate, StateGate
-from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script
+from vessal.cell.cell import Cell
+from vessal.cell.gate import ActionGate, StateGate
+from vessal.cell.kernel import Kernel
+from vessal.cell.kernel.boot import compose_boot_script
 
 
 def _make_cell() -> Cell:

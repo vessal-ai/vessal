@@ -13,8 +13,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vessal.ark.shell.cli.__main__ import main
-from vessal.ark.shell.cli.process_utils import _is_project_running, _read_lock_port, _read_lock_pid, _is_port_in_use
+from vessal.shell.cli.__main__ import main
+from vessal.shell.cli.process_utils import _is_project_running, _read_lock_port, _read_lock_pid, _is_port_in_use
 
 
 # ============================================================
@@ -26,18 +26,18 @@ class TestInit:
     """vessal create command: scaffold generation."""
 
     def test_init_creates_project_directory(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         assert (tmp_path / "my-agent").is_dir()
 
     def test_init_creates_hull_toml(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text()
         assert 'name = "my-agent"' in content
 
     def test_init_creates_env_example_not_env(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         assert (tmp_path / "my-agent" / ".env.example").exists()
         assert not (tmp_path / "my-agent" / ".env").exists()
@@ -47,14 +47,14 @@ class TestInit:
         assert "OPENAI_MODEL" in content
 
     def test_init_creates_gitignore(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / ".gitignore").read_text()
         assert ".env" in content
         assert "logs/" in content
 
     def test_init_creates_skills_package(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         skills_dir = tmp_path / "my-agent" / "skills"
         assert skills_dir.is_dir()
@@ -63,27 +63,27 @@ class TestInit:
         assert (skills_dir / "tasks").is_dir()
 
     def test_init_skills_are_valid_packages(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         for name in ("chat", "tasks", "pin"):
             init_file = tmp_path / "my-agent" / "skills" / name / "__init__.py"
             assert init_file.exists(), f"skills/{name}/__init__.py missing"
 
     def test_init_hull_toml_skills_uses_name_list(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text()
         assert "*.py" not in content
         assert "skill_paths" not in content
 
     def test_init_fails_if_directory_exists(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         (tmp_path / "my-agent").mkdir()
         with pytest.raises(FileExistsError):
             write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
     def test_init_hull_toml_has_all_sections(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "test-proj", install_venv=False)
         content = (tmp_path / "test-proj" / "hull.toml").read_text()
         assert "[agent]" in content
@@ -92,7 +92,7 @@ class TestInit:
         assert "[gates]" in content
 
     def test_init_creates_pyproject_toml(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "pyproject.toml").read_text()
         assert 'name = "my-agent"' in content
@@ -100,32 +100,32 @@ class TestInit:
         assert '"vessal"' in content
 
     def test_init_creates_venv(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
-        with patch("vessal.ark.shell.cli.project_scaffold.shutil.which", return_value=None), \
-             patch("vessal.ark.shell.cli.project_scaffold.subprocess.run") as mock_run:
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
+        with patch("vessal.shell.cli.project_scaffold.shutil.which", return_value=None), \
+             patch("vessal.shell.cli.project_scaffold.subprocess.run") as mock_run:
             write_project_scaffold(tmp_path / "my-agent", install_venv=True)
         all_args = [call[0][0] for call in mock_run.call_args_list]
         assert any("venv" in str(a) for a in all_args)
 
     def test_init_gitignore_includes_venv(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / ".gitignore").read_text()
         assert ".venv/" in content
 
     def test_init_creates_soul_md(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         assert (tmp_path / "my-agent" / "SOUL.md").exists()
 
     def test_init_soul_md_contains_project_name(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "SOUL.md").read_text(encoding="utf-8")
         assert "my-agent" in content
 
     def test_init_hull_toml_has_required_sections(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "[hull]" in content
@@ -135,14 +135,14 @@ class TestInit:
         assert "[compression]" not in content
 
     def test_init_hull_toml_has_context_budget_comment(self, tmp_path):
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "context_budget" in content
 
     def test_init_hull_toml_has_core_section(self, tmp_path):
         """Generated hull.toml contains [core] section."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
@@ -151,7 +151,7 @@ class TestInit:
 
     def test_init_hull_toml_has_core_timeout(self, tmp_path):
         """hull.toml [core] section contains timeout configuration."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
@@ -159,7 +159,7 @@ class TestInit:
 
     def test_init_hull_toml_has_core_max_retries(self, tmp_path):
         """hull.toml [core] section contains max_retries configuration."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
@@ -167,7 +167,7 @@ class TestInit:
 
     def test_init_chat_skill_md_has_frontmatter(self, tmp_path):
         """Copied chat SKILL.md contains YAML frontmatter."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         skill_md = tmp_path / "my-agent" / "skills" / "chat" / "SKILL.md"
@@ -177,7 +177,7 @@ class TestInit:
 
     def test_init_copies_builtin_skills_flat(self, tmp_path):
         """vessal create copies built-in Skills flat into skills/<name>/."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         skills_dir = tmp_path / "my-agent" / "skills"
@@ -190,7 +190,7 @@ class TestInit:
 
     def test_init_hull_toml_has_no_skill_paths(self, tmp_path):
         """Generated hull.toml does not contain skill_paths (flat layout uses .pth)."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
@@ -199,7 +199,7 @@ class TestInit:
 
     def test_init_no_venv_skips_subprocess(self, tmp_path):
         """install_venv=False skips all subprocess calls."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
         with patch("subprocess.run") as mock_run:
             write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
@@ -207,9 +207,9 @@ class TestInit:
 
     def test_init_uses_uv_sync_when_uv_available(self, tmp_path):
         """When uv is on PATH, write_project_scaffold calls uv sync instead of python -m venv."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
-        with patch("vessal.ark.shell.cli.project_scaffold.shutil.which", return_value="/usr/bin/uv"), \
-             patch("vessal.ark.shell.cli.project_scaffold.subprocess.run") as mock_run:
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
+        with patch("vessal.shell.cli.project_scaffold.shutil.which", return_value="/usr/bin/uv"), \
+             patch("vessal.shell.cli.project_scaffold.subprocess.run") as mock_run:
             write_project_scaffold(tmp_path / "my-agent", install_venv=True)
 
         mock_run.assert_called_once()
@@ -218,9 +218,9 @@ class TestInit:
 
     def test_init_uses_pip_when_uv_not_available(self, tmp_path):
         """When uv is not on PATH, write_project_scaffold falls back to python -m venv + pip install."""
-        from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
-        with patch("vessal.ark.shell.cli.project_scaffold.shutil.which", return_value=None), \
-             patch("vessal.ark.shell.cli.project_scaffold.subprocess.run") as mock_run:
+        from vessal.shell.cli.project_scaffold import write_project_scaffold
+        with patch("vessal.shell.cli.project_scaffold.shutil.which", return_value=None), \
+             patch("vessal.shell.cli.project_scaffold.subprocess.run") as mock_run:
             write_project_scaffold(tmp_path / "my-agent", install_venv=True)
 
         assert mock_run.call_count == 2
@@ -254,7 +254,7 @@ class TestSkillCreate:
     """vessal skill create command: Skill scaffold generation."""
 
     def _scaffold(self, tmp_path, skill_name="my_skill"):
-        from vessal.ark.shell.cli.scaffold import write_skill_scaffold
+        from vessal.shell.cli.scaffold import write_skill_scaffold
         base = tmp_path / skill_name
         base.mkdir()
         write_skill_scaffold(base, skill_name)
@@ -293,7 +293,7 @@ class TestSkillCreate:
 
     def test_skill_init_camelcase_classname(self, tmp_path):
         """Generated class name is the CamelCase form of the skill_name."""
-        from vessal.ark.shell.cli.scaffold import write_skill_scaffold
+        from vessal.shell.cli.scaffold import write_skill_scaffold
         base = tmp_path / "my_cool_skill"
         base.mkdir()
         write_skill_scaffold(base, "my_cool_skill")
@@ -541,7 +541,7 @@ def _make_frame_dict(
     diff: str = "",
 ) -> dict:
     """Construct a canonical format frame dict (for writing test JSONL)."""
-    from vessal.ark.shell.hull.cell.protocol import (
+    from vessal.cell.protocol import (
         Action,
         FrameRecord,
         Observation,
@@ -610,7 +610,7 @@ class TestStartForegroundLock:
         """_start_foreground creates data/vessal.lock, not a PID file."""
         import argparse
         from unittest.mock import patch
-        from vessal.ark.shell.cli.process_cmds import _start_foreground
+        from vessal.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj"
         project_dir.mkdir()
@@ -633,7 +633,7 @@ class TestStartForegroundLock:
                 lock_file_created["exists"] = True
             raise KeyboardInterrupt
 
-        with patch("vessal.ark.shell.server.ShellServer") as MockShell:
+        with patch("vessal.shell.server.ShellServer") as MockShell:
             mock_shell = MockShell.return_value
             mock_shell.start.return_value = None
             mock_shell.serve_forever.side_effect = capture_serve_forever
@@ -650,7 +650,7 @@ class TestStartForegroundLock:
         """_start_foreground creates data/vessal.lock and writes the port number."""
         import argparse
         from unittest.mock import patch
-        from vessal.ark.shell.cli.process_cmds import _start_foreground
+        from vessal.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj2"
         project_dir.mkdir()
@@ -672,7 +672,7 @@ class TestStartForegroundLock:
                 lock_contents["data"] = lock_path.read_text()
             raise KeyboardInterrupt
 
-        with patch("vessal.ark.shell.server.ShellServer") as MockShell:
+        with patch("vessal.shell.server.ShellServer") as MockShell:
             mock_shell = MockShell.return_value
             mock_shell.start.return_value = None
             mock_shell.serve_forever.side_effect = capture_serve_forever
@@ -690,7 +690,7 @@ class TestStartForegroundLock:
         """When shell.start() raises RuntimeError, the lock file is released and exits with code 1."""
         import argparse
         import threading
-        from vessal.ark.shell.cli.process_cmds import _start_foreground
+        from vessal.shell.cli.process_cmds import _start_foreground
 
         project_dir = tmp_path / "proj3"
         project_dir.mkdir()
@@ -719,7 +719,7 @@ class TestStartForegroundLock:
             def shutdown(self):
                 pass
 
-        monkeypatch.setattr("vessal.ark.shell.server.ShellServer", FakeShellServer)
+        monkeypatch.setattr("vessal.shell.server.ShellServer", FakeShellServer)
 
         args = argparse.Namespace(dir=str(project_dir), port=9001, daemon=False)
 
@@ -739,7 +739,7 @@ class TestStopCommand:
     def test_stop_reports_not_running_when_no_lock(self, tmp_path, capsys):
         """Reports Agent is not running when no lock file exists."""
         import argparse
-        from vessal.ark.shell.cli.process_cmds import _cmd_stop
+        from vessal.shell.cli.process_cmds import _cmd_stop
 
         (tmp_path / "data").mkdir()
         args = argparse.Namespace(dir=str(tmp_path), port=8420)
@@ -750,7 +750,7 @@ class TestStopCommand:
     def test_stop_reports_not_running_when_no_data_dir(self, tmp_path, capsys):
         """Reports Agent is not running when data/ directory does not exist."""
         import argparse
-        from vessal.ark.shell.cli.process_cmds import _cmd_stop
+        from vessal.shell.cli.process_cmds import _cmd_stop
 
         args = argparse.Namespace(dir=str(tmp_path), port=8420)
         _cmd_stop(args)

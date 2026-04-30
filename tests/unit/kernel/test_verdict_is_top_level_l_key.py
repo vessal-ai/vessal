@@ -1,8 +1,8 @@
 """Spec §3 / §08: verdict is L["verdict"], not nested in Observation."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.protocol import Action, Pong
 
 
 def test_verdict_lives_at_l_top_level(tmp_path) -> None:

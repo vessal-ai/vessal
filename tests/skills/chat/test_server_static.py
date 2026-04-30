@@ -24,13 +24,13 @@ def test_start_registers_static_routes(mock_hull_api):
 
 def test_static_handler_returns_css(tmp_path):
     """StaticRouter serves correct content_type for CSS files."""
-    from vessal.ark.shell.hull.skill_static import StaticRouter
+    from vessal.hull.skill_static import StaticRouter
 
     css_file = tmp_path / "style.css"
     css_file.write_text("body { color: red; }", encoding="utf-8")
 
     routes: dict = {}
-    from vessal.ark.shell.hull.hull_api import HullApi, ScopedHullApi
+    from vessal.hull.hull_api import HullApi, ScopedHullApi
     hull_api = HullApi(routes=routes, wake_fn=lambda _r: None)
     scoped = ScopedHullApi(hull_api, "chat")
 

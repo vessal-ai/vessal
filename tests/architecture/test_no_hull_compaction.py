@@ -4,7 +4,7 @@ import os
 
 
 def test_hull_runtime_mixin_no_compaction_methods():
-    from vessal.ark.shell.hull import hull_runtime_mixin
+    from vessal.hull import hull_runtime_mixin
     src = open(hull_runtime_mixin.__file__).read()
     assert "_drain_compaction_results" not in src
     assert "_try_shift_compaction" not in src
@@ -12,7 +12,7 @@ def test_hull_runtime_mixin_no_compaction_methods():
 
 
 def test_hull_no_compaction_thread_pool():
-    from vessal.ark.shell.hull import hull_init_mixin
+    from vessal.hull import hull_init_mixin
     src = open(hull_init_mixin.__file__).read()
     assert "_compaction_thread_pool" not in src
     assert "_compaction_result_queue" not in src
@@ -24,8 +24,8 @@ def test_hull_no_compaction_thread_pool():
 def test_hull_compaction_mixin_renamed_to_snapshot_only():
     """hull_compaction_mixin.py is renamed; no compaction methods remain."""
     repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    old = os.path.join(repo, "src/vessal/ark/shell/hull/hull_compaction_mixin.py")
-    new = os.path.join(repo, "src/vessal/ark/shell/hull/hull_snapshot_mixin.py")
+    old = os.path.join(repo, "src/vessal/hull/hull_compaction_mixin.py")
+    new = os.path.join(repo, "src/vessal/hull/hull_snapshot_mixin.py")
     assert not os.path.exists(old), "hull_compaction_mixin.py must be renamed/deleted"
     assert os.path.exists(new), "hull_snapshot_mixin.py expected"
     src = open(new).read()

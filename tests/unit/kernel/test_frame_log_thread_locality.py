@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.frame_log import open_read_only
-from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
+from vessal.cell.kernel.frame_log import open_read_only
+from vessal.cell.kernel.frame_log.schema import open_db
 
 
 def test_open_read_only_can_select(tmp_path: Path):
@@ -58,13 +58,13 @@ def test_open_db_allows_cross_thread_use(tmp_path: Path):
 
 
 def test_open_read_only_exported_from_package():
-    from vessal.ark.shell.hull.cell.kernel import frame_log
+    from vessal.cell.kernel import frame_log
     assert hasattr(frame_log, "open_read_only")
 
 
 def test_kernel_exposes_db_path(tmp_path: Path):
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-    from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
+    from vessal.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.boot import compose_boot_script, BootSkillEntry
 
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
@@ -76,8 +76,8 @@ def test_kernel_exposes_db_path(tmp_path: Path):
 
 
 def test_kernel_db_path_is_none_when_no_db(tmp_path: Path):
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-    from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
+    from vessal.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.boot import compose_boot_script, BootSkillEntry
 
     script = compose_boot_script([
         BootSkillEntry("_system", "System"),

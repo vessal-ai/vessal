@@ -26,7 +26,7 @@ def _free_port() -> int:
 @pytest.mark.asyncio
 async def test_console_lists_chat_ui_tab(tmp_path: Path):
     project = tmp_path / "my_agent"
-    from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+    from vessal.shell.cli.project_scaffold import write_project_scaffold
     write_project_scaffold(project, install_venv=True)
 
     port = _free_port()

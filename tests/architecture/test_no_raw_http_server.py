@@ -2,7 +2,7 @@
 
 Production code must never construct ``http.server.HTTPServer`` or
 ``http.server.ThreadingHTTPServer`` directly. The only legitimate
-construction site is ``src/vessal/ark/shell/http_server.py``, which wraps
+construction site is ``src/vessal/shell/http_server.py``, which wraps
 them with the project's quiet-disconnect ``handle_error`` policy.
 
 Tests under ``tests/`` are whitelisted — they use ``HTTPServer`` as fake
@@ -15,7 +15,7 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SRC_ROOT = _REPO_ROOT / "src" / "vessal"
-_ALLOWED_FILE = _SRC_ROOT / "ark" / "shell" / "http_server.py"
+_ALLOWED_FILE = _SRC_ROOT / "shell" / "http_server.py"
 
 _FORBIDDEN_NAMES = {"HTTPServer", "ThreadingHTTPServer"}
 
@@ -56,7 +56,7 @@ def test_no_raw_http_server_in_production():
             continue
         violations.extend(_scan_file(py_file))
     assert not violations, (
-        "Production code must use vessal.ark.shell.http_server.Safe*HTTPServer "
+        "Production code must use vessal.shell.http_server.Safe*HTTPServer "
         "instead of raw http.server.HTTPServer/ThreadingHTTPServer. "
         "Violations:\n  " + "\n  ".join(violations)
     )

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vessal.ark.shell.errors import CliUserError
+from vessal.shell.errors import CliUserError
 
 
 def test_cli_create_translates_cli_user_error(capsys):
@@ -17,7 +17,7 @@ def test_cli_create_translates_cli_user_error(capsys):
         raise CliUserError("target already exists")
 
     with patch("sys.argv", ["vessal", "create"]), \
-         patch("vessal.ark.shell.tui.create_wizard.run", fake_wizard):
+         patch("vessal.shell.tui.create_wizard.run", fake_wizard):
         with pytest.raises(SystemExit) as exc:
             main()
         assert exc.value.code == 1

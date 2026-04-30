@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.kernel.frame_log.schema import DDL
+from vessal.cell.kernel import Kernel
+from vessal.cell.kernel.frame_log.schema import DDL
 from tests.unit.kernel._ping_helpers import minimal_kernel
 
 

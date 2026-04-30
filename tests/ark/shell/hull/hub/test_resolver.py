@@ -1,10 +1,10 @@
-# src/vessal/ark/shell/hub/tests/test_resolver.py
+# src/vessal/shell/hub/tests/test_resolver.py
 """Tests for source resolver."""
 from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.hub.resolver import ResolvedSource, resolve
+from vessal.hull.hub.resolver import ResolvedSource, resolve
 
 
 SAMPLE_TOML = """\

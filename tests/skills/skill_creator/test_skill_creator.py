@@ -65,7 +65,7 @@ def test_matches_cli_scaffolder_output(tmp_path, monkeypatch):
     monkeypatch.setattr(sc_module, "__file__", str(tmp_path / "skills" / "skill_creator" / "skill.py"))
 
     from vessal.skills.skill_creator.skill import SkillCreator
-    from vessal.ark.shell.cli.scaffold import write_skill_scaffold
+    from vessal.shell.cli.scaffold import write_skill_scaffold
 
     skill_dir = tmp_path / "skills" / "demo"
     cli_dir = tmp_path / "cli" / "demo"

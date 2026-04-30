@@ -5,8 +5,8 @@ import json
 import sqlite3
 from pathlib import Path
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.protocol import Action, Pong
 
 
 def test_runtime_error_per_assert_lays_down_one_errors_row_each(tmp_path: Path):

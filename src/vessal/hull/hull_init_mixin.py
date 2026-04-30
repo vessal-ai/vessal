@@ -1,0 +1,443 @@
+"""hull_init_mixin.py — Hull initialization phases: hull.toml, Cell, venv, gates wiring.
+
+Part of the Hull class via multiple-inheritance composition (see hull.py).
+Methods here may assume the attributes set by Hull.__init__ are available via self.
+"""
+from __future__ import annotations
+
+import logging
+import sys
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+logger = logging.getLogger(__name__)
+
+_PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
+def _load_prompt(name: str) -> str:
+    """Load a prompt file from the prompts/ directory. Returns an empty string if the file does not exist."""
+    path = _PROMPTS_DIR / name
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return ""
+
+
+# ─────────────────────────────────────────────
+# Hull-owned renderer helpers
+# (moved from the deleted kernel/render/ directory in PR 5)
+# ─────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Section:
+    """An independent segment of system_prompt, participating in assembly by priority.
+
+    Attributes:
+        name:     Segment name, unique identifier.
+        priority: Rendering order; lower value renders first.
+        required: When True, cannot be trimmed.
+        render:   Render function with signature (ns: dict) -> str.
+    """
+    name: str
+    priority: int
+    required: bool
+    render: Callable[[dict], str]
+
+
+class SystemPromptBuilder:
+    """system_prompt assembler. Registers Sections; build(ns) sorts and joins them."""
+
+    def __init__(self) -> None:
+        self._sections: list[Section] = []
+
+    def register(self, section: Section) -> None:
+        self._sections.append(section)
+
+    def build(self, ns: dict) -> str:
+        sorted_sections = sorted(self._sections, key=lambda s: s.priority)
+        parts: list[str] = []
+        for section in sorted_sections:
+            text = section.render(ns)
+            if text.strip():
+                parts.append(text)
+        return "\n\n".join(parts)
+
+
+def render_capabilities(ns: dict) -> str:
+    """Generate the Loaded Tools section from Skill instances in the namespace."""
+    lines: list[str] = []
+    for key, obj in ns.items():
+        if isinstance(getattr(obj, "name", None), str) and isinstance(getattr(obj, "description", None), str):
+            name = getattr(obj, "name", key)
+            description = getattr(obj, "description", "")
+            if description:
+                lines.append(f"- `{name}` — {description}")
+    if not lines:
+        return ""
+    return "## Loaded Tools\n\n" + "\n".join(sorted(lines))
+
+
+class HullInitMixin:
+    """Initialization phases for Hull: config loading, Cell creation, venv, gates."""
+
+    def _init_config(self) -> dict:
+        """Phase 1: Load config, .env, activate venv. Pure config reads, no side effects on Cell."""
+        from dotenv import load_dotenv
+        config = self._load_config()
+
+        env_path = self._project_dir / ".env"
+        if env_path.exists():
+            load_dotenv(env_path)
+
+        self._activate_venv()
+        return config
+
+    def _init_skills_pre(self, hull_cfg: dict) -> list:
+        """Phase 2.5: build BootSkillEntry list and initialize SkillLoader registry.
+
+        Runs BEFORE _init_cell so the boot script is ready for Cell construction.
+        """
+        from vessal.cell.kernel.boot import BootSkillEntry
+        from vessal.hull.skill_loader import SkillLoader, _camel
+
+        self._skill_manager = SkillLoader()
+
+        entries = [BootSkillEntry("_system", "System")]
+        for skill_name in hull_cfg.get("skills", []):
+            try:
+                self._skill_manager.load(skill_name)  # validates + registers; class discarded
+            except Exception as e:
+                print(f"[error] skill '{skill_name}' failed to register: {e}")
+                continue
+            entries.append(BootSkillEntry(skill_name, _camel(skill_name)))
+        return entries
+
+    def _init_cell(
+        self,
+        core_cfg: dict,
+        cell_cfg: dict,
+        agent_cfg: dict,
+        cells_cfg: dict | None = None,
+        boot_entries: list | None = None,
+    ) -> None:
+        """Phase 2: Create Cell, setup logging/tracer, inject agent vars.
+
+        cells_cfg is the [cells] table from hull.toml. The main Cell reads
+        [cells.main]; missing entries fall back to defaults (data_dir = "data/main").
+        boot_entries is the BootSkillEntry list from _init_skills_pre; passed through
+        to compose_boot_script so Cell/Kernel can exec skill instantiation on boot.
+        """
+        import os
+        from vessal.cell import Cell
+        from vessal.cell.kernel.boot import compose_boot_script
+        from vessal.util.logging import Tracer
+
+        cells_cfg = cells_cfg or {}
+        main_cfg = cells_cfg.get("main", {})
+        cell_name = "main"
+        data_dir_rel = main_cfg.get("data_dir", "data/main")
+        if Path(data_dir_rel).is_absolute():
+            raise ValueError(
+                f"[cells.main] data_dir must be relative to project_dir; "
+                f"got absolute path {data_dir_rel!r}"
+            )
+        data_dir_abs = (self._project_dir / data_dir_rel).resolve()
+        data_dir_abs.mkdir(parents=True, exist_ok=True)
+
+        os.environ["VESSAL_DATA_DIR"] = str(data_dir_abs)
+        self._snapshots_dir = data_dir_abs / "snapshots"
+
+        restore_path = None
+        if self._snapshots_dir.exists():
+            snaps = sorted(self._snapshots_dir.glob("*.pkl"))
+            restore_path = str(snaps[-1]) if snaps else None
+
+        boot_script = compose_boot_script(boot_entries or [])
+
+        main_llm_config = self._resolve_llm_config(core_cfg, cell_cfg)
+        logger.info(
+            "core config: model=%s base_url=%s api_key=%s api_params=%s",
+            main_llm_config.model,
+            main_llm_config.base_url,
+            self._redact_api_key(main_llm_config.api_key),
+            main_llm_config.api_params,
+        )
+        self._main_cell = Cell(
+            boot_script=boot_script,
+            timeout=core_cfg.get("timeout", 60.0),
+            core_max_retries=core_cfg.get("max_retries", 3),
+            default_llm_config=main_llm_config,
+            cell_name=cell_name,
+            data_dir=str(data_dir_abs),
+            restore_path=restore_path,
+        )
+
+        self._log_dir = str(self._project_dir / "logs")
+        self._max_frames = cell_cfg.get("max_frames", 100)
+        trace_enabled = cell_cfg.get("trace", True)
+        self._tracer = Tracer(self._log_dir, enabled=trace_enabled)
+        self._ensure_log_readme()
+
+        if "language" in agent_cfg:
+            self._main_cell.L["language"] = agent_cfg["language"]
+
+        # --- Compaction Cell ---
+        compaction_cfg = cells_cfg.get("compaction", {})
+        compaction_data_dir_rel = compaction_cfg.get("data_dir", "data/compaction")
+        compaction_data_dir_abs = (self._project_dir / compaction_data_dir_rel).resolve()
+        compaction_data_dir_abs.mkdir(parents=True, exist_ok=True)
+
+        main_db_path = str(data_dir_abs / "frame_log.sqlite")
+
+        compaction_boot_entries = list(self._compaction_preset_entries(main_db_path))
+        compaction_boot_script = compose_boot_script(compaction_boot_entries)
+
+        compaction_snapshots_dir = compaction_data_dir_abs / "snapshots"
+        compaction_restore = None
+        if compaction_snapshots_dir.exists():
+            snaps = sorted(compaction_snapshots_dir.glob("*.pkl"))
+            compaction_restore = str(snaps[-1]) if snaps else None
+
+        compaction_llm_config = self._resolve_llm_config(
+            core_cfg, cell_cfg, overrides=compaction_cfg
+        )
+        if compaction_llm_config != main_llm_config:
+            logger.info(
+                "compaction core config: model=%s base_url=%s api_key=%s api_params=%s",
+                compaction_llm_config.model,
+                compaction_llm_config.base_url,
+                self._redact_api_key(compaction_llm_config.api_key),
+                compaction_llm_config.api_params,
+            )
+        self._compaction_cell = Cell(
+            boot_script=compaction_boot_script,
+            timeout=core_cfg.get("timeout", 60.0),
+            core_max_retries=core_cfg.get("max_retries", 3),
+            default_llm_config=compaction_llm_config,
+            cell_name="compaction",
+            data_dir=str(compaction_data_dir_abs),
+            restore_path=compaction_restore,
+        )
+        self._main_db_path = main_db_path
+
+    def _init_skills(self, hull_cfg: dict) -> None:
+        """Phase 3: route table, bind hull to G skills, start servers."""
+        from vessal.hull.hull_api import HullApi
+
+        self._main_cell.L["_builtin_names"] = []
+        self._main_cell.L["_data_dir"] = str(self._project_dir / "data")
+
+        self._routes: dict[tuple[str, str], object] = {}
+        self._running_servers: dict[str, object] = {}
+        self._server_kwargs: dict[str, dict] = {
+            "heartbeat": {"heartbeat": hull_cfg.get("heartbeat", 1800.0)},
+        }
+        self._hull_api = HullApi(routes=self._routes, wake_fn=self.wake)
+
+        # Bind skills that need hull reference
+        for skill_name in list(hull_cfg.get("skills", [])):
+            skill_inst = self._main_cell.G.get(skill_name)
+            if skill_inst is not None:
+                bind = getattr(skill_inst, "_bind_hull", None)
+                if callable(bind):
+                    bind(self)
+
+        # Start servers
+        for skill_name in hull_cfg.get("skills", []):
+            if self._skill_manager.has_server(skill_name):
+                try:
+                    self._start_skill_server(skill_name)
+                    print(f"  └─ routes: /skills/{skill_name}/", flush=True)
+                except Exception as e:
+                    print(f"[error] skill server '{skill_name}' failed to start: {e}", flush=True)
+
+    def _init_prompts(self) -> None:
+        """Phase 4: Load system prompts and SOUL; build SystemPromptBuilder."""
+        protocol_text = _load_prompt("system.md")
+        self._soul_path = self._project_dir / "SOUL.md"
+        if self._soul_path.exists():
+            self._soul_text = self._soul_path.read_text(encoding="utf-8")
+            self._soul_mtime = self._soul_path.stat().st_mtime
+        else:
+            self._soul_text = ""
+            self._soul_mtime = 0.0
+
+        self._prompt_builder = SystemPromptBuilder()
+        self._prompt_builder.register(Section("protocol", 0, True, lambda ns: protocol_text))
+        self._prompt_builder.register(Section("soul", 10, False, lambda ns: ns.get("_soul", "")))
+        self._prompt_builder.register(Section("capabilities", 20, False, render_capabilities))
+
+    def _init_loop(self, gates_cfg: dict) -> None:
+        """Phase 5: Gates, FrameHooks, EventLoop, wake injection."""
+        from vessal.hull.event_loop import EventLoop, FrameHooks
+
+        if "state_gate" in gates_cfg:
+            self._main_cell.state_gate = gates_cfg["state_gate"]
+        if "action_gate" in gates_cfg:
+            self._main_cell.action_gate = gates_cfg["action_gate"]
+        self._load_gate_files()
+
+        self._rewrite_runtime_owned()
+        self._main_cell.G["_system_prompt"] = self._prompt_builder.build(self._main_cell.G)
+
+        from vessal.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
+        self._compaction_cell.G["_system_prompt"] = COMPACTION_SYSTEM_PROMPT
+
+        hooks = FrameHooks(
+            before_frame=self._rewrite_runtime_owned,
+            after_frame=self._after_frame,
+            snapshot=self.snapshot,
+        )
+
+        self._event_loop = EventLoop(
+            main_cell=self._main_cell,
+            compaction_cell=self._compaction_cell,
+            main_db_path=self._main_db_path,
+            max_frames_per_wake=self._max_frames,
+            tracer=self._tracer,
+            hooks=hooks,
+        )
+
+        self._main_cell.G["_inject_wake"] = lambda reason="user_message": self.wake(reason)
+
+    def _ensure_log_readme(self) -> None:
+        """Ensure the logs directory has a README.md file."""
+        log_dir = Path(self._log_dir)
+        readme_path = log_dir / "README.md"
+        if readme_path.exists():
+            return
+        log_dir.mkdir(parents=True, exist_ok=True)
+        readme_path.write_text(
+            """# Vessal Log Directory
+
+This directory contains various log files from Agent execution.
+
+## File types
+
+| Suffix | Purpose | Format |
+|--------|---------|--------|
+| `.jsonl` | Structured frame logs for programmatic analysis | JSON Lines (canonical FrameRecord format) |
+| `.trace.log` | Execution traces for debugging performance | timestamp|frame|phase|event|ms|details |
+
+## Configuration
+
+Adjust in hull.toml [cell]:
+
+```toml
+[cell]
+trace = true   # enable trace logs (default)
+trace = false  # disable to reduce IO
+```
+""",
+            encoding="utf-8",
+        )
+
+    def _load_config(self) -> dict:
+        """Read hull.toml; return an empty dict if it does not exist."""
+        toml_path = self._project_dir / "hull.toml"
+        if not toml_path.exists():
+            return {}
+        with open(toml_path, "rb") as f:
+            return tomllib.load(f)
+
+    def _activate_venv(self) -> None:
+        """Add the project .venv's site-packages to sys.path.
+
+        Makes packages installed into .venv importable (e.g., by the pip Skill).
+        Silently skips if .venv does not exist.
+        """
+        venv_path = self._project_dir / ".venv"
+        if not venv_path.exists():
+            return
+
+        if sys.platform == "win32":
+            site_packages = venv_path / "Lib" / "site-packages"
+        else:
+            py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+            site_packages = venv_path / "lib" / py_ver / "site-packages"
+
+        if site_packages.exists() and str(site_packages) not in sys.path:
+            import site as site_mod
+            site_mod.addsitedir(str(site_packages))
+
+    def _load_gate_files(self) -> None:
+        """Read Python gate files from the gates/ directory and register them via cell.set_gate().
+
+        Scans gates/action_gate.py and gates/state_gate.py,
+        extracts the check() function and registers it as a custom gate rule.
+        Silently returns if the gates/ directory does not exist;
+        logs a warning if a file is missing check() or fails to execute.
+        """
+        gates_dir = Path(self._project_dir) / "gates"
+        if not gates_dir.is_dir():
+            return
+
+        for gate_type in ("action_gate", "state_gate"):
+            gate_file = gates_dir / f"{gate_type}.py"
+            if not gate_file.exists():
+                continue
+
+            try:
+                code = gate_file.read_text(encoding="utf-8")
+                ns: dict = {}
+                exec(compile(code, str(gate_file), "exec"), ns)
+
+                check_fn = ns.get("check")
+                if check_fn is None or not callable(check_fn):
+                    logger.warning("gates/%s.py missing check() function, skipping", gate_type)
+                    continue
+
+                self._main_cell.set_gate(gate_type.replace("_gate", ""), check_fn)
+                logger.info("Loaded custom gate: %s", gate_type)
+            except Exception as e:
+                logger.warning("Failed to load gates/%s.py: %s", gate_type, e)
+
+    def _resolve_llm_config(
+        self,
+        core_cfg: dict,
+        cell_cfg: dict,
+        overrides: dict | None = None,
+    ) -> "LLMConfig":
+        """Build an LLMConfig from env + hull.toml. Hull-only concern.
+
+        Precedence: overrides (per-cell hull.toml section) > [core.api_params] > defaults.
+        api_key/base_url/model come from environment (loaded via load_dotenv earlier
+        in _init_config; that load is the only env-touching point in Vessal).
+        """
+        import os
+        from vessal.cell.protocol import LLMConfig
+
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        base_url = os.environ.get("OPENAI_BASE_URL", "")
+        model = os.environ.get("OPENAI_MODEL", "")
+
+        overrides = overrides or {}
+        api_params = overrides.get("api_params") or core_cfg.get("api_params", {
+            "temperature": cell_cfg.get("temperature", 0.7),
+            "max_tokens": cell_cfg.get("max_tokens", 4096),
+        })
+
+        return LLMConfig(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            api_params=dict(api_params),
+        )
+
+    @staticmethod
+    def _redact_api_key(api_key: str) -> str:
+        """Show first 3 + last 1 chars, mask middle. 'sk-***c' style."""
+        if len(api_key) <= 8:
+            return "***"
+        return f"{api_key[:3]}***{api_key[-1]}"
+
+    def _compaction_preset_entries(self, main_db_path: str):
+        """Boot Skill entries for the compaction Cell — _system + Compaction."""
+        from vessal.cell.kernel.boot import BootSkillEntry
+        return [
+            BootSkillEntry("_system", "System"),
+            BootSkillEntry("compaction", "Compaction", f"main_db_path={main_db_path!r}"),
+        ]

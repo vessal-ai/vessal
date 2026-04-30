@@ -14,7 +14,7 @@ def hull_factory(tmp_path, monkeypatch):
     (tmp_path / "hull.toml").write_text(
         "[hull]\nskills = []\n", encoding="utf-8"
     )
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
 
     def build():
         return Hull(str(tmp_path))

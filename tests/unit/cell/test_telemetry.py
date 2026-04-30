@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.cell.core.telemetry import append_usage
+from vessal.cell.core.telemetry import append_usage
 
 
 def test_append_usage_creates_file_when_missing(tmp_path: Path):

@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from unittest.mock import MagicMock, patch
 
-from vessal.ark.shell.hull.event_loop import EventLoop
+from vessal.hull.event_loop import EventLoop
 
 
 @pytest.fixture
@@ -76,8 +76,8 @@ def test_inject_wake_does_not_touch_skills(mock_cell, mock_compaction_cell):
 
 def test_run_wake_cycle_skips_frame_logger_without_log_dir(mock_cell, mock_compaction_cell):
     """_run_wake_cycle does not create a FrameLogger when Tracer has no log directory."""
-    from vessal.ark.shell.hull.event_loop import FrameHooks
-    from vessal.ark.util.logging import Tracer
+    from vessal.hull.event_loop import FrameHooks
+    from vessal.util.logging import Tracer
 
     mock_cell.G["_system"]._sleeping = True  # sleep immediately, zero frame loop
 
@@ -99,10 +99,10 @@ def test_inject_wake_alarm_reason(mock_cell, mock_compaction_cell):
 
 def test_frame_loop_calls_before_frame_hook(mock_cell, mock_compaction_cell, monkeypatch):
     """_frame_loop calls hooks.before_frame every frame."""
-    from vessal.ark.shell.hull.event_loop import FrameHooks
+    from vessal.hull.event_loop import FrameHooks
 
     monkeypatch.setattr(
-        "vessal.ark.shell.hull.event_loop.should_compact",
+        "vessal.hull.event_loop.should_compact",
         lambda path, k=4: False,
     )
 
@@ -155,10 +155,10 @@ def test_inject_wake_fn_puts_event_on_queue():
 
 def test_after_frame_hook_fires(mock_cell, mock_compaction_cell, monkeypatch):
     """_frame_loop calls hooks.after_frame once per successful frame."""
-    from vessal.ark.shell.hull.event_loop import FrameHooks
+    from vessal.hull.event_loop import FrameHooks
 
     monkeypatch.setattr(
-        "vessal.ark.shell.hull.event_loop.should_compact",
+        "vessal.hull.event_loop.should_compact",
         lambda path, k=4: False,
     )
 
@@ -186,7 +186,7 @@ def test_after_frame_hook_fires(mock_cell, mock_compaction_cell, monkeypatch):
 
 def test_frame_loop_breaks_on_protocol_error(mock_cell, mock_compaction_cell):
     """_frame_loop breaks immediately on protocol_error without retrying."""
-    from vessal.ark.shell.hull.cell.protocol import StepResult
+    from vessal.cell.protocol import StepResult
 
     call_count = 0
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.util.logging.console import print_frame_line, print_run_summary
+from vessal.util.logging.console import print_frame_line, print_run_summary
 
 
 def _make_frame(

@@ -26,7 +26,7 @@ def test_hull_loads_action_gate_from_file(tmp_path):
         '    return True, ""\n'
     )
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     os.chdir(tmp_path)
     hull = Hull(str(tmp_path))
 
@@ -38,6 +38,6 @@ def test_hull_no_gates_dir_no_error(tmp_path):
     """Hull works fine without gates/ directory."""
     _write_minimal_project(tmp_path)
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     os.chdir(tmp_path)
     Hull(str(tmp_path))  # Should not raise

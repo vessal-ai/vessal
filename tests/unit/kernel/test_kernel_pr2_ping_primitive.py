@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.kernel import Kernel
+from vessal.cell.protocol import (
     Action, Observation, Ping, Pong, Verdict,
 )
 from tests.unit.kernel._ping_helpers import minimal_kernel

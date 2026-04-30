@@ -15,9 +15,9 @@ from openai import (
     BadRequestError,
 )
 
-from vessal.ark.shell.hull.cell.core.parser import ParseError, parse_response
-from vessal.ark.shell.hull.cell.core import Core
-from vessal.ark.shell.hull.cell.protocol import FrameStream, Ping, Pong, State, Action, LLMConfig
+from vessal.cell.core.parser import ParseError, parse_response
+from vessal.cell.core import Core
+from vessal.cell.protocol import FrameStream, Ping, Pong, State, Action, LLMConfig
 
 
 # ============================================================
@@ -154,7 +154,7 @@ def _make_ping(**kwargs) -> Ping:
 
 
 def _make_llm_config(**overrides) -> "LLMConfig":
-    from vessal.ark.shell.hull.cell.protocol import LLMConfig
+    from vessal.cell.protocol import LLMConfig
     base = dict(
         api_key="sk-test",
         base_url="http://localhost:9999/v1",
@@ -165,7 +165,7 @@ def _make_llm_config(**overrides) -> "LLMConfig":
     return LLMConfig(**base)
 
 
-@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+@patch("vessal.cell.core.core.openai.OpenAI")
 def test_core_step_takes_llm_config_per_call(mock_openai_cls):
     mock_client = MagicMock()
     mock_openai_cls.return_value = mock_client
@@ -183,7 +183,7 @@ def test_core_step_takes_llm_config_per_call(mock_openai_cls):
     assert isinstance(pong, Pong)
 
 
-@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+@patch("vessal.cell.core.core.openai.OpenAI")
 def test_core_constructs_client_with_explicit_credentials(mock_openai_cls):
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = _make_mock_response("<action>pass</action>")
@@ -199,7 +199,7 @@ def test_core_constructs_client_with_explicit_credentials(mock_openai_cls):
     )
 
 
-@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+@patch("vessal.cell.core.core.openai.OpenAI")
 def test_core_does_not_touch_environ(mock_openai_cls, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "WRONG_KEY_FROM_ENV")
     monkeypatch.setenv("OPENAI_BASE_URL", "http://wrong.example.com/v1")
@@ -219,7 +219,7 @@ def test_core_does_not_touch_environ(mock_openai_cls, monkeypatch):
     assert create_kwargs["model"] == "right-model"
 
 
-@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+@patch("vessal.cell.core.core.openai.OpenAI")
 def test_core_caches_client_per_credentials(mock_openai_cls):
     mock_openai_cls.return_value = MagicMock()
     mock_openai_cls.return_value.chat.completions.create.return_value = _make_mock_response(
@@ -232,7 +232,7 @@ def test_core_caches_client_per_credentials(mock_openai_cls):
     assert mock_openai_cls.call_count == 1
 
 
-@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+@patch("vessal.cell.core.core.openai.OpenAI")
 def test_core_creates_distinct_clients_for_distinct_configs(mock_openai_cls):
     mock_openai_cls.return_value = MagicMock()
     mock_openai_cls.return_value.chat.completions.create.return_value = _make_mock_response(
@@ -247,7 +247,7 @@ def test_core_creates_distinct_clients_for_distinct_configs(mock_openai_cls):
 class TestCore:
     """Core class tests with mocked OpenAI API."""
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_step_calls_api_correctly(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -265,7 +265,7 @@ class TestCore:
         assert call_args.kwargs["max_tokens"] == 2048
         assert isinstance(pong, Pong)
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_step_returns_pong(self, mock_openai_cls):
         """Core.step() returns a Pong."""
         mock_client = MagicMock()
@@ -279,7 +279,7 @@ class TestCore:
         assert isinstance(pong, Pong)
         assert pong.action.operation == "y = 2 + 3"
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_step_empty_response(self, mock_openai_cls):
         """Core.step() raises ValueError when response content is None (no action tag)."""
         mock_client = MagicMock()
@@ -299,7 +299,7 @@ class TestCore:
         with pytest.raises(ValueError):
             core.step(_make_ping(), _make_llm_config())
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_client_created_with_timeout(self, mock_openai_cls):
         """OpenAI() is passed the timeout and credential parameters."""
         mock_client = MagicMock()
@@ -313,7 +313,7 @@ class TestCore:
             timeout=60.0,
         )
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_client_created_with_custom_timeout(self, mock_openai_cls):
         """Custom timeout parameter is forwarded to the OpenAI client."""
         mock_client = MagicMock()
@@ -327,7 +327,7 @@ class TestCore:
             timeout=120.0,
         )
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_system_and_user_messages_sent(self, mock_openai_cls):
         """step(ping) sends system + user messages."""
         mock_client = MagicMock()
@@ -337,7 +337,7 @@ class TestCore:
         )
 
         core = Core()
-        from vessal.ark.shell.hull.cell.protocol import Entry, FrameContent
+        from vessal.cell.protocol import Entry, FrameContent
         ping = Ping(
             system_prompt="You are an agent.",
             state=State(
@@ -362,7 +362,7 @@ class TestCore:
         assert "frame stream" in messages[1]["content"]
         assert "GoalSkill" in messages[1]["content"]
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_messages_sent_every_call(self, mock_openai_cls):
         """Multiple consecutive step() calls each carry system + user messages."""
         mock_client = MagicMock()
@@ -371,7 +371,7 @@ class TestCore:
             "<action>pass</action>"
         )
 
-        from vessal.ark.shell.hull.cell.protocol import Entry, FrameContent
+        from vessal.cell.protocol import Entry, FrameContent
 
         def _ping_with_frame(n: int) -> Ping:
             return Ping(
@@ -407,7 +407,7 @@ class TestCore:
 class TestCoreResilience:
     """Core network robustness: timeouts, retries, error classification."""
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_default_timeout(self, mock_openai_cls):
         """Default timeout is 60.0."""
         mock_client = MagicMock()
@@ -421,7 +421,7 @@ class TestCoreResilience:
             timeout=60.0,
         )
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_custom_timeout(self, mock_openai_cls):
         """Custom timeout is forwarded to the OpenAI client."""
         mock_client = MagicMock()
@@ -435,19 +435,19 @@ class TestCoreResilience:
             timeout=120.0,
         )
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_default_max_retries(self, mock_openai_cls):
         """Default max_retries is 3."""
         core = Core()
         assert core._max_retries == 3
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_custom_max_retries(self, mock_openai_cls):
         """Custom max_retries takes effect."""
         core = Core(max_retries=5)
         assert core._max_retries == 5
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_retry_on_timeout(self, mock_openai_cls):
         """APITimeoutError triggers retry; eventually succeeds and returns Pong."""
         mock_client = MagicMock()
@@ -466,7 +466,7 @@ class TestCoreResilience:
         assert pong.action.operation == "x = 1"
         assert mock_client.chat.completions.create.call_count == 3
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_retry_exhausted_raises(self, mock_openai_cls):
         """Raises the last exception after retries are exhausted."""
         mock_client = MagicMock()
@@ -486,7 +486,7 @@ class TestCoreResilience:
         mock_response.request = MagicMock()
         return error_cls(message, response=mock_response, body=None)
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_no_retry_on_auth_error(self, mock_openai_cls):
         """AuthenticationError is raised immediately without retrying."""
         mock_client = MagicMock()
@@ -502,7 +502,7 @@ class TestCoreResilience:
         # Called only once, no retries
         assert mock_client.chat.completions.create.call_count == 1
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_no_retry_on_permission_error(self, mock_openai_cls):
         """PermissionDeniedError is raised immediately without retrying."""
         mock_client = MagicMock()
@@ -517,7 +517,7 @@ class TestCoreResilience:
 
         assert mock_client.chat.completions.create.call_count == 1
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_no_retry_on_bad_request(self, mock_openai_cls):
         """BadRequestError is raised immediately without retrying."""
         mock_client = MagicMock()
@@ -537,7 +537,7 @@ class TestCoreResilience:
         mock_request = MagicMock()
         return APIConnectionError(message=message, request=mock_request)
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_retry_on_connection_error(self, mock_openai_cls):
         """APIConnectionError triggers retry and returns Pong."""
         mock_client = MagicMock()
@@ -554,7 +554,7 @@ class TestCoreResilience:
         assert pong.action.operation == "pass"
         assert mock_client.chat.completions.create.call_count == 2
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_retry_on_server_error(self, mock_openai_cls):
         """InternalServerError triggers retry and returns Pong."""
         mock_client = MagicMock()
@@ -577,7 +577,7 @@ class TestCoreResilience:
 # ============================================================
 
 
-@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+@patch("vessal.cell.core.core.openai.OpenAI")
 def test_core_step_accepts_ping(mock_openai_cls):
     """Core.step() accepts a Ping and returns a Pong."""
     mock_client = MagicMock()
@@ -596,7 +596,7 @@ def test_core_step_accepts_ping(mock_openai_cls):
     assert isinstance(pong.action, Action)
 
 
-@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+@patch("vessal.cell.core.core.openai.OpenAI")
 def test_core_step_ping_builds_system_and_user_messages(mock_openai_cls):
     """step(ping) sends system + user messages whose content comes from ping fields."""
     mock_client = MagicMock()
@@ -605,7 +605,7 @@ def test_core_step_ping_builds_system_and_user_messages(mock_openai_cls):
         "<action>pass</action>"
     )
 
-    from vessal.ark.shell.hull.cell.protocol import Entry, FrameContent
+    from vessal.cell.protocol import Entry, FrameContent
     core = Core()
     ping = Ping(
         system_prompt="You are an agent.",
@@ -632,7 +632,7 @@ def test_core_step_ping_builds_system_and_user_messages(mock_openai_cls):
     assert "GoalSkill" in messages[1]["content"]
 
 
-@patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+@patch("vessal.cell.core.core.openai.OpenAI")
 def test_core_step_pong_parsed_correctly(mock_openai_cls):
     """core.step() returns a Pong with the correct action.operation field."""
     mock_client = MagicMock()
@@ -656,7 +656,7 @@ def test_core_step_pong_parsed_correctly(mock_openai_cls):
 class TestCoreUsageReturn:
     """Core.step() returns (Pong, usage: dict)."""
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_returns_usage_tuple(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -671,7 +671,7 @@ class TestCoreUsageReturn:
         assert usage["prompt_tokens"] == 5000
         assert usage["completion_tokens"] == 200
 
-    @patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI")
+    @patch("vessal.cell.core.core.openai.OpenAI")
     def test_returns_none_when_no_usage(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -703,7 +703,7 @@ def test_core_step_returns_pong_and_usage_dict():
         choices = [_FakeChoice]
         usage = _FakeUsage
 
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI") as mock_cls:
+    with patch("vessal.cell.core.core.openai.OpenAI") as mock_cls:
         mock_client = MagicMock()
         mock_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = _FakeResponse
@@ -731,7 +731,7 @@ def test_core_step_usage_empty_when_response_usage_is_none():
         choices = [_FakeChoice]
         usage = None
 
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI") as mock_cls:
+    with patch("vessal.cell.core.core.openai.OpenAI") as mock_cls:
         mock_client = MagicMock()
         mock_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = _FakeResponse
@@ -758,7 +758,7 @@ def test_core_step_cached_tokens_defaults_to_zero():
         choices = [_FakeChoice]
         usage = _FakeUsage
 
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI") as mock_cls:
+    with patch("vessal.cell.core.core.openai.OpenAI") as mock_cls:
         mock_client = MagicMock()
         mock_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = _FakeResponse

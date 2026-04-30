@@ -42,7 +42,7 @@ class TestContainerHullHandler:
     """ContainerHullHandler forwards HTTP to hull.handle()."""
 
     def test_get_forwards_to_handle(self):
-        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
+        from vessal.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, {"status": "ok"}))
         server, port = _start_server(ContainerHullHandler, hull)
@@ -55,7 +55,7 @@ class TestContainerHullHandler:
             server.shutdown()
 
     def test_post_forwards_json_body(self):
-        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
+        from vessal.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, {"received": True}))
         server, port = _start_server(ContainerHullHandler, hull)
@@ -76,7 +76,7 @@ class TestContainerHullHandler:
             server.shutdown()
 
     def test_healthz_does_not_hit_hull(self):
-        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
+        from vessal.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull()
         server, port = _start_server(ContainerHullHandler, hull)
@@ -89,8 +89,8 @@ class TestContainerHullHandler:
             server.shutdown()
 
     def test_static_response(self):
-        from vessal.ark.shell.hull.hull_api import StaticResponse
-        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
+        from vessal.hull.hull_api import StaticResponse
+        from vessal.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, StaticResponse(b"<h1>hi</h1>", "text/html")))
         server, port = _start_server(ContainerHullHandler, hull)
@@ -102,7 +102,7 @@ class TestContainerHullHandler:
             server.shutdown()
 
     def test_get_with_query_params(self):
-        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
+        from vessal.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, {"frames": []}))
         server, port = _start_server(ContainerHullHandler, hull)
@@ -116,7 +116,7 @@ class TestContainerHullHandler:
             server.shutdown()
 
     def test_post_empty_body(self):
-        from vessal.ark.shell.runtime.container_mode import ContainerHullHandler
+        from vessal.shell.runtime.container_mode import ContainerHullHandler
 
         hull = FakeHull(response=(200, {"ok": True}))
         server, port = _start_server(ContainerHullHandler, hull)

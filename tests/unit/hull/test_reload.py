@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.hull import Hull
+from vessal.hull.hull import Hull
 
 
 def _seed_project(tmp_path: Path) -> Path:

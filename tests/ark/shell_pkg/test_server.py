@@ -7,7 +7,7 @@ import urllib.error
 
 import pytest
 
-from vessal.ark.shell.server import ShellServer
+from vessal.shell.server import ShellServer
 
 
 class _FakeHullBackend(http.server.BaseHTTPRequestHandler):
@@ -64,7 +64,7 @@ def shell_server(monkeypatch, tmp_path):
         self._hull_alive = True
 
     monkeypatch.setattr(
-        "vessal.ark.shell.server.ShellServer._spawn_hull", fake_spawn
+        "vessal.shell.server.ShellServer._spawn_hull", fake_spawn
     )
 
     server = ShellServer(project_dir=str(tmp_path), port=0)

@@ -5,7 +5,7 @@ Requires a ns reference to read arbitrary variable values.
 """
 from __future__ import annotations
 
-from vessal.ark.shell.hull import render_value
+from vessal.hull import render_value
 from vessal.skills._base import BaseSkill
 
 

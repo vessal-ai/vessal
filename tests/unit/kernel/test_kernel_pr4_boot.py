@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.kernel.frame_log import open_db
-from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.kernel.frame_log import open_db
+from vessal.cell.kernel.boot import compose_boot_script, BootSkillEntry
 
 
 # ────────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ def test_no_dropped_keys_helpers():
     are all gone from kernel.py (deferred to PR 6 DeadHandle but the L-side filter
     must already be removed in PR 4 because boot frame's obs_diff_json is the
     spec-mandated disclosure channel)."""
-    import vessal.ark.shell.hull.cell.kernel.kernel as km
+    import vessal.cell.kernel.kernel as km
     src = Path(km.__file__).read_text()
     assert "_picklable" not in src
     assert "_dropped_keys" not in src
@@ -227,7 +227,7 @@ def test_no_dropped_keys_helpers():
 
 def test_skills_manifest_module_deleted():
     with pytest.raises(ModuleNotFoundError):
-        import vessal.ark.shell.hull.skills_manifest  # noqa: F401
+        import vessal.hull.skills_manifest  # noqa: F401
 
 
 # ────────────────────────────────────────────────────────────
@@ -239,7 +239,7 @@ def test_snapshots_live_under_per_cell_data_dir(tmp_path: Path, monkeypatch):
     data/<cell>/. Hull MUST NOT use <project>/snapshots/."""
     # Hull-level integration test: build a Hull on a fake project, snapshot,
     # verify path lands under data/<cell>/snapshots/.
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
 
     project = tmp_path / "agent"
     (project / "data" / "main").mkdir(parents=True)

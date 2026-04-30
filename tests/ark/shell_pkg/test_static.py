@@ -4,7 +4,7 @@ import urllib.request
 
 def test_console_root_redirects_to_index(monkeypatch, tmp_path):
     (tmp_path / "hull.toml").write_text("[agent]\nname='x'\n")
-    from vessal.ark.shell.server import ShellServer
+    from vessal.shell.server import ShellServer
     server = ShellServer(project_dir=str(tmp_path), port=0)
     monkeypatch.setattr(server, "_spawn_hull", lambda: setattr(server, "_internal_port", 9999))
     monkeypatch.setattr(server, "_monitor_hull", lambda: None)
@@ -21,7 +21,7 @@ def test_console_root_redirects_to_index(monkeypatch, tmp_path):
 
 def test_console_asset_served(monkeypatch, tmp_path):
     (tmp_path / "hull.toml").write_text("[agent]\nname='x'\n")
-    from vessal.ark.shell.server import ShellServer
+    from vessal.shell.server import ShellServer
     server = ShellServer(project_dir=str(tmp_path), port=0)
     monkeypatch.setattr(server, "_spawn_hull", lambda: setattr(server, "_internal_port", 9999))
     monkeypatch.setattr(server, "_monitor_hull", lambda: None)

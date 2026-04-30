@@ -1,7 +1,7 @@
 """Tests for picker.build_menu (pure, no I/O)."""
 from pathlib import Path
 
-from vessal.ark.shell.tui.picker import build_menu
+from vessal.shell.tui.picker import build_menu
 
 
 def test_inside_project_offers_full_menu(tmp_path):

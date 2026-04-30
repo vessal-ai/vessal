@@ -4,7 +4,7 @@
 class TestHullApi:
 
     def test_register_route(self):
-        from vessal.ark.shell.hull.hull_api import HullApi
+        from vessal.hull.hull_api import HullApi
 
         routes = {}
         wake_fn = lambda reason: None
@@ -18,7 +18,7 @@ class TestHullApi:
         assert routes[("GET", "/custom")](None) == (200, {"ok": True})
 
     def test_unregister_route(self):
-        from vessal.ark.shell.hull.hull_api import HullApi
+        from vessal.hull.hull_api import HullApi
 
         routes = {("GET", "/custom"): lambda b: (200, {})}
         api = HullApi(routes=routes, wake_fn=lambda r: None)
@@ -27,7 +27,7 @@ class TestHullApi:
         assert ("GET", "/custom") not in routes
 
     def test_wake(self):
-        from vessal.ark.shell.hull.hull_api import HullApi
+        from vessal.hull.hull_api import HullApi
 
         wakes = []
         api = HullApi(routes={}, wake_fn=lambda r: wakes.append(r))

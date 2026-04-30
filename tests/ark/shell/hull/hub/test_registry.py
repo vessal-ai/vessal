@@ -1,10 +1,10 @@
-# src/vessal/ark/shell/hub/tests/test_registry.py
+# src/vessal/shell/hub/tests/test_registry.py
 """Tests for SkillHub registry fetch, search, and list."""
 from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.hub.registry import Registry
+from vessal.hull.hub.registry import Registry
 
 SAMPLE_TOML = """\
 [browser]

@@ -10,7 +10,7 @@ import sys
 
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "vessal.ark.shell.cli", *args],
+        [sys.executable, "-m", "vessal.shell.cli", *args],
         capture_output=True,
         text=True,
         check=False,

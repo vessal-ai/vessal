@@ -17,7 +17,7 @@ def soul_env(tmp_path):
 
 def _make_hull_stub(soul_path: Path, cell: MagicMock):
     """Create a minimal Hull-like object with soul hot-reload attributes."""
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
 
     hull = object.__new__(Hull)
     hull._main_cell = cell

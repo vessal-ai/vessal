@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.cli.skills_init_writer import (
+from vessal.shell.cli.skills_init_writer import (
     write_initial,
     add as add_skill,
     remove as remove_skill,

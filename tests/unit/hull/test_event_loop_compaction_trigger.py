@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 def _make_main_cell_mock():
     """Return a MagicMock that behaves like a Cell for EventLoop's _frame_loop."""
-    from vessal.ark.shell.hull.cell.protocol import StepResult
+    from vessal.cell.protocol import StepResult
     from vessal.skills.system.skill import System
 
     class _FakeKernel:
@@ -34,13 +34,13 @@ def _make_main_cell_mock():
 
 
 def test_compaction_step_called_when_trigger_true(monkeypatch):
-    from vessal.ark.shell.hull.event_loop import EventLoop
+    from vessal.hull.event_loop import EventLoop
 
     main_cell = _make_main_cell_mock()
     compaction_cell = MagicMock()
 
     monkeypatch.setattr(
-        "vessal.ark.shell.hull.event_loop.should_compact",
+        "vessal.hull.event_loop.should_compact",
         lambda path, k=4: True,
     )
 
@@ -57,13 +57,13 @@ def test_compaction_step_called_when_trigger_true(monkeypatch):
 
 
 def test_compaction_step_skipped_when_trigger_false(monkeypatch):
-    from vessal.ark.shell.hull.event_loop import EventLoop
+    from vessal.hull.event_loop import EventLoop
 
     main_cell = _make_main_cell_mock()
     compaction_cell = MagicMock()
 
     monkeypatch.setattr(
-        "vessal.ark.shell.hull.event_loop.should_compact",
+        "vessal.hull.event_loop.should_compact",
         lambda path, k=4: False,
     )
 

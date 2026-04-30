@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.protocol import Action, Pong
 
 
 def test_kernel_ping_pipes_stderr_to_observation(tmp_path: Path):

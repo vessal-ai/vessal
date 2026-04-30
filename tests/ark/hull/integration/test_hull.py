@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vessal.ark.shell.hull import Hull
+from vessal.hull import Hull
 
 
 # ============================================================
@@ -43,7 +43,7 @@ def _make_project(tmp_path, toml_content="", skills=None, env_content=None, soul
 def _make_hull(tmp_path, toml_content="", skills=None, env_content=None, soul_content=None):
     """Create a Hull and mock Core to avoid API calls. Returns Hull instance."""
     _make_project(tmp_path, toml_content, skills, env_content, soul_content)
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+    with patch("vessal.cell.core.core.openai.OpenAI"):
         hull = Hull(str(tmp_path))
     return hull
 
@@ -53,7 +53,7 @@ def _set_responses(hull, responses):
 
     Bare Python strings are auto-wrapped in <action>...</action> format to pass parse_response.
     """
-    from vessal.ark.shell.hull.cell.core.parser import parse_response
+    from vessal.cell.core.parser import parse_response
 
     def make_result(resp):
         if isinstance(resp, str):
@@ -171,7 +171,7 @@ class TestRunLoop:
         """Loop stops at the frame limit; _sleeping remains False."""
         toml = "[cell]\nmax_frames = 2"
         hull = _make_hull(tmp_path, toml_content=toml)
-        from vessal.ark.shell.hull.cell.core.parser import parse_response
+        from vessal.cell.core.parser import parse_response
         _raw = "<action>\npass\n</action>"
         hull._main_cell._core.step = MagicMock(
             return_value=(parse_response(_raw), {})
@@ -194,7 +194,7 @@ class TestRunLoop:
             return original_step(tracer)
 
         hull._main_cell.step = capturing_step
-        from vessal.ark.shell.hull.cell.core.parser import parse_response
+        from vessal.cell.core.parser import parse_response
         _raw = '<action>\n_system.sleep()\n</action>'
         hull._main_cell._core.step = MagicMock(
             return_value=(parse_response(_raw), {})
@@ -267,7 +267,7 @@ class TestRunLoop:
 class TestLog:
     def test_frame_logger_can_be_created(self, tmp_path):
         """FrameLogger can be created normally."""
-        from vessal.ark.util.logging import FrameLogger
+        from vessal.util.logging import FrameLogger
         hull = _make_hull(tmp_path)
         log_dir = hull._log_dir
         fl = FrameLogger(log_dir)
@@ -321,7 +321,7 @@ class TestSnapshot:
         hull1._main_cell.L["my_var"] = "hello"
         hull1.snapshot()
 
-        with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+        with patch("vessal.cell.core.core.openai.OpenAI"):
             hull2 = Hull(str(tmp_path))
         assert hull2._main_cell.L.get("my_var") == "hello"
 
@@ -344,7 +344,7 @@ class TestEnv:
         os.environ.pop("TEST_HULL_UNIQUE_VAR", None)
 
         _make_project(tmp_path, env_content=env_content)
-        with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+        with patch("vessal.cell.core.core.openai.OpenAI"):
             Hull(str(tmp_path))
 
         assert os.environ.get("TEST_HULL_UNIQUE_VAR") == "hello_world"
@@ -492,7 +492,7 @@ class TestWake:
             wake_seen.append(hull._main_cell.G["_system"]._wake_reason)
             return original_step(tracer)
         hull._main_cell.step = capturing_step
-        from vessal.ark.shell.hull.cell.core.parser import parse_response
+        from vessal.cell.core.parser import parse_response
         _raw = '<action>\n_system.sleep()\n</action>'
         hull._main_cell._core.step = MagicMock(
             return_value=(parse_response(_raw), {})

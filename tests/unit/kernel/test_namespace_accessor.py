@@ -1,4 +1,4 @@
-from vessal.ark.shell.hull.cell.cell import Cell
+from vessal.cell.cell import Cell
 from tests.unit.kernel._ping_helpers import minimal_kernel
 
 

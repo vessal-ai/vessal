@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+from vessal.cell.kernel.dead_handle import DeadHandle
+from vessal.cell.kernel.kernel import Kernel
 
 
 def test_dead_handle_repr_does_not_raise() -> None:

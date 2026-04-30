@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import FrameStream, Ping, State
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.protocol import FrameStream, Ping, State
 
 
 def _kernel(tmp_path):
@@ -39,7 +39,7 @@ def test_ping_returns_dataclass_state(tmp_path):
 
 def test_ping_frame_stream_reflects_sqlite(tmp_path):
     """After two committed frames, FrameStream has entries for x=1 and y=2."""
-    from vessal.ark.shell.hull.cell.protocol import Action, Pong
+    from vessal.cell.protocol import Action, Pong
 
     k = _kernel(tmp_path)
     p1 = Pong(think="", action=Action(operation="x = 1", expect="True"))
@@ -55,18 +55,18 @@ def test_ping_frame_stream_reflects_sqlite(tmp_path):
 
 def test_frame_stream_module_no_longer_imports():
     with pytest.raises(ImportError):
-        import vessal.ark.shell.hull.cell.kernel.frame_stream  # noqa: F401
+        import vessal.cell.kernel.frame_stream  # noqa: F401
 
 
 def test_render_module_no_longer_imports():
     with pytest.raises(ImportError):
-        from vessal.ark.shell.hull.cell.kernel import render  # noqa: F401
+        from vessal.cell.kernel import render  # noqa: F401
 
 
 def test_kernel_render_helper_removed():
     """Kernel.ping no longer calls a Kernel-side render() function."""
     import inspect
-    from vessal.ark.shell.hull.cell.kernel import kernel as k_mod
+    from vessal.cell.kernel import kernel as k_mod
     src = inspect.getsource(k_mod.Kernel.ping)
     assert "_render(" not in src
     assert "render(self.L" not in src

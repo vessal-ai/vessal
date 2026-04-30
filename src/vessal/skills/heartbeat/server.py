@@ -11,7 +11,7 @@ import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vessal.ark.shell.hull.hull_api import HullApi
+    from vessal.hull.hull_api import HullApi
 
 _instance: "_HeartbeatServer | None" = None
 

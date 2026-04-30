@@ -8,7 +8,7 @@ from pathlib import Path
 
 HULL_INIT_MIXIN = (
     Path(__file__).resolve().parents[3]
-    / "src" / "vessal" / "ark" / "shell" / "hull" / "hull_init_mixin.py"
+    / "src" / "vessal" / "hull" / "hull_init_mixin.py"
 )
 
 
@@ -31,7 +31,7 @@ def test_hull_skills_absent_from_ns_when_not_configured(tmp_path, monkeypatch):
     (tmp_path / "hull.toml").write_text(
         "[hull]\nskills = []\n", encoding="utf-8"
     )
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     hull = Hull(str(tmp_path))
     assert "skill_manager" not in hull._main_cell.L, \
         "'skill_manager' should not be pre-injected; it must come from [hull].skills config"

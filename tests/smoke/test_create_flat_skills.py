@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+from vessal.shell.cli.project_scaffold import write_project_scaffold
 
 
 def test_create_writes_flat_skills_layout(tmp_path: Path):
@@ -54,7 +54,7 @@ def test_pth_file_written_with_install_venv(tmp_path: Path):
     venv = project / ".venv"
     subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
 
-    from vessal.ark.shell.cli.project_scaffold import _write_user_skills_pth
+    from vessal.shell.cli.project_scaffold import _write_user_skills_pth
     _write_user_skills_pth(project)
 
     bin_dir = "Scripts" if sys.platform == "win32" else "bin"

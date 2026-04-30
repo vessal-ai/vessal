@@ -13,8 +13,8 @@ from __future__ import annotations
 import cloudpickle
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
+from vessal.cell.kernel import Kernel
+from vessal.cell.kernel.lenient import UnresolvedRef
 from tests.unit.kernel._ping_helpers import _ns, _exec, minimal_kernel
 
 
