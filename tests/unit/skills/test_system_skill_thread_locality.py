@@ -10,7 +10,7 @@ def test_signal_update_callable_from_non_construction_thread(tmp_path: Path):
 
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "vessal.skills.system", "System", ""),
     ])
     kernel = Kernel(boot_script=script, db_path=str(db))
     sys_skill = kernel.G["_system"]
@@ -36,7 +36,7 @@ def test_signal_update_no_db_does_not_crash(tmp_path: Path):
     from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
 
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "vessal.skills.system", "System", ""),
     ])
     kernel = Kernel(boot_script=script, db_path=None)
     sys_skill = kernel.G["_system"]
