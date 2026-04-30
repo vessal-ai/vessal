@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, Union
 
 FRAME_SCHEMA_VERSION = 8
@@ -472,10 +472,19 @@ class StepResult:
 
 
 
+@dataclass(frozen=True)
+class LLMConfig:
+    api_key: str
+    base_url: str
+    model: str
+    api_params: dict[str, Any] = field(default_factory=dict)
+
+
 __all__ = [
     "FRAME_SCHEMA_VERSION",
     "Action", "State",
     "Ping", "Pong", "Observation", "FrameRecord", "StepResult",
     "Verdict", "VerdictFailure",
     "FrameContent", "SummaryContent", "Entry", "FrameStream",
+    "LLMConfig",
 ]
