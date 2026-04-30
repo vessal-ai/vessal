@@ -17,7 +17,7 @@ def skill_env(tmp_path, monkeypatch):
     skill_dir = skills_dir / "test_skill"
     skill_dir.mkdir()
     (skill_dir / "__init__.py").write_text(
-        "from .skill import TestSkill as Skill\n__all__ = ['Skill']\n"
+        "from .skill import TestSkill\n__all__ = ['TestSkill']\n"
     )
     (skill_dir / "skill.py").write_text(
         "from vessal.skills._base import BaseSkill\n"
