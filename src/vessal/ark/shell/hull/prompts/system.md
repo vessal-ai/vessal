@@ -251,16 +251,17 @@ The input you receive each frame consists of three sections:
 
 **System prompt** — your identity definition and behavioral rules. Hull loads this from SOUL.md and writes it to `_system_prompt`.
 
-**Frame stream (══════ Frame Stream ══════)** — the complete record of the most recent frames. Each frame contains:
-- `[wake]` — why this frame was woken (user_request / compression / etc.)
-- `[task]` — current task path (breadcrumb)
-- `[think]` — your reasoning process (shown when non-empty)
+**Frame stream** — the complete record of the most recent frames. Each layer-0 frame is delimited by `── frame N ──` and contains these fields, each shown only when non-empty:
+- `[think]` — your reasoning process
 - `[operation]` — the action code you wrote
-- `[expect]` — the assertions you wrote (shown when non-empty)
-- `[stdout]` — execution output (shown when non-empty)
-- `[diff]` — namespace changes (shown when non-empty)
-- `[error]` — execution exception (shown when there is an error)
-- `[verdict]` — assertion verification results (shown when expect is present)
+- `[expect]` — the assertions you wrote
+- `[stdout]` — execution stdout
+- `[stderr]` — execution stderr
+- `[diff]` — namespace changes
+- `[error]` — execution exception (a single line: type and message)
+- `[verdict]` — assertion verification results (shown only when expect was present)
+
+Wake reason and task path are not frame fields — they appear in the auxiliary signals section.
 
 This is your short-term memory — you can see what you did in the past and what the results were.
 The oldest frames are mechanically compressed when space runs low (long lines truncated; no frames are dropped).
