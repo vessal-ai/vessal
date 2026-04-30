@@ -66,3 +66,19 @@ def test_pth_file_written_with_install_venv(tmp_path: Path):
     pth = Path(out) / "vessal_user_skills.pth"
     assert pth.exists(), f"{pth} not written"
     assert pth.read_text().strip() == str(project.resolve())
+
+
+def test_skills_registry_re_exports_bundled_skills(tmp_path: Path):
+    project = tmp_path / "my_agent"
+    write_project_scaffold(project, install_venv=False)
+    text = (project / "skills" / "__init__.py").read_text(encoding="utf-8")
+    for line in (
+        "from .chat import Chat",
+        "from .heartbeat import Heartbeat",
+        "from .pin import Pin",
+        "from .skill_manager import SkillManager",
+        "from .system import System",
+        "from .tasks import Tasks",
+        "from .compaction import Compaction",
+    ):
+        assert line in text, f"missing registry line: {line}"

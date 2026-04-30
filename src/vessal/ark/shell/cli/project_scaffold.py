@@ -23,16 +23,13 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
 
     skills_dir = project_dir / "skills"
     skills_dir.mkdir(parents=True, exist_ok=True)
-    (skills_dir / "__init__.py").write_text(
-        '"""Project Skills package — populated by `vessal create` from vessal.skills.*."""\n',
-        encoding="utf-8",
-    )
 
     builtin_skills_src = Path(__file__).resolve().parent.parent.parent.parent / "skills"
+    copied: list[str] = []
     if builtin_skills_src.exists():
         for child in builtin_skills_src.iterdir():
             if not child.is_dir():
-                continue  # Skip _base.py and __init__.py — library code stays in vessal package
+                continue
             if child.name.startswith("_") or child.name == "__pycache__":
                 continue
             shutil.copytree(
@@ -40,6 +37,10 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
                 str(skills_dir / child.name),
                 ignore=shutil.ignore_patterns("__pycache__"),
             )
+            copied.append(child.name)
+
+    from vessal.ark.shell.cli.skills_init_writer import write_initial
+    write_initial(skills_dir, copied)
 
     _write_hull_toml(project_dir, project_name)
     _write_soul_md(project_dir, project_name)
