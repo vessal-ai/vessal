@@ -6,7 +6,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-CELL_ROOT = Path(__file__).resolve().parents[3] / "src/vessal/ark/shell/hull/cell"
+CELL_ROOT = Path(__file__).resolve().parents[3] / "src/vessal/cell"
 
 FORBIDDEN_IMPORTS = {
     "vessal.util.logging",      # A1 — use TracerLike Protocol instead
