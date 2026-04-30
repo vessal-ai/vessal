@@ -123,11 +123,13 @@ def _cmd_skill_check(args: argparse.Namespace) -> None:
             module = importlib.import_module(name)
             ok("Module imported successfully")
 
-            skill_cls = getattr(module, "Skill", None)
+            from vessal.ark.shell.hull.skill_loader import _camel
+            expected_cls_name = _camel(name)
+            skill_cls = getattr(module, expected_cls_name, None)
             if skill_cls is None:
-                fail("__init__.py does not export 'Skill' (should be: from .skill import XxxClass as Skill)")
+                fail(f"__init__.py does not export class '{expected_cls_name}' (should be: from .skill import {expected_cls_name})")
             else:
-                ok("Exports 'Skill'")
+                ok(f"Exports '{expected_cls_name}'")
                 from vessal.skills._base import BaseSkill
                 if issubclass(skill_cls, BaseSkill):
                     ok(f"Skill inherits BaseSkill: {skill_cls.__name__}")

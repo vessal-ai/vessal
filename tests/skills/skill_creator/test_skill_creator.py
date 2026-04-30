@@ -49,8 +49,8 @@ def test_create_class_name_camelcase(creator, skills_dir):
 def test_create_init_exports_skill(creator, skills_dir):
     creator.create("code_review")
     init_content = (skills_dir / "code_review" / "__init__.py").read_text()
-    assert "from .skill import" in init_content
-    assert "as Skill" in init_content
+    assert "from .skill import CodeReview" in init_content
+    assert '__all__ = ["CodeReview"]' in init_content
 
 
 def test_create_duplicate_fails(creator, skills_dir):

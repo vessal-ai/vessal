@@ -278,9 +278,8 @@ class TestSkillCreate:
         """Generated __init__.py imports Skill class from skill.py and exports __all__."""
         base = self._scaffold(tmp_path)
         content = (base / "__init__.py").read_text(encoding="utf-8")
-        assert "from .skill import" in content
-        assert "as Skill" in content
-        assert '__all__ = ["Skill"]' in content
+        assert "from .skill import MySkill" in content
+        assert '__all__ = ["MySkill"]' in content
         assert "__guide__" not in content
         assert "from pathlib import Path" not in content
 
@@ -301,7 +300,7 @@ class TestSkillCreate:
         content = (base / "skill.py").read_text(encoding="utf-8")
         assert "class MyCoolSkill(BaseSkill)" in content
         init_content = (base / "__init__.py").read_text(encoding="utf-8")
-        assert "from .skill import MyCoolSkill as Skill" in init_content
+        assert "from .skill import MyCoolSkill" in init_content
 
     def test_skill_init_skill_md_has_frontmatter(self, tmp_path):
         """Generated SKILL.md contains v1 YAML frontmatter with required fields."""
@@ -355,7 +354,7 @@ class TestSkillCheck:
         skill_dir.mkdir()
         class_name = "".join(part.capitalize() for part in name.split("_"))
         (skill_dir / "__init__.py").write_text(
-            f'"""{name}"""\nfrom .skill import {class_name} as Skill\n__all__ = ["Skill"]\n',
+            f'"""{name}"""\nfrom .skill import {class_name}\n__all__ = ["{class_name}"]\n',
             encoding="utf-8",
         )
         (skill_dir / "skill.py").write_text(
@@ -448,7 +447,7 @@ class TestSkillCheck:
         skill_dir = tmp_path / "bad_skill"
         skill_dir.mkdir()
         (skill_dir / "__init__.py").write_text(
-            'from .skill import BadSkill as Skill\n__all__ = ["Skill"]\n',
+            'from .skill import BadSkill\n__all__ = ["BadSkill"]\n',
             encoding="utf-8",
         )
         (skill_dir / "skill.py").write_text(
