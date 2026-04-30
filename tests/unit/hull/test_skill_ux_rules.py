@@ -16,11 +16,16 @@ FORBIDDEN_IN_SIGNAL = [
 ]
 
 
+def _skill_cls(mod, skill_name: str):
+    cls_name = "".join(p.capitalize() for p in skill_name.split("_") if p)
+    return getattr(mod, cls_name)
+
+
 @pytest.mark.parametrize("skill_name", BUILTIN_SKILLS)
 def test_description_max_15_chars(skill_name):
     """Each built-in Skill's description must not exceed 15 characters."""
     mod = importlib.import_module(f"vessal.skills.{skill_name}")
-    cls = mod.Skill
+    cls = _skill_cls(mod, skill_name)
     assert len(cls.description) <= 30, (
         f"{skill_name}.description = {cls.description!r} ({len(cls.description)} chars, exceeds 30)"
     )
@@ -30,7 +35,7 @@ def test_description_max_15_chars(skill_name):
 def test_signal_no_method_names(skill_name):
     """signal_update() output (if any) must not contain method names."""
     mod = importlib.import_module(f"vessal.skills.{skill_name}")
-    cls = mod.Skill
+    cls = _skill_cls(mod, skill_name)
     instance = cls()
     instance.signal_update()
     if not instance.signal:

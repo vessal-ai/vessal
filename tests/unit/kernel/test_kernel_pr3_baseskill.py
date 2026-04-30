@@ -33,11 +33,11 @@ def test_baseskill_requires_signal_dict_and_signal_update():
 
 
 def test_systemskill_in_G_after_init():
-    from vessal.skills.system.skill import SystemSkill
+    from skills.system.skill import System
 
     k = minimal_kernel()
     assert "_system" in k.G
-    assert isinstance(k.G["_system"], SystemSkill)
+    assert isinstance(k.G["_system"], System)
 
 
 def test_signals_dict_uses_triple_key():
@@ -57,7 +57,7 @@ def test_signals_dict_uses_triple_key():
     assert ("FooSkill", "foo", "L") in signals
     assert signals[("FooSkill", "foo", "L")] == {"hello": "world"}
     # _system always present in G
-    assert ("SystemSkill", "_system", "G") in signals
+    assert ("System", "_system", "G") in signals
 
 
 def test_signals_lebg_shadow_L_over_G():
@@ -100,7 +100,7 @@ def test_signal_update_exception_isolates_to_error_id():
     payload = signals[("Boom", "boom", "L")]
     assert "_error_id" in payload
     # _system signal still present — one Skill failure must not block others
-    assert ("SystemSkill", "_system", "G") in signals
+    assert ("System", "_system", "G") in signals
 
 
 def test_no_signal_outputs_key_anymore():
@@ -117,7 +117,7 @@ def test_systemskill_wake_propagates_to_signal():
     k = minimal_kernel()
     k.G["_system"].wake("user_message")
     signals = _scan(k)
-    payload = signals[("SystemSkill", "_system", "G")]
+    payload = signals[("System", "_system", "G")]
     assert payload.get("wake_reason") == "user_message"
 
 
@@ -126,7 +126,7 @@ def test_systemskill_carries_frame():
     k.L["_frame"] = 7
 
     signals = _scan(k)
-    payload = signals[("SystemSkill", "_system", "G")]
+    payload = signals[("System", "_system", "G")]
     assert payload["frame"] == 7
 
 

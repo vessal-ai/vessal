@@ -8,7 +8,7 @@ from vessal.ark.shell.hull.event_loop import EventLoop
 
 @pytest.fixture
 def mock_cell():
-    from vessal.skills.system.skill import SystemSkill
+    from vessal.skills.system.skill import System
 
     class _FakeKernel:
         def __init__(self):
@@ -18,7 +18,7 @@ def mock_cell():
             }
 
     fk = _FakeKernel()
-    sys_skill = SystemSkill()
+    sys_skill = System()
     sys_skill._bind_kernel(fk)
     cell = MagicMock()
     cell.L = fk.L
@@ -195,6 +195,7 @@ def test_frame_loop_breaks_on_protocol_error(mock_cell, mock_compaction_cell):
         call_count += 1
         return StepResult(protocol_error="BadRequestError: test")
 
+    mock_cell.G["_system"]._sleeping = False
     mock_cell.step = fake_step
     loop = _make_loop(mock_cell, mock_compaction_cell, max_frames_per_wake=10)
     loop._frame_loop()

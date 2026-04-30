@@ -27,6 +27,10 @@ class SkillCreator(BaseSkill):
         if base.exists():
             return f"Creation failed: {name} already exists at {base}"
         write_skill_scaffold(base, name)
+
+        from vessal.ark.shell.cli.skills_init_writer import add as _register
+        _register(target_dir, name)
+
         return (
             f"Created {name} at {base}. "
             f"Edit {base}/skill.py and {base}/SKILL.md, "

@@ -113,10 +113,10 @@ def test_hull_imports_no_shell():
 def test_ark_imports_no_skills():
     """ARK does not import Skills.
 
-    Exception 1: Kernel imports vessal.skills.system (SystemSkill) and vessal.skills._base
+    Exception 1: Kernel imports vessal.skills.system (System) and vessal.skills._base
     (BaseSkill) for the G["_system"] bootstrap and _signal_scan. This is the single
     intentional downward seam defined by spec §6.2: Kernel is the assembly point that
-    binds the SystemSkill carrier to the execution engine.
+    binds the System carrier to the execution engine.
 
     Exception 2: skill_cmds.py (CLI validator) imports vessal.skills._base to verify that
     user-provided Skills subclass BaseSkill. This is a validation seam: the CLI tool must

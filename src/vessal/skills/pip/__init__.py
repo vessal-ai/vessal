@@ -1,4 +1,4 @@
 """pip — Python package installer."""
-from .skill import Pip as Skill
+from .skill import Pip
 
-__all__ = ["Skill"]
+__all__ = ["Pip"]

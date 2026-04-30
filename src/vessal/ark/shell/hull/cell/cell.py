@@ -91,12 +91,12 @@ class Cell:
 
         if boot_script is None:
             # WART: standalone Cell construction (no Hull, no project) — falls back to
-            # the vessal package's SystemSkill. This bypasses the "runtime imports only
+            # the vessal package's System skill. This bypasses the "runtime imports only
             # from <project>/skills/" rule because there is no project here. Used only
             # by unit tests that construct Cell in isolation. Revisit if Cell ever gets
             # a true project-less mode.
             boot_script = compose_boot_script([
-                BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+                BootSkillEntry("_system", "System"),
             ])
 
         self._kernel = Kernel(boot_script=boot_script, db_path=db_path, restore_path=restore_path)

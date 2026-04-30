@@ -1,4 +1,3 @@
-"""Compaction Skill — preset Skill of the compaction Cell."""
-from ._skill import CompactionSkill as Skill
-
-__all__ = ["Skill"]
+"""compaction — preset Skill of the compaction Cell."""
+from ._skill import Compaction
+__all__ = ["Compaction"]

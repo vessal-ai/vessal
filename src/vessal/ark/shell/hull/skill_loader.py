@@ -9,6 +9,11 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def _camel(snake: str) -> str:
+    """Convert snake_case folder name to PascalCase: skill_manager -> SkillManager."""
+    return "".join(part.capitalize() for part in snake.split("_") if part)
+
+
 def _install_packages(packages: list[str]) -> None:
     """Install packages via pip and refresh the import cache."""
     import subprocess
@@ -151,11 +156,13 @@ class SkillLoader:
         except Exception as e:
             raise RuntimeError(f"load({name!r}) failed: {e}") from e
 
-        skill_cls = getattr(module, "Skill", None)
+        cls_name = _camel(name)
+        skill_cls = getattr(module, cls_name, None)
         if skill_cls is None:
             raise RuntimeError(
-                f"Skill {name!r} __init__.py does not export 'Skill' "
-                f"(use `from .skill import XxxClass as Skill`)"
+                f"Skill {name!r} module does not export class {cls_name!r}. "
+                f"Convention: folder `{name}` exports class `{cls_name}` from "
+                f"its __init__.py."
             )
 
         if body:

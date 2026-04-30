@@ -24,8 +24,8 @@ def write_skill_scaffold(
 
     (base / "__init__.py").write_text(
         f'"""{skill_name} — {_DEFAULT_DESCRIPTION}"""\n'
-        f'from .skill import {class_name} as Skill\n\n'
-        f'__all__ = ["Skill"]\n',
+        f'from .skill import {class_name}\n\n'
+        f'__all__ = ["{class_name}"]\n',
         encoding="utf-8",
     )
 

@@ -8,7 +8,7 @@ Responsible for:
 - Single entry point: ping(pong, namespace) → Ping (no exec when pong=None; exec+commit+render when pong=Pong)
 - Operation code execution (→ executor.py)
 - expect assertion evaluation (→ expect.py)
-- Signal collection (BaseSkill instances + SystemSkill + dict aggregation to L["signals"])
+- Signal collection (BaseSkill instances + System + dict aggregation to L["signals"])
 - Rendering namespace to Ping (→ render/renderer.py)
 
 Not responsible for:

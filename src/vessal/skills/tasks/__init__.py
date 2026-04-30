@@ -1,4 +1,4 @@
 """tasks — hierarchical task management Skill."""
-from .skill import Tasks as Skill
+from .skill import Tasks
 
-__all__ = ["Skill"]
+__all__ = ["Tasks"]

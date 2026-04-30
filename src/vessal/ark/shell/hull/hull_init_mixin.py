@@ -101,18 +101,18 @@ class HullInitMixin:
         Runs BEFORE _init_cell so the boot script is ready for Cell construction.
         """
         from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
-        from vessal.ark.shell.hull.skill_loader import SkillLoader
+        from vessal.ark.shell.hull.skill_loader import SkillLoader, _camel
 
         self._skill_manager = SkillLoader()
 
-        entries = [BootSkillEntry("_system", "skills.system", "Skill", "")]
+        entries = [BootSkillEntry("_system", "System")]
         for skill_name in hull_cfg.get("skills", []):
             try:
                 self._skill_manager.load(skill_name)  # validates + registers; class discarded
             except Exception as e:
                 print(f"[error] skill '{skill_name}' failed to register: {e}")
                 continue
-            entries.append(BootSkillEntry(skill_name, f"skills.{skill_name}", "Skill", ""))
+            entries.append(BootSkillEntry(skill_name, _camel(skill_name)))
         return entries
 
     def _init_cell(
@@ -381,18 +381,9 @@ trace = false  # disable to reduce IO
                 logger.warning("Failed to load gates/%s.py: %s", gate_type, e)
 
     def _compaction_preset_entries(self, main_db_path: str):
-        """Boot Skill entries for the compaction Cell — _system + CompactionSkill."""
+        """Boot Skill entries for the compaction Cell — _system + Compaction."""
         from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
         return [
-            BootSkillEntry(
-                var_name="_system",
-                import_path="skills.system.skill",  # avoids class_name collision with compaction
-                class_name="SystemSkill",
-            ),
-            BootSkillEntry(
-                var_name="compaction",
-                import_path="skills.compaction._skill",
-                class_name="CompactionSkill",
-                kwargs_repr=f"main_db_path={main_db_path!r}",
-            ),
+            BootSkillEntry("_system", "System"),
+            BootSkillEntry("compaction", "Compaction", f"main_db_path={main_db_path!r}"),
         ]

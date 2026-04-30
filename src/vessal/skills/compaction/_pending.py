@@ -1,5 +1,5 @@
 """PendingView / PendingGroup — the read-side data shape returned by
-CompactionSkill.read_pending(). See docs/architecture/cell/06-compaction.md §6.3."""
+Compaction.read_pending(). See docs/architecture/cell/06-compaction.md §6.3."""
 
 from __future__ import annotations
 

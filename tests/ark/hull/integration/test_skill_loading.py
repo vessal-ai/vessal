@@ -17,7 +17,7 @@ def skill_env(tmp_path, monkeypatch):
     skill_dir = skills_dir / "test_skill"
     skill_dir.mkdir()
     (skill_dir / "__init__.py").write_text(
-        "from .skill import TestSkill as Skill\n__all__ = ['Skill']\n"
+        "from .skill import TestSkill\n__all__ = ['TestSkill']\n"
     )
     (skill_dir / "skill.py").write_text(
         "from vessal.skills._base import BaseSkill\n"
@@ -31,7 +31,9 @@ def skill_env(tmp_path, monkeypatch):
         "---\nname: test_skill\ndescription: Test skill.\n---\nTest guide body.\n"
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    sys.modules.pop("skills", None)
+    for mod in list(sys.modules):
+        if mod == "skills" or mod.startswith("skills."):
+            monkeypatch.delitem(sys.modules, mod, raising=False)
     return tmp_path
 
 

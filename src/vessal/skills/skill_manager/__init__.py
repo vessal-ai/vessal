@@ -1,4 +1,4 @@
 """skill_manager — Skill inventory, hot-load/unload, and SkillHub search."""
-from .skill import SkillManager as Skill
+from .skill import SkillManager
 
-__all__ = ["Skill"]
+__all__ = ["SkillManager"]

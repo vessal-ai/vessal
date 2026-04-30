@@ -1,4 +1,4 @@
 """pin — variable pinned-observation Skill."""
-from .skill import Pin as Skill
+from .skill import Pin
 
-__all__ = ["Skill"]
+__all__ = ["Pin"]

@@ -21,7 +21,6 @@ def hull_from_scaffold(tmp_path, monkeypatch):
     skill_name = "smoketest"
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir(parents=True, exist_ok=True)
-    (skills_dir / "__init__.py").write_text("", encoding="utf-8")
 
     # Copy built-in skills required by Hull boot script into the project skills/ dir.
     for builtin in ("system", "compaction"):
@@ -34,6 +33,9 @@ def hull_from_scaffold(tmp_path, monkeypatch):
     skill_pkg = skills_dir / skill_name
     skill_pkg.mkdir(parents=True)
     write_skill_scaffold(skill_pkg, skill_name)
+
+    from vessal.ark.shell.cli.skills_init_writer import write_initial
+    write_initial(skills_dir, ["system", "compaction", skill_name])
 
     (tmp_path / "hull.toml").write_text(
         f'[hull]\n'
@@ -57,6 +59,7 @@ def hull_from_scaffold(tmp_path, monkeypatch):
 
 def test_scaffold_module_imports(tmp_path):
     skill_name = "demo_import"
+    class_name = "DemoImport"
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()
     (skills_dir / "__init__.py").write_text("", encoding="utf-8")
@@ -69,9 +72,9 @@ def test_scaffold_module_imports(tmp_path):
         sys.modules.pop("skills", None)
         sys.modules.pop(f"skills.{skill_name}", None)
         mod = importlib.import_module(f"skills.{skill_name}")
-        assert hasattr(mod, "Skill")
+        assert hasattr(mod, class_name)
         from vessal.skills._base import BaseSkill
-        assert issubclass(mod.Skill, BaseSkill)
+        assert issubclass(getattr(mod, class_name), BaseSkill)
     finally:
         sys.path.remove(str(tmp_path))
         sys.modules.pop("skills", None)
@@ -91,6 +94,7 @@ def test_hull_loads_scaffolded_skill(hull_from_scaffold):
 def test_scaffolded_skill_accepts_ns_kwarg(tmp_path):
     import inspect
     skill_name = "demo_sig"
+    class_name = "DemoSig"
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()
     (skills_dir / "__init__.py").write_text("", encoding="utf-8")
@@ -103,7 +107,8 @@ def test_scaffolded_skill_accepts_ns_kwarg(tmp_path):
         sys.modules.pop("skills", None)
         sys.modules.pop(f"skills.{skill_name}", None)
         mod = importlib.import_module(f"skills.{skill_name}")
-        sig = inspect.signature(mod.Skill.__init__)
+        skill_cls = getattr(mod, class_name)
+        sig = inspect.signature(skill_cls.__init__)
         assert "ns" in sig.parameters, f"expected ns parameter in scaffold __init__: {sig}"
         assert sig.parameters["ns"].default is None
     finally:

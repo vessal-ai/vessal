@@ -1,4 +1,4 @@
 """heartbeat — periodic heartbeat wake-up Skill."""
-from .skill import Heartbeat as Skill
+from .skill import Heartbeat
 
-__all__ = ["Skill"]
+__all__ = ["Heartbeat"]
