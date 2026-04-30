@@ -68,7 +68,7 @@ def test_kernel_exposes_db_path(tmp_path: Path):
 
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "System"),
     ])
     kernel = Kernel(boot_script=script, db_path=str(db))
 
@@ -80,7 +80,7 @@ def test_kernel_db_path_is_none_when_no_db(tmp_path: Path):
     from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
 
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "System"),
     ])
     kernel = Kernel(boot_script=script, db_path=None)
 

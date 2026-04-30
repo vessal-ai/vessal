@@ -17,24 +17,24 @@ from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkil
 
 def test_compose_boot_script_emits_imports_and_zero_arg_constructors():
     entries = [
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
-        BootSkillEntry("chat", "vessal.skills.chat", "Chat", ""),
+        BootSkillEntry("_system", "System"),
+        BootSkillEntry("chat", "Chat"),
     ]
     script = compose_boot_script(entries)
     # Standard tools always present
     assert "import importlib, copy, json" in script
-    # Skill imports
-    assert "from vessal.skills.system import Skill" in script
-    assert "from vessal.skills.chat import Chat" in script
+    # Single consolidated import
+    assert "from skills import" in script and "System" in script
+    assert "from skills import" in script and "Chat" in script
     # Zero-arg construction in declared order
-    sys_idx = script.find("_system = Skill()")
+    sys_idx = script.find("_system = System()")
     chat_idx = script.find("chat = Chat()")
     assert 0 < sys_idx < chat_idx
 
 
 def test_compose_boot_script_supports_kwargs_repr():
     entries = [
-        BootSkillEntry("chat", "vessal.skills.chat", "Chat", "model=\"gpt-4\""),
+        BootSkillEntry("chat", "Chat", "model=\"gpt-4\""),
     ]
     script = compose_boot_script(entries)
     assert "chat = Chat(model=\"gpt-4\")" in script
@@ -47,7 +47,7 @@ def test_compose_boot_script_supports_kwargs_repr():
 def test_kernel_cold_start_writes_boot_frame_at_n_1(tmp_path: Path):
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "System"),
     ])
     Kernel(boot_script=script, db_path=str(db))
 
@@ -61,7 +61,7 @@ def test_kernel_cold_start_writes_boot_frame_at_n_1(tmp_path: Path):
 def test_boot_frame_pong_operation_contains_real_script(tmp_path: Path):
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "System"),
     ])
     Kernel(boot_script=script, db_path=str(db))
 
@@ -69,7 +69,7 @@ def test_boot_frame_pong_operation_contains_real_script(tmp_path: Path):
     op, expect, verdict = conn.execute(
         "SELECT pong_operation, pong_expect, verdict_value FROM frame_content WHERE n = 1"
     ).fetchone()
-    assert "from vessal.skills.system import Skill" in op
+    assert "from skills import System" in op
     assert expect == ""
     assert verdict is None
 
@@ -77,7 +77,7 @@ def test_boot_frame_pong_operation_contains_real_script(tmp_path: Path):
 def test_boot_frame_obs_stdout_captures_skill_init_prints(tmp_path: Path):
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "System"),
     ])
     Kernel(boot_script=script, db_path=str(db))
 
@@ -108,8 +108,8 @@ def test_cold_start_obs_diff_json_is_empty_list(tmp_path: Path):
 def test_preset_skills_live_in_G(tmp_path: Path):
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
-        BootSkillEntry("chat", "vessal.skills.chat", "Chat", ""),
+        BootSkillEntry("_system", "System"),
+        BootSkillEntry("chat", "Chat"),
     ])
     k = Kernel(boot_script=script, db_path=str(db))
 
@@ -130,7 +130,7 @@ def test_systemskill_bound_to_kernel_after_boot(tmp_path: Path):
     """Kernel walks G after exec; calls _bind_kernel(self) on any object that defines it."""
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "System"),
     ])
     k = Kernel(boot_script=script, db_path=str(db))
     sysskill = k.G["_system"]
@@ -147,7 +147,7 @@ def test_restart_loads_l_after_boot_script(tmp_path: Path):
     db = tmp_path / "frame_log.sqlite"
     snap = tmp_path / "snap.pkl"
     script = compose_boot_script([
-        BootSkillEntry("_system", "vessal.skills.system", "Skill", ""),
+        BootSkillEntry("_system", "System"),
     ])
 
     # Cold start, write some L state, snapshot it

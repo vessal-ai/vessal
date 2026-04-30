@@ -30,7 +30,7 @@ class TestKernelHasGAndL:
 
     def test_g_starts_with_system_skill(self):
         # PR 3 populates G["_system"] with System; boot script (PR 4) adds more.
-        from vessal.skills.system.skill import System
+        from skills.system.skill import System
         k = minimal_kernel()
         assert "_system" in k.G
         assert isinstance(k.G["_system"], System)
