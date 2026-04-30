@@ -39,8 +39,9 @@ def project_skills(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     skills_dir.mkdir()
     (skills_dir / "__init__.py").write_text("", encoding="utf-8")
     monkeypatch.syspath_prepend(str(tmp_path))
-    # Ensure no stale 'skills' package in sys.modules.
-    sys.modules.pop("skills", None)
+    for mod in list(sys.modules):
+        if mod == "skills" or mod.startswith("skills."):
+            monkeypatch.delitem(sys.modules, mod, raising=False)
     return skills_dir
 
 
@@ -140,7 +141,7 @@ def test_load_resolves_class_by_camel_case(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(str(project))
     for mod in list(sys.modules):
         if mod == "skills" or mod.startswith("skills."):
-            del sys.modules[mod]
+            monkeypatch.delitem(sys.modules, mod, raising=False)
 
     loader = SkillLoader()
     cls = loader.load("foo_bar")
@@ -157,7 +158,7 @@ def test_load_rejects_skill_with_wrong_class_name(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(str(project))
     for mod in list(sys.modules):
         if mod == "skills" or mod.startswith("skills."):
-            del sys.modules[mod]
+            monkeypatch.delitem(sys.modules, mod, raising=False)
 
     loader = SkillLoader()
     with pytest.raises(RuntimeError, match="does not export class 'Broken'"):
