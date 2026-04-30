@@ -1,31 +1,30 @@
 """core.py — LLM call pipeline: Core is the reasoning half of the Agent loop, responsible for model invocation and retries."""
+#
 #   1. Constructs OpenAI-compatible messages from Ping (system_prompt + state)
 #   2. Calls the LLM API (OpenAI-compatible interface), handles network retries
 #   3. Extracts text from the response, calls parse_response() to return a Pong
 #
-# Model compatibility design principles:
-#   - Core only fixes two parameters: model (from OPENAI_MODEL env var) and messages
-#   - All other API parameters are passed through via api_params dict to create()
-#   - Parameters required by different models/providers (temperature, max_tokens,
-#     extra_body, etc.) are injected by the caller (Cell/Hull) via config; Core
-#     does not hardcode them
+# Core is stateless wrt LLM contract:
+#   - Construction takes only network policy (timeout, max_retries).
+#   - Per-call llm_config (api_key, base_url, model, api_params) arrives via step().
+#   - openai.OpenAI() instances are cached internally by (api_key, base_url, timeout)
+#     so repeated frames with the same LLMConfig reuse the underlying connection pool.
 #
 # Network robustness:
 #   - Retryable errors (network timeout, connection drop): automatic retry with exponential backoff
 #   - Non-retryable errors (auth failure, bad request): raise immediately, no wasted retries
 #
 # Public interface:
-#   Core(timeout, max_retries, api_params)    constructor
-#   step(ping, tracer, frame) -> Pong         call LLM, return parsed Pong
+#   Core(timeout, max_retries)                           constructor, network policy only
+#   step(ping, llm_config, tracer, frame) -> Pong        per-frame LLM call
 
 import logging
-import os
 import time
 
 import openai
 
 from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
-from vessal.ark.shell.hull.cell.protocol import Ping, Pong
+from vessal.ark.shell.hull.cell.protocol import Ping, Pong, LLMConfig
 from vessal.ark.shell.hull.cell.core.retry import is_retryable_error, calculate_backoff_seconds
 from vessal.ark.shell.hull.cell.core.parser import ParseError, parse_response
 
@@ -36,56 +35,33 @@ logger = logging.getLogger("vessal.cell.core")
 class Core:
     """LLM call pipeline. Ping → LLM API → parse → Pong.
 
-    Sends the perceptual state rendered by Ping to the LLM, and parses
-    the response into a Pong (control signal).
-
-    Model compatibility: Core only fixes model and messages; all other API
-    parameters are determined entirely by api_params. When switching models
-    or providers, only api_params and environment variables need to be updated;
-    Core code itself requires no modification.
-
-    Stateless: each step() is an independent API call; no conversation history
-    is maintained and no responses are cached.
+    Stateless wrt LLM contract: each step() receives a full LLMConfig
+    (api_key, base_url, model, api_params) per call. Core holds only
+    network policy (timeout, max_retries) and a cache of openai.OpenAI
+    instances keyed by (api_key, base_url, timeout).
     """
-
-    # Default values used when api_params is not specified.
-    # Valid for most OpenAI-compatible models; if max_completion_tokens,
-    # extra_body, etc. are needed, override the entire dict via the
-    # api_params constructor argument.
-    _DEFAULT_API_PARAMS: dict[str, object] = {
-        "temperature": 0.7,
-        "max_tokens": 4096,
-    }
 
     def __init__(
         self,
+        *,
         timeout: float = 60.0,
         max_retries: int = 3,
-        api_params: dict[str, object] | None = None,
     ) -> None:
-        """Initialize Core.
-
-        Args:
-            timeout:    Request timeout in seconds, default 60. 0 means no timeout (not recommended).
-            max_retries: Maximum retry count for network errors, default 3.
-            api_params: Parameters passed through to chat.completions.create().
-                        Core only manages model and messages; everything else is
-                        determined by the caller via this dict.
-                        Default: {"temperature": 0.7, "max_tokens": 4096}.
-                        Example: {"temperature": 0.5, "max_completion_tokens": 2048,
-                                  "extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
-        """
-        self._client = openai.OpenAI(timeout=timeout)
-        self._model = os.environ.get("OPENAI_MODEL", "gpt-4o")
         self._timeout = timeout
         self._max_retries = max_retries
-        self._api_params = dict(api_params) if api_params else dict(self._DEFAULT_API_PARAMS)
+        self._client_cache: dict[tuple[str, str, float], "openai.OpenAI"] = {}
 
-    @property
-    def max_tokens(self) -> int:
-        """Token budget derived from api_params. OpenAI parameter naming stays local to Core."""
-        return self._api_params.get("max_tokens",
-                self._api_params.get("max_completion_tokens", 4096))
+    def _client_for(self, cfg: LLMConfig) -> "openai.OpenAI":
+        key = (cfg.api_key, cfg.base_url, self._timeout)
+        client = self._client_cache.get(key)
+        if client is None:
+            client = openai.OpenAI(
+                api_key=cfg.api_key,
+                base_url=cfg.base_url,
+                timeout=self._timeout,
+            )
+            self._client_cache[key] = client
+        return client
 
     @staticmethod
     def _build_messages(ping: "Ping") -> list[dict]:
@@ -95,6 +71,8 @@ class Core:
     def step(
         self,
         ping: Ping,
+        llm_config: LLMConfig,
+        *,
         tracer: TracerLike | None = None,
         frame: int = 0,
     ) -> tuple[Pong, dict]:
@@ -135,10 +113,11 @@ class Core:
                 if attempt > 0:
                     logger.info(f"Core retry attempt {attempt}/{self._max_retries}")
 
-                response = self._client.chat.completions.create(
-                    model=self._model,
+                client = self._client_for(llm_config)
+                response = client.chat.completions.create(
+                    model=llm_config.model,
                     messages=messages,
-                    **self._api_params,
+                    **llm_config.api_params,
                 )
 
                 # message.content is the model's final output text.

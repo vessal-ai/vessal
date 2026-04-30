@@ -101,10 +101,10 @@ class TestConfig:
         assert hull._main_cell.L["language"] == "zh"
 
     def test_cell_temperature_forwarded(self, tmp_path):
-        """[cell].temperature is forwarded to Core api_params."""
+        """[cell].temperature is forwarded to Cell's default_llm_config.api_params."""
         toml = "[cell]\ntemperature = 0.3"
         hull = _make_hull(tmp_path, toml_content=toml)
-        assert hull._main_cell._core._api_params["temperature"] == 0.3
+        assert hull._main_cell._default_llm_config.api_params["temperature"] == 0.3
 
     def test_max_frames_config(self, tmp_path):
         """[cell].max_frames is stored in Hull (not in Cell)."""

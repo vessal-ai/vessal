@@ -45,13 +45,13 @@ Core 无状态。不维护对话历史。不缓存响应。每次调用彼此独
 
 | 参数 | 谁定 | 从哪来 |
 |---|---|---|
-| `base_url` | 环境 | `OPENAI_BASE_URL` |
-| `api_key` | 环境 | `OPENAI_API_KEY` |
-| `model` | Core | `OPENAI_MODEL` |
+| `api_key` | Hull → LLMConfig | `.env` / `hull.toml` |
+| `base_url` | Hull → LLMConfig | `.env` / `hull.toml` |
+| `model` | Hull → LLMConfig | `.env` / `hull.toml` |
 | `messages` | Core | Composer 产出 |
-| `temperature` / `max_tokens` / ... | Cell | llm_config |
+| `temperature` / `max_tokens` / ... | Hull → LLMConfig | `hull.toml [core.api_params]` |
 
-连接走环境变量，推理参数走 llm_config。换 Provider → 改 env；换参数 → 改 llm_config；Core 代码永不触。
+全部 LLM 调用参数走 LLMConfig，逐帧灌入 `core.step(ping, llm_config)`。Core 不读 os.environ，不持有启动期 LLM 状态。换 Provider → Hull 改 LLMConfig；Core 代码永不触。
 
 **分工不侵入**：Kernel 负责代码运行与命名空间；Core 负责与大模型相关的一切操作。字符串化是协议层的事，归 Core。
 
@@ -95,7 +95,7 @@ scope（"G"/"L"）不出现在渲染里，只是聚合键的去重维度。
 
 ## api_call
 
-薄到极致。一行 `self._client.chat.completions.create(model=..., messages=..., **llm_config)`。不做参数预处理、不做响应解析、不做缓存、不做日志、不做流式。
+薄到极致。一行 `client.chat.completions.create(model=llm_config.model, messages=..., **llm_config.api_params)`。client 从 `_client_cache` 按 `(api_key, base_url, timeout)` 查找或懒创建。不做参数预处理、不做响应解析、不做缓存、不做日志、不做流式。
 
 usage（`resp.usage`）由 Core 作为 `usage: dict` 返给 Cell，Cell 写 JSONL。Core 自己不碰文件系统。
 
@@ -206,7 +206,7 @@ Core 不发明。借生态现成工具：
 
 - 对外只有一个原语 `pong(ping, llm_config) → Pong`。
 - Core 无状态。每次调用独立。
-- `base_url` / `api_key` 从环境变量走 OpenAI SDK；`model` 来自 `OPENAI_MODEL`；`messages` 由 Composer 产出；其余参数由 `llm_config` 注入。
+- `api_key` / `base_url` / `model` / `api_params` 全部走 LLMConfig，逐帧传入 `core.step(ping, llm_config)`。Core 不读 os.environ。`messages` 由 Composer 产出。
 - Composer 三区顺序不变：system_prompt / frame_stream / signals。
 - signals 二级分区：`(class_name, var_name)` → 子项。分隔符 `══════` / `── ──`。
 - scope 不出现在渲染里，只是聚合键的去重维度。

@@ -62,7 +62,7 @@ def test_frame_number_passed_to_core_equals_ns_frame_plus_one():
     pong = _fixed_pong("pass")
     received_frames: list[int] = []
 
-    def _capture_frame(ping, tracer, frame):
+    def _capture_frame(ping, llm_config, *, tracer, frame):
         received_frames.append(frame)
         return (pong, {})
 

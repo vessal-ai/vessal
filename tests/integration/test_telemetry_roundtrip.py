@@ -28,8 +28,10 @@ def _stub_usage(frame_index: int):
 @pytest.fixture
 def cell_with_data_dir(tmp_path):
     from unittest.mock import patch
+    from vessal.ark.shell.hull.cell.protocol import LLMConfig
+    cfg = LLMConfig(api_key="k", base_url="u", model="m", api_params={})
     with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
-        cell = Cell(data_dir=str(tmp_path))
+        cell = Cell(data_dir=str(tmp_path), default_llm_config=cfg)
     return cell, tmp_path
 
 
@@ -38,7 +40,7 @@ def test_four_frame_loop_writes_four_jsonl_records(cell_with_data_dir):
 
     call_idx = {"n": 0}
 
-    def stubbed_step(ping, tracer=None, frame=0):
+    def stubbed_step(ping, llm_config, *, tracer=None, frame=0):
         i = call_idx["n"]
         call_idx["n"] += 1
         return _stub_pong(f"step_{i} = {i}"), _stub_usage(i)
@@ -69,7 +71,7 @@ def test_no_jsonl_record_when_action_gate_blocks(cell_with_data_dir):
     cell.action_gate = "safe"
     cell.set_gate("action", lambda code: (False, "denied"))
 
-    cell._core.step = MagicMock(return_value=(_stub_pong(), _stub_usage(0)))
+    cell._core.step = MagicMock(return_value=(_stub_pong(), _stub_usage(0)))  # MagicMock accepts any args
     result = cell.step()
 
     jsonl_path = data_dir / "cache_metrics.jsonl"
