@@ -119,10 +119,10 @@ def test_preset_skills_live_in_G(tmp_path: Path):
     assert "chat" not in k.L
 
 
-def test_systemskill_zero_arg_construction():
-    """Spec §7.4 example: `_system = SystemSkill()` — no arguments."""
-    from vessal.skills.system.skill import SystemSkill
-    s = SystemSkill()
+def test_system_zero_arg_construction():
+    """Spec §7.4 example: `_system = System()` — no arguments."""
+    from vessal.skills.system.skill import System
+    s = System()
     assert isinstance(s.signal, dict)
 
 
