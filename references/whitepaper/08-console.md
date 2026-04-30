@@ -218,12 +218,12 @@ The Console is the rot-prone layer in this codebase's history. The anti-rot rule
 
 ## 8.6 Evolution and the Current Migration
 
-The Console layer's current state (as of the `20260418-console-dataflow-redesign` issue) contains residual rot from before this chapter was written: `ark/util/logging/viewer.html` still exists, `console_spa` hard-codes several views that should be Skill-provided, and one contract violation (the `?after=` drop in the chat outbox call) actively breaks user interaction. The migration path sanctioned by this chapter is:
+The Console layer's current state (as of the `20260418-console-dataflow-redesign` issue) contains residual rot from before this chapter was written: `util/logging/viewer.html` still exists, `console` hard-codes several views that should be Skill-provided, and one contract violation (the `?after=` drop in the chat outbox call) actively breaks user interaction. The migration path sanctioned by this chapter is:
 
 1. **Define the contract** — this chapter.
 2. **Strip the Launcher** — remove hard-coded `chat`, `state`, `logs`, `market` views; retain only top-nav + base signals + frames.
 3. **Rewrite the frames view as a reactive component** — compatible with the Launcher's template lifecycle (no imperative DOM insertions into subtrees that can be torn down).
-4. **Migrate chat to its Skill UI** — delete the `console_spa` chat implementation; mount `skills/chat/ui/` via iframe.
+4. **Migrate chat to its Skill UI** — delete the `console` chat implementation; mount `skills/chat/ui/` via iframe.
 5. **Create the skills management UI** — originally labelled "market" in the Launcher; it is replaced by a Skill-provided UI whose tab label is the Skill's own name.
 6. **Retire viewer.html and the `/logs` route** — together, in the same PR, with the frames view handling both roles.
 

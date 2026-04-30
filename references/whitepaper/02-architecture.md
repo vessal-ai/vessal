@@ -52,7 +52,7 @@ What Cell does not do: know about events, know about scheduling, know how many f
 
 Cell has no registration interface for tools or signals. Hull writes objects into the namespace via `cell.set()`, and the Kernel discovers their capabilities automatically through duck-typing (checking attribute names rather than inheritance). Cell has no concept of what a Skill is — it only knows the objects in the namespace.
 
-**Cell tracing boundary.** Cell does not import `vessal.ark.util.logging`. Tracing is received via the `TracerLike` Protocol defined inside Cell (`src/vessal/ark/shell/hull/cell/_tracer_protocol.py`). Hull is free to import the concrete `Tracer` and pass it in. This boundary is enforced because Cell is a leaf — it must not depend on any outer layer. A Protocol eliminates the import without losing type safety.
+**Cell tracing boundary.** Cell does not import `vessal.util.logging`. Tracing is received via the `TracerLike` Protocol defined inside Cell (`src/vessal/cell/_tracer_protocol.py`). Hull is free to import the concrete `Tracer` and pass it in. This boundary is enforced because Cell is a leaf — it must not depend on any outer layer. A Protocol eliminates the import without losing type safety.
 
 ```mermaid
 flowchart LR
