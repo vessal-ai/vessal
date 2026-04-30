@@ -9,7 +9,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from vessal.ark.shell.hull.event_loop import EventLoop
-from vessal.skills.system import SystemSkill
+from vessal.skills.system.skill import SystemSkill
 
 
 def _make_stub_cell(responses=None) -> MagicMock:

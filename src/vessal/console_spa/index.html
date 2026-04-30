@@ -28,6 +28,7 @@
                   :class="{active: current === v.id}"
                   @click="current = v.id"
                   :title="v.label"
+                  :data-skill-tab="v.id.startsWith('skill:') ? v.id.slice(6) : null"
                   x-text="v.icon"></button>
         </template>
       </nav>

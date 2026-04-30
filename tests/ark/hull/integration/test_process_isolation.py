@@ -16,13 +16,17 @@ Environment requirements:
 """
 from __future__ import annotations
 
+import os
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 import pytest
 
 from vessal.ark.shell.server import ShellServer
+
+_VESSAL_SRC = str(Path(__file__).resolve().parents[4] / "src" / "vessal")
 
 
 # ------------------------------------------------------------------ fixtures
@@ -43,7 +47,6 @@ def agent_project(tmp_path):
         'name = "test"\n'
         "[hull]\n"
         "skills = []\n"
-        "skill_paths = []\n"
         "[cell]\n"
         "[core]\n"
         "[core.api_params]\n"
@@ -65,7 +68,7 @@ def agent_project(tmp_path):
 # ------------------------------------------------------------------ tests
 
 
-def test_hull_crash_does_not_kill_shell(agent_project):
+def test_hull_crash_does_not_kill_shell(agent_project, monkeypatch):
     """Shell remains alive and returns 503 to requests after Hull subprocess crashes.
 
     Steps:
@@ -76,6 +79,10 @@ def test_hull_crash_does_not_kill_shell(agent_project):
         5. Wait for the monitor thread to detect the crash (_hull_alive → False)
         6. Verify the Shell HTTP service still responds, returning 503
     """
+    pythonpath = os.pathsep.join(
+        [str(agent_project), _VESSAL_SRC, os.environ.get("PYTHONPATH", "")]
+    )
+    monkeypatch.setenv("PYTHONPATH", pythonpath)
     server = ShellServer(project_dir=str(agent_project), port=0)
     try:
         server.start()
@@ -109,7 +116,7 @@ def test_hull_crash_does_not_kill_shell(agent_project):
         server.shutdown()
 
 
-def test_shell_restarts_hull_after_crash(agent_project):
+def test_shell_restarts_hull_after_crash(agent_project, monkeypatch):
     """Shell automatically restarts Hull after a crash, and the new process has a different PID.
 
     Steps:
@@ -121,6 +128,10 @@ def test_shell_restarts_hull_after_crash(agent_project):
 
     Timeout 35s: Hull subprocess startup takes < 1s (measured), with buffer for slow CI machines.
     """
+    pythonpath = os.pathsep.join(
+        [str(agent_project), _VESSAL_SRC, os.environ.get("PYTHONPATH", "")]
+    )
+    monkeypatch.setenv("PYTHONPATH", pythonpath)
     server = ShellServer(project_dir=str(agent_project), port=0)
     try:
         server.start()

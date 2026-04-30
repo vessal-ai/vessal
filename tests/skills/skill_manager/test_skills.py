@@ -1,4 +1,4 @@
-"""test_skills — merged Skills(SkillBase) class contract."""
+"""test_skills — merged SkillManager(BaseSkill) class contract."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vessal.skills._base import BaseSkill
-from vessal.skills.skills.skill import Skills
+from vessal.skills.skill_manager.skill import SkillManager
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def hull():
 
 @pytest.fixture
 def skills(hull):
-    s = Skills()
+    s = SkillManager()
     s._bind_hull(hull)
     return s
 
@@ -30,18 +30,18 @@ def skills(hull):
 # ── Class-level contract ──
 
 def test_inherits_skillbase():
-    assert issubclass(Skills, BaseSkill)
+    assert issubclass(SkillManager, BaseSkill)
 
 
 def test_name_and_description_are_class_attrs():
-    assert Skills.name == "skills"
-    assert isinstance(Skills.description, str) and Skills.description
+    assert SkillManager.name == "skill_manager"
+    assert isinstance(SkillManager.description, str) and SkillManager.description
 
 
 def test_tools_list_uses_new_names():
-    assert "load" in Skills.tools
-    assert "unload" in Skills.tools
-    assert "load_skill" not in Skills.tools
+    assert "load" in SkillManager.tools
+    assert "unload" in SkillManager.tools
+    assert "load_skill" not in SkillManager.tools
 
 
 # ── list / load / unload ──
@@ -91,7 +91,7 @@ def test_signal_lists_available_with_load_markers(hull):
     ]
     hull.loaded_skill_names.return_value = ["chat"]
 
-    s = Skills()
+    s = SkillManager()
     s._bind_hull(hull)
     s.signal_update()
     assert s.signal != {}
@@ -103,7 +103,7 @@ def test_signal_lists_available_with_load_markers(hull):
 def test_signal_contains_guide_reminder(hull):
     hull.available_skills.return_value = []
     hull.loaded_skill_names.return_value = []
-    s = Skills()
+    s = SkillManager()
     s._bind_hull(hull)
     s.signal_update()
     body = s.signal["available"]
@@ -113,7 +113,7 @@ def test_signal_contains_guide_reminder(hull):
 def test_signal_has_no_method_names(hull):
     hull.available_skills.return_value = [{"name": "chat", "description": "desc"}]
     hull.loaded_skill_names.return_value = []
-    s = Skills()
+    s = SkillManager()
     s._bind_hull(hull)
     s.signal_update()
     body = s.signal["available"]
@@ -132,7 +132,7 @@ def test_prompt_is_valid_cognitive_protocol(skills):
 # ── hub interactions ──
 
 def test_search_hub_returns_matches(skills):
-    with patch("vessal.skills.skills.skill.Registry") as mock_reg:
+    with patch("vessal.skills.skill_manager.skill.Registry") as mock_reg:
         mock_reg.fetch.return_value.search.return_value = [
             {"name": "browser", "description": "web", "source": "x", "tags": ["web"]}
         ]
@@ -141,7 +141,7 @@ def test_search_hub_returns_matches(skills):
 
 
 def test_list_hub_returns_paged(skills):
-    with patch("vessal.skills.skills.skill.Registry") as mock_reg:
+    with patch("vessal.skills.skill_manager.skill.Registry") as mock_reg:
         instance = mock_reg.fetch.return_value
         instance.list_paged.return_value = [
             {"name": "a", "description": "da", "source": "x", "tags": []},
@@ -152,6 +152,6 @@ def test_list_hub_returns_paged(skills):
 
 
 def test_signal_returns_empty_when_hull_unbound():
-    s = Skills()
+    s = SkillManager()
     s.signal_update()
     assert s.signal == {}

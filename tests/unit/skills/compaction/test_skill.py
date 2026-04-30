@@ -4,7 +4,7 @@ import pytest
 
 
 def test_init_stores_main_db_path(tmp_path):
-    from vessal.skills.compaction import CompactionSkill
+    from vessal.skills.compaction._skill import CompactionSkill
 
     db = tmp_path / "main_frame_log.sqlite"
     db.touch()
@@ -15,7 +15,7 @@ def test_init_stores_main_db_path(tmp_path):
 
 
 def test_init_prints_self_introduction(tmp_path, capsys):
-    from vessal.skills.compaction import CompactionSkill
+    from vessal.skills.compaction._skill import CompactionSkill
 
     db = tmp_path / "main.sqlite"
     db.touch()
@@ -38,7 +38,7 @@ def main_db(tmp_path):
 
 def test_write_summary_inserts_entries_and_summary_atomically(main_db):
     import sqlite3
-    from vessal.skills.compaction import CompactionSkill
+    from vessal.skills.compaction._skill import CompactionSkill
 
     skill = CompactionSkill(main_db_path=main_db)
     skill.write_summary(
@@ -65,7 +65,7 @@ def test_write_summary_inserts_entries_and_summary_atomically(main_db):
 
 def test_write_summary_rolls_back_on_pk_conflict(main_db):
     import sqlite3
-    from vessal.skills.compaction import CompactionSkill
+    from vessal.skills.compaction._skill import CompactionSkill
 
     skill = CompactionSkill(main_db_path=main_db)
     skill.write_summary(layer=1, n_start=1, n_end=4, schema_version=1, body="first")
@@ -83,7 +83,7 @@ def test_write_summary_rolls_back_on_pk_conflict(main_db):
 
 def test_read_pending_returns_no_groups_when_below_k(main_db):
     import sqlite3
-    from vessal.skills.compaction import CompactionSkill
+    from vessal.skills.compaction._skill import CompactionSkill
 
     conn = sqlite3.connect(main_db)
     try:
@@ -107,7 +107,7 @@ def test_read_pending_returns_no_groups_when_below_k(main_db):
 
 def test_read_pending_returns_one_group_at_k(main_db):
     import sqlite3
-    from vessal.skills.compaction import CompactionSkill
+    from vessal.skills.compaction._skill import CompactionSkill
 
     conn = sqlite3.connect(main_db)
     try:
@@ -138,7 +138,7 @@ def test_read_pending_returns_one_group_at_k(main_db):
 
 def test_read_pending_skips_layers_already_covered(main_db):
     import sqlite3
-    from vessal.skills.compaction import CompactionSkill
+    from vessal.skills.compaction._skill import CompactionSkill
 
     conn = sqlite3.connect(main_db)
     try:
@@ -166,7 +166,7 @@ def test_read_pending_skips_layers_already_covered(main_db):
 
 
 def test_system_prompt_loads_and_is_nonempty():
-    from vessal.skills.compaction import COMPACTION_SYSTEM_PROMPT
+    from vessal.ark.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
 
     assert isinstance(COMPACTION_SYSTEM_PROMPT, str)
     assert "compaction" in COMPACTION_SYSTEM_PROMPT.lower()

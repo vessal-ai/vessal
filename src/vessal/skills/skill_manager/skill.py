@@ -1,4 +1,4 @@
-"""skills Skill — inventory, hot-load/unload, and hub search."""
+"""skill_manager Skill — inventory, hot-load/unload, and hub search."""
 from __future__ import annotations
 
 import logging
@@ -14,17 +14,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Skills(BaseSkill):
+class SkillManager(BaseSkill):
     """Agent-facing Skill management + Console-facing inventory UI."""
 
-    name = "skills"
+    name = "skill_manager"
     description = "skill inventory"
     tools = ["load", "unload", "search_hub", "download_skill", "list_hub"]
 
     def __init__(self) -> None:
         super().__init__()
         self._hull: "Hull | None" = None
-        print("skills: load(name)/unload(name)/list() — Skill management")
+        print("skill_manager: load(name)/unload(name)/list() — Skill management")
 
     def _bind_hull(self, hull: "Hull") -> None:
         """Hull loader calls this exactly once after injection into ns."""
@@ -111,25 +111,15 @@ class Skills(BaseSkill):
         return "\n".join(lines)
 
     def download_skill(self, name: str) -> str:
-        """Download and install a skill from SkillHub."""
+        """Download and install a skill from SkillHub into <project>/skills/<name>/."""
         from vessal.ark.shell.hull.hub.installer import install
         from vessal.ark.shell.hull.hub.resolver import resolve
 
-        skill_paths = self._hull.get_ns("skill_paths")
-        if not skill_paths:
-            return "download failed: no skill_paths configured"
-
-        hub_dir = None
-        for sp in skill_paths:
-            if sp.endswith("/hub") or sp.endswith("\\hub"):
-                hub_dir = Path(sp)
-                break
-        if hub_dir is None:
-            hub_dir = Path(skill_paths[0])
+        target_dir = Path(__file__).resolve().parent.parent  # <project>/skills/
 
         try:
             resolved = resolve(name)
-            return install(resolved, hub_dir)
+            return install(resolved, target_dir)
         except RuntimeError as e:
             return f"download failed: {e}"
 

@@ -17,7 +17,8 @@ def test_project_scaffold_emits_core_files(tmp_path):
     assert (project / ".gitignore").exists()
     assert (project / "gates" / "action_gate.py").exists()
     assert (project / "gates" / "state_gate.py").exists()
-    assert (project / "skills" / "local" / "example" / "__init__.py").exists()
+    assert (project / "skills" / "__init__.py").exists()
+    assert (project / "skills" / "chat" / "__init__.py").exists()
 
 
 def test_project_scaffold_embeds_project_name_in_hull_toml(tmp_path):

@@ -90,7 +90,7 @@ Skills pass information to the Agent at different granularities through three ch
 
 Creation guidelines: description ≤ 15 characters, write only the function; _signal() does not expose method signatures; SKILL.md is the only place containing method signatures; _prompt() only contains behavioral rules. Changes to _prompt() must go through the file (unload → modify → reload); runtime dynamic modification is not allowed.
 
-Skill modification policy: Agents may modify any Skill (including built-in ones). Built-in Skill modifications are overwritten on vessal package upgrades; for persistent modifications, create a same-named user Skill in skill_paths to override.
+Skill modification policy: Agents may modify any Skill in `<project>/skills/<name>/` freely; the project owns the Skill source. `vessal create` populates this directory once from the vessal package's source skills; subsequent vessal upgrades do not overwrite it. To pick up new built-in Skills shipped by vessal, copy them manually or use `skill_manager.download_skill('<name>')`.
 
 ## Public Interface
 

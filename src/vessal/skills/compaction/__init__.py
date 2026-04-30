@@ -1,10 +1,4 @@
-"""Compaction Skill — preset Skill of the compaction Cell.
+"""Compaction Skill — preset Skill of the compaction Cell."""
+from ._skill import CompactionSkill as Skill
 
-See docs/architecture/cell/06-compaction.md §6 for full design context.
-"""
-
-from vessal.ark.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
-
-from ._skill import CompactionSkill
-
-__all__ = ["CompactionSkill", "COMPACTION_SYSTEM_PROMPT"]
+__all__ = ["Skill"]

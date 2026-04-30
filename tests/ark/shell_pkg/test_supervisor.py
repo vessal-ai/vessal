@@ -1,15 +1,28 @@
 """test_supervisor.py — Integration tests for ShellServer subprocess management."""
+import os
+import sys
 import time
 import pytest
+from pathlib import Path
+
+_VESSAL_SRC = str(Path(__file__).resolve().parents[3] / "src" / "vessal")
 
 
-def test_shell_server_spawns_hull_subprocess(tmp_path):
+def _set_hull_pythonpath(monkeypatch, project_dir):
+    """Inject PYTHONPATH so Hull subprocess can resolve `from skills.* import Skill`."""
+    pythonpath = os.pathsep.join(
+        [str(project_dir), _VESSAL_SRC, os.environ.get("PYTHONPATH", "")]
+    )
+    monkeypatch.setenv("PYTHONPATH", pythonpath)
+
+
+def test_shell_server_spawns_hull_subprocess(tmp_path, monkeypatch):
     """Hull subprocess is running after ShellServer starts."""
     from vessal.ark.shell.server import ShellServer
 
     # Create minimal hull.toml
     (tmp_path / "hull.toml").write_text(
-        '[agent]\nname = "test"\n[hull]\nskills = []\nskill_paths = []\n'
+        '[agent]\nname = "test"\n[hull]\nskills = []\n'
         '[cell]\n[core]\n[core.api_params]\n'
     )
     (tmp_path / "SOUL.md").write_text("test agent")
@@ -18,6 +31,7 @@ def test_shell_server_spawns_hull_subprocess(tmp_path):
         "OPENAI_MODEL=test\n"
     )
 
+    _set_hull_pythonpath(monkeypatch, tmp_path)
     server = ShellServer(project_dir=str(tmp_path), port=0)
     try:
         server.start()
@@ -28,12 +42,12 @@ def test_shell_server_spawns_hull_subprocess(tmp_path):
         server.shutdown()
 
 
-def test_shell_server_detects_hull_crash(tmp_path):
+def test_shell_server_detects_hull_crash(tmp_path, monkeypatch):
     """ShellServer detects a Hull subprocess crash and updates its state."""
     from vessal.ark.shell.server import ShellServer
 
     (tmp_path / "hull.toml").write_text(
-        '[agent]\nname = "test"\n[hull]\nskills = []\nskill_paths = []\n'
+        '[agent]\nname = "test"\n[hull]\nskills = []\n'
         '[cell]\n[core]\n[core.api_params]\n'
     )
     (tmp_path / "SOUL.md").write_text("test agent")
@@ -42,6 +56,7 @@ def test_shell_server_detects_hull_crash(tmp_path):
         "OPENAI_MODEL=test\n"
     )
 
+    _set_hull_pythonpath(monkeypatch, tmp_path)
     server = ShellServer(project_dir=str(tmp_path), port=0)
     try:
         server.start()

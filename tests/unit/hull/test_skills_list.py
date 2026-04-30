@@ -9,7 +9,7 @@ import pytest
 @pytest.fixture
 def hull(tmp_path):
     (tmp_path / "hull.toml").write_text(
-        '[hull]\nskills = []\nskill_paths = []\n'
+        '[hull]\nskills = []\n'
     )
     (tmp_path / ".env").write_text("OPENAI_API_KEY=test-key\n")
     os.chdir(tmp_path)

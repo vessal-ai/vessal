@@ -409,12 +409,12 @@ class TestRuntimeOwned:
 
 
 class TestSkills:
-    def test_skill_paths_set(self, tmp_path):
-        """[hull].skill_paths is parsed as absolute paths written to ns["skill_paths"]."""
-        toml = '[hull]\nskill_paths = ["skills/extra/"]'
+    def test_no_skill_paths_in_ns(self, tmp_path):
+        """Flat layout: skill_paths is not injected into ns."""
+        toml = '[hull]\nskills = []'
         hull = _make_hull(tmp_path, toml_content=toml)
-        expected = str(tmp_path / "skills/extra")
-        assert any(expected in p for p in hull._main_cell.L["skill_paths"])
+        assert "skill_paths" not in hull._main_cell.L
+        assert "skill_paths" not in hull._main_cell.G
 
     def test_no_skills_section(self, tmp_path):
         """No Skills are loaded and startup proceeds normally when hull.toml has no [hull] section."""
@@ -477,7 +477,7 @@ class TestVenvActivation:
 class TestWake:
     def test_wake_default_empty(self, tmp_path):
         """SystemSkill wake_reason is empty string after Hull initialization."""
-        from vessal.skills.system import SystemSkill
+        from skills.system.skill import SystemSkill
         hull = _make_hull(tmp_path)
         system = hull._main_cell.G.get("_system")
         assert isinstance(system, SystemSkill)

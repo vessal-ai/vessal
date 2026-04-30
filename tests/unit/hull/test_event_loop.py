@@ -8,7 +8,7 @@ from vessal.ark.shell.hull.event_loop import EventLoop
 
 @pytest.fixture
 def mock_cell():
-    from vessal.skills.system import SystemSkill
+    from vessal.skills.system.skill import SystemSkill
 
     class _FakeKernel:
         def __init__(self):

@@ -9,7 +9,7 @@ def _write_minimal_project(path: Path) -> None:
     (path / "hull.toml").write_text(
         '[agent]\nname = "test"\nlanguage = "en"\n'
         '[cell]\nmax_frames = 5\n'
-        '[hull]\nskills = []\nskill_paths = []\n',
+        '[hull]\nskills = []\n',
         encoding="utf-8",
     )
     (path / ".env").write_text("OPENAI_API_KEY=test-key\n", encoding="utf-8")

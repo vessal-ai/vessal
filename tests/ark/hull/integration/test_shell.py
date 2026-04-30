@@ -53,31 +53,28 @@ class TestInit:
         assert ".env" in content
         assert "logs/" in content
 
-    def test_init_creates_skills_example(self, tmp_path):
+    def test_init_creates_skills_package(self, tmp_path):
         from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
-        example_dir = tmp_path / "my-agent" / "skills" / "local" / "example"
-        assert example_dir.is_dir()
-        assert (example_dir / "__init__.py").exists()
-        assert (example_dir / "requirements.txt").exists()
+        skills_dir = tmp_path / "my-agent" / "skills"
+        assert skills_dir.is_dir()
+        assert (skills_dir / "__init__.py").exists()
+        assert (skills_dir / "chat").is_dir()
+        assert (skills_dir / "tasks").is_dir()
 
-    def test_init_example_skill_is_valid_package(self, tmp_path):
+    def test_init_skills_are_valid_packages(self, tmp_path):
         from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
-        init_file = tmp_path / "my-agent" / "skills" / "local" / "example" / "__init__.py"
-        content = init_file.read_text(encoding="utf-8")
-        assert '"""' in content
-        assert "__all__" in content
-        assert "def " in content
-        assert "__guide__" not in content
-        assert "from pathlib import Path" not in content
+        for name in ("chat", "tasks", "pin"):
+            init_file = tmp_path / "my-agent" / "skills" / name / "__init__.py"
+            assert init_file.exists(), f"skills/{name}/__init__.py missing"
 
     def test_init_hull_toml_skills_uses_name_list(self, tmp_path):
         from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
         content = (tmp_path / "my-agent" / "hull.toml").read_text()
         assert "*.py" not in content
-        assert "skill_paths" in content
+        assert "skill_paths" not in content
 
     def test_init_fails_if_directory_exists(self, tmp_path):
         from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
@@ -168,43 +165,36 @@ class TestInit:
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
         assert "max_retries = 3" in content
 
-    def test_init_example_skill_md_has_frontmatter(self, tmp_path):
-        """Generated example SKILL.md contains YAML frontmatter."""
+    def test_init_chat_skill_md_has_frontmatter(self, tmp_path):
+        """Copied chat SKILL.md contains YAML frontmatter."""
         from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
-        skill_md = tmp_path / "my-agent" / "skills" / "local" / "example" / "SKILL.md"
+        skill_md = tmp_path / "my-agent" / "skills" / "chat" / "SKILL.md"
         content = skill_md.read_text(encoding="utf-8")
         assert "---" in content  # frontmatter delimiter
-        assert "name: example" in content
-        assert "version:" in content
-        assert "description:" in content
-        assert "tags:" in content
-        assert "category:" in content
+        assert "name:" in content
 
-    def test_init_copies_builtin_skills(self, tmp_path):
-        """vessal create copies built-in Skills to skills/bundled/; SkillHub skills are excluded."""
+    def test_init_copies_builtin_skills_flat(self, tmp_path):
+        """vessal create copies built-in Skills flat into skills/<name>/."""
         from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
-        bundled_dir = tmp_path / "my-agent" / "skills" / "bundled"
-        assert (bundled_dir / "chat" / "skill.py").exists()
-        assert (bundled_dir / "tasks" / "skill.py").exists()
-        assert (bundled_dir / "pin" / "skill.py").exists()
-        assert not (bundled_dir / "human").exists()
-        # Migrated to SkillHub — must not be bundled
-        assert not (bundled_dir / "ui").exists()
-        assert not (bundled_dir / "search").exists()
-        assert not (bundled_dir / "audio").exists()
-        assert not (bundled_dir / "vision").exists()
+        skills_dir = tmp_path / "my-agent" / "skills"
+        assert (skills_dir / "chat" / "skill.py").exists()
+        assert (skills_dir / "tasks" / "skill.py").exists()
+        assert (skills_dir / "pin" / "skill.py").exists()
+        assert not (skills_dir / "bundled").exists()
+        assert not (skills_dir / "hub").exists()
+        assert not (skills_dir / "local").exists()
 
-    def test_init_hull_toml_has_skill_paths(self, tmp_path):
-        """Generated hull.toml contains skill_paths configuration."""
+    def test_init_hull_toml_has_no_skill_paths(self, tmp_path):
+        """Generated hull.toml does not contain skill_paths (flat layout uses .pth)."""
         from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
         write_project_scaffold(tmp_path / "my-agent", install_venv=False)
 
         content = (tmp_path / "my-agent" / "hull.toml").read_text(encoding="utf-8")
-        assert "skill_paths" in content
+        assert "skill_paths" not in content
         assert "skills" in content
 
     def test_init_no_venv_skips_subprocess(self, tmp_path):
@@ -628,7 +618,7 @@ class TestStartForegroundLock:
         toml = (
             '[agent]\nname = "test"\n'
             '[cell]\nmax_frames=1\n'
-            '[hull]\nskills=[]\nskill_paths=[]\n'
+            '[hull]\nskills=[]\n'
             '[core]\ntimeout=60\nmax_retries=3\n'
             '[compression]\nenabled=false\n'
             '[gates]\n'
@@ -668,7 +658,7 @@ class TestStartForegroundLock:
         toml = (
             '[agent]\nname = "test"\n'
             '[cell]\nmax_frames=1\n'
-            '[hull]\nskills=[]\nskill_paths=[]\n'
+            '[hull]\nskills=[]\n'
             '[core]\ntimeout=60\nmax_retries=3\n'
             '[compression]\nenabled=false\n'
             '[gates]\n'
@@ -708,7 +698,7 @@ class TestStartForegroundLock:
         toml = (
             '[agent]\nname = "test"\n'
             '[cell]\nmax_frames=1\n'
-            '[hull]\nskills=[]\nskill_paths=[]\n'
+            '[hull]\nskills=[]\n'
             '[core]\ntimeout=60\nmax_retries=3\n'
             '[compression]\nenabled=false\n'
             '[gates]\n'

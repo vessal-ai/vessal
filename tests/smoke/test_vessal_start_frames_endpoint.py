@@ -50,10 +50,29 @@ def _http_post_json(url: str, body: dict, timeout: float = 5.0) -> tuple[int, di
 
 @pytest.fixture
 def agent_project(tmp_path: Path):
-    from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
-
     project = tmp_path / "agent"
-    write_project_scaffold(project, install_venv=False)
+    project.mkdir(parents=True)
+    (project / "hull.toml").write_text(
+        "[agent]\n"
+        'name = "smoke-test"\n'
+        "\n"
+        "[hull]\n"
+        "skills = []\n"
+        "\n"
+        "[cell]\n"
+        "max_frames = 10\n"
+        "\n"
+        "[core]\n"
+        "timeout = 10\n"
+        "\n"
+        "[core.api_params]\n"
+        "temperature = 0.7\n"
+        "\n"
+        "[cells.main]\n"
+        'data_dir = "data/main"\n',
+        encoding="utf-8",
+    )
+    (project / "SOUL.md").write_text("smoke test agent", encoding="utf-8")
     (project / ".env").write_text(
         "OPENAI_API_KEY=sk-smoke-test-stub\n"
         "OPENAI_BASE_URL=http://127.0.0.1:1\n"
@@ -65,6 +84,10 @@ def agent_project(tmp_path: Path):
 
 def test_frames_endpoint_does_not_crash_hull(agent_project: Path):
     port = 18422
+    vessal_src = str(Path(__file__).resolve().parents[2] / "src" / "vessal")
+    pythonpath = os.pathsep.join(
+        [str(agent_project), vessal_src, os.environ.get("PYTHONPATH", "")]
+    )
     proc = subprocess.Popen(
         [sys.executable, "-m", "vessal.cli", "start",
          "--foreground", "--port", str(port)],
@@ -72,7 +95,7 @@ def test_frames_endpoint_does_not_crash_hull(agent_project: Path):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        env={**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONPATH": pythonpath},
     )
 
     try:

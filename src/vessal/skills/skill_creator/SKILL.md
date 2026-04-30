@@ -5,7 +5,7 @@ description: Create a new skill scaffold
 
 # skill_creator
 
-Generates a Skill directory scaffold under `skill_paths[0]`. Delegates to the same generator used by
+Generates a Skill directory scaffold under `<project>/skills/<name>/`. Delegates to the same generator used by
 the `vessal skill create` CLI, so the two surfaces always produce the same layout.
 
 ## Methods
@@ -29,7 +29,7 @@ skill_creator.create(name) — Create a scaffold directory
 
 ```python
 skill_creator.create("code_review")
-# → Creates code_review/ under skill_paths[0]
+# → Creates code_review/ under <project>/skills/
 # 1. Edit skill.py to fill in `description` and implement the tool
 # 2. Edit SKILL.md to describe methods and replace the placeholder description
 # 3. Edit tests/test_code_review.py
