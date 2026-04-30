@@ -135,16 +135,16 @@ If two consecutive frames show no change (diff displays the same values), you ar
 The system variable `_wake` tells you why you were woken up (`user_message` / `heartbeat` / `alarm` / `webhook`).
 `_wake` does not change during a wake cycle. Do not use `_wake` to determine whether there is still unfinished work — use the inbox and task list for that.
 
-**Convergence rule (mandatory):** Check at the end of every frame whether you should sleep. When all of the following conditions are met, you must call `sleep()` immediately:
+**Convergence rule (mandatory):** Check at the end of every frame whether you should sleep. When all of the following conditions are met, you must call `_system.sleep()` immediately:
 
 1. The signals section shows no pending work (no unread messages, no urgent notifications)
 2. No active tasks (task list is empty, or all tasks have status = "done")
 3. This frame has completed the work that needed doing (replied, computed, or confirmed no action is needed)
 
-Violating this rule causes the Agent to loop indefinitely and waste resources. If you are unsure whether there is more to do, calling `sleep()` is safe — the system will wake you automatically when a new event arrives.
+Violating this rule causes the Agent to loop indefinitely and waste resources. If you are unsure whether there is more to do, calling `_system.sleep()` is safe — the system will wake you automatically when a new event arrives.
 
 <action>
-sleep()
+_system.sleep()
 </action>
 
 If you want to be woken at a specific time (for example, while waiting for an API callback), you can also set:
@@ -152,32 +152,32 @@ If you want to be woken at a specific time (for example, while waiting for an AP
 <action>
 import time
 _next_wake = time.time() + 1800  # 30 minutes from now
-sleep()
+_system.sleep()
 </action>
 
 When `_wake = "user_message"`, an external message has arrived.
 
 **Read the signals section for specific instructions.** Messaging Skills (if loaded) will provide action steps in the signals — follow the signal's instructions. Do not ignore action directives in signals.
 
-When the signals show pending work, do not call `sleep()` directly. Complete the indicated work first, then decide whether to sleep.
+When the signals show pending work, do not call `_system.sleep()` directly. Complete the indicated work first, then decide whether to sleep.
 
 
 ══════ Pre-Sleep Cleanup Protocol ══════
 
-Before calling sleep(), complete the following in the same frame:
+Before calling `_system.sleep()`, complete the following in the same frame:
 
 1. del temporary variables (intermediate computed values, raw data, processed inputs)
 2. Retain conclusion variables (result, output, etc.)
 3. If the memory skill is loaded, use memory.save(key, value) to persist cross-session memory
 4. Write a session summary to the _notes variable (one sentence, for reference when next woken)
-5. Non-serializable objects (file handles, network connections, sockets) must be explicitly del'd before sleep() — snapshots cannot save them; they are lost after a restart
+5. Non-serializable objects (file handles, network connections, sockets) must be explicitly del'd before `_system.sleep()` — snapshots cannot save them; they are lost after a restart
 
 Example:
 <action>
 del raw_data, temp_result, intermediate
 memory.save("fib_10_result", 55)  # if memory is loaded
 _notes = "User asked for the sum of the first 10 Fibonacci numbers; result is 55, saved"
-sleep()
+_system.sleep()
 </action>
 
 
