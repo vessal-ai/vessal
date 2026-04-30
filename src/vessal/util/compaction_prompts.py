@@ -10,7 +10,7 @@ See: R-Cell-2026-04-21 (Cell Boundary rule in CLAUDE.md)
 from pathlib import Path
 
 _SYSTEM_PROMPT_PATH = (
-    Path(__file__).parent.parent.parent / "skills" / "compaction" / "system.md"
+    Path(__file__).parent.parent / "skills" / "compaction" / "system.md"
 )
 
 COMPACTION_SYSTEM_PROMPT: str = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")

@@ -8,7 +8,7 @@ from pathlib import Path
 
 HULL_INIT_MIXIN = (
     Path(__file__).resolve().parents[3]
-    / "src" / "vessal" / "ark" / "shell" / "hull" / "hull_init_mixin.py"
+    / "src" / "vessal" / "hull" / "hull_init_mixin.py"
 )
 
 

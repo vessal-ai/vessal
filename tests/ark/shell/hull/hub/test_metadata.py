@@ -1,4 +1,4 @@
-# src/vessal/ark/shell/hub/tests/test_metadata.py
+# src/vessal/shell/hub/tests/test_metadata.py
 """Tests for .installed.toml metadata read/write."""
 from pathlib import Path
 from vessal.hull.hub.metadata import write_installed, read_installed, is_hub_installed

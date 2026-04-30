@@ -1,4 +1,4 @@
-# src/vessal/ark/shell/hub/metadata.py
+# src/vessal/shell/hub/metadata.py
 """Read/write .installed.toml metadata for hub-installed skills."""
 from __future__ import annotations
 

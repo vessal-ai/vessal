@@ -13,7 +13,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-_RUNTIME_DIR = Path(__file__).resolve().parents[2] / "src" / "vessal" / "ark" / "shell" / "runtime"
+_RUNTIME_DIR = Path(__file__).resolve().parents[2] / "src" / "vessal" / "shell" / "runtime"
 
 
 def _concrete_handlers(root: Path) -> list[tuple[str, str, set[str]]]:

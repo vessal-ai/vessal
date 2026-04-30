@@ -13,7 +13,7 @@ import pytest
 
 PROMPT_PATH = (
     Path(__file__).resolve().parents[3]
-    / "src" / "vessal" / "ark" / "shell" / "hull" / "prompts" / "system.md"
+    / "src" / "vessal" / "hull" / "prompts" / "system.md"
 )
 
 

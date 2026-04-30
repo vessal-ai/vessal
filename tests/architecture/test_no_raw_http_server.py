@@ -2,7 +2,7 @@
 
 Production code must never construct ``http.server.HTTPServer`` or
 ``http.server.ThreadingHTTPServer`` directly. The only legitimate
-construction site is ``src/vessal/ark/shell/http_server.py``, which wraps
+construction site is ``src/vessal/shell/http_server.py``, which wraps
 them with the project's quiet-disconnect ``handle_error`` policy.
 
 Tests under ``tests/`` are whitelisted — they use ``HTTPServer`` as fake
@@ -15,7 +15,7 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SRC_ROOT = _REPO_ROOT / "src" / "vessal"
-_ALLOWED_FILE = _SRC_ROOT / "ark" / "shell" / "http_server.py"
+_ALLOWED_FILE = _SRC_ROOT / "shell" / "http_server.py"
 
 _FORBIDDEN_NAMES = {"HTTPServer", "ThreadingHTTPServer"}
 

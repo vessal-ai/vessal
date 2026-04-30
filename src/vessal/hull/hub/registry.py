@@ -1,4 +1,4 @@
-# src/vessal/ark/shell/hub/registry.py
+# src/vessal/shell/hub/registry.py
 """SkillHub registry: fetch, search, and resolve skill names."""
 from __future__ import annotations
 

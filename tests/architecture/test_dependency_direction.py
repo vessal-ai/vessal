@@ -82,7 +82,7 @@ def _scan_imports(source_dir: str, forbidden: list[str]) -> list[str]:
 def test_cell_imports_no_hull_or_shell():
     """Cell does not import Hull or Shell."""
     violations = _scan_imports(
-        str(_REPO_ROOT / "src/vessal/ark/shell/hull/cell"),
+        str(_REPO_ROOT / "src/vessal/cell"),
         ["vessal.hull.hull", "vessal.hull.event_loop",
          "vessal.hull.skill_loader",
          "vessal.hull.skill",
@@ -95,7 +95,7 @@ def test_cell_imports_no_hull_or_shell():
 def test_cell_imports_no_util_logging():
     """Cell must not import ark.util.logging (TracerLike Protocol is the boundary)."""
     violations = _scan_imports(
-        str(_REPO_ROOT / "src/vessal/ark/shell/hull/cell"),
+        str(_REPO_ROOT / "src/vessal/cell"),
         ["vessal.util.logging"],
     )
     assert violations == [], "Cell must use TracerLike Protocol, not ark.util.logging directly:\n" + "\n".join(violations)
@@ -104,7 +104,7 @@ def test_cell_imports_no_util_logging():
 def test_hull_imports_no_shell():
     """Hull does not import Shell boundary code (server/cli)."""
     violations = _scan_imports(
-        str(_REPO_ROOT / "src/vessal/ark/shell/hull"),
+        str(_REPO_ROOT / "src/vessal/hull"),
         ["vessal.shell.server", "vessal.shell.cli", "vessal.shell"],
     )
     assert violations == [], "Hull isolation violations:\n" + "\n".join(violations)
@@ -122,8 +122,8 @@ def test_ark_imports_no_skills():
     user-provided Skills subclass BaseSkill. This is a validation seam: the CLI tool must
     know the canonical base class to enforce it.
     """
-    _KERNEL_PY = str(_REPO_ROOT / "src/vessal/ark/shell/hull/cell/kernel/kernel.py")
-    _SKILL_CMDS_PY = str(_REPO_ROOT / "src/vessal/ark/shell/cli/skill_cmds.py")
+    _KERNEL_PY = str(_REPO_ROOT / "src/vessal/cell/kernel/kernel.py")
+    _SKILL_CMDS_PY = str(_REPO_ROOT / "src/vessal/shell/cli/skill_cmds.py")
     _ALLOWED_FROM_KERNEL = {"vessal.skills.system", "vessal.skills._base"}
     _ALLOWED_FROM_CLI = {"vessal.skills._base"}
     violations = _scan_imports(
@@ -152,7 +152,7 @@ def test_shell_does_not_access_hull_event_queue():
     Hull internal code is not subject to this constraint.
     """
     violations = []
-    shell_dir = _REPO_ROOT / "src/vessal/ark/shell"
+    shell_dir = _REPO_ROOT / "src/vessal/shell"
     hull_dir = shell_dir / "hull"
     for py_file in shell_dir.rglob("*.py"):
         if "__pycache__" in str(py_file):
@@ -177,7 +177,7 @@ def test_shell_does_not_access_hull_ns():
     Hull internal code is not subject to this constraint.
     """
     violations = []
-    shell_dir = _REPO_ROOT / "src/vessal/ark/shell"
+    shell_dir = _REPO_ROOT / "src/vessal/shell"
     hull_dir = shell_dir / "hull"
     for py_file in shell_dir.rglob("*.py"):
         if "__pycache__" in str(py_file):

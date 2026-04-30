@@ -1,4 +1,4 @@
-# src/vessal/ark/shell/hub/tests/test_installer.py
+# src/vessal/shell/hub/tests/test_installer.py
 """Tests for skill installer."""
 from pathlib import Path
 

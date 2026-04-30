@@ -1,4 +1,4 @@
-# src/vessal/ark/shell/hub/tests/test_integration.py
+# src/vessal/shell/hub/tests/test_integration.py
 """Integration test for the full skill install flow (local, no network)."""
 from pathlib import Path
 

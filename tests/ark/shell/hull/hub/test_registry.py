@@ -1,4 +1,4 @@
-# src/vessal/ark/shell/hub/tests/test_registry.py
+# src/vessal/shell/hub/tests/test_registry.py
 """Tests for SkillHub registry fetch, search, and list."""
 from pathlib import Path
 

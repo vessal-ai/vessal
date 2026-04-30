@@ -24,8 +24,8 @@ def test_hull_no_compaction_thread_pool():
 def test_hull_compaction_mixin_renamed_to_snapshot_only():
     """hull_compaction_mixin.py is renamed; no compaction methods remain."""
     repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    old = os.path.join(repo, "src/vessal/ark/shell/hull/hull_compaction_mixin.py")
-    new = os.path.join(repo, "src/vessal/ark/shell/hull/hull_snapshot_mixin.py")
+    old = os.path.join(repo, "src/vessal/hull/hull_compaction_mixin.py")
+    new = os.path.join(repo, "src/vessal/hull/hull_snapshot_mixin.py")
     assert not os.path.exists(old), "hull_compaction_mixin.py must be renamed/deleted"
     assert os.path.exists(new), "hull_snapshot_mixin.py expected"
     src = open(new).read()

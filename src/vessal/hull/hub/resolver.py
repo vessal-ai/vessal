@@ -1,4 +1,4 @@
-# src/vessal/ark/shell/hub/resolver.py
+# src/vessal/shell/hub/resolver.py
 """Resolve install source strings to git URLs."""
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-# src/vessal/ark/shell/hub/installer.py
+# src/vessal/shell/hub/installer.py
 """Clone, locate, validate, and copy skills from git repos."""
 from __future__ import annotations
 

@@ -24,7 +24,7 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
     skills_dir = project_dir / "skills"
     skills_dir.mkdir(parents=True, exist_ok=True)
 
-    builtin_skills_src = Path(__file__).resolve().parent.parent.parent.parent / "skills"
+    builtin_skills_src = Path(__file__).resolve().parent.parent.parent / "skills"
     copied: list[str] = []
     if builtin_skills_src.exists():
         for child in builtin_skills_src.iterdir():
