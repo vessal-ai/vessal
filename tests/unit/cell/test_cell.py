@@ -89,17 +89,19 @@ class TestConstructor:
         cell = _make_cell()
         assert not hasattr(cell, "run")
 
-    def test_api_params_forwarded_to_core(self):
-        """api_params are forwarded to Core."""
-        cell = _make_cell(api_params={"temperature": 0.3, "max_tokens": 2048})
-        assert cell._core._api_params["temperature"] == 0.3
-        assert cell._core._api_params["max_tokens"] == 2048
+    def test_api_params_forwarded_via_llm_config(self):
+        """api_params forwarded via default_llm_config are accessible on the Cell."""
+        from vessal.ark.shell.hull.cell.protocol import LLMConfig
+        cfg = LLMConfig(api_key="k", base_url="u", model="m",
+                        api_params={"temperature": 0.3, "max_tokens": 2048})
+        cell = _make_cell(default_llm_config=cfg)
+        assert cell._default_llm_config.api_params["temperature"] == 0.3
+        assert cell._default_llm_config.api_params["max_tokens"] == 2048
 
-    def test_default_api_params(self):
-        """Default api_params include temperature and max_tokens."""
+    def test_default_max_tokens_via_property(self):
+        """Cell.max_tokens defaults to 4096 when no default_llm_config is set."""
         cell = _make_cell()
-        assert cell._core._api_params["temperature"] == 0.7
-        assert cell._core._api_params["max_tokens"] == 4096
+        assert cell.max_tokens == 4096
 
     def test_snapshot_path_forwarded(self, tmp_path):
         """restore_path is forwarded to Kernel — namespace is consistent when restored from snapshot."""
