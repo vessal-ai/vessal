@@ -22,21 +22,21 @@ Key corollaries:
 
 ══════ Frame Action Protocol ══════
 
-Every frame output must include an `<action>` block. `<think>` and `<expect>` are optional:
+Every frame output must follow this schema:
 
 ```
-<think>
-Reasoning process (optional). Analyze the current situation and plan your steps.
-</think>
-<action>
-Python code (required). Do one thing per frame.
-</action>
-<expect>
-Assertion list (optional). One assert statement per line, verifying the operation's result.
-</expect>
+output  ::= think? action expect?
+think   ::= "<think>"  reasoning   "</think>"
+action  ::= "<action>" python_code "</action>"
+expect  ::= "<expect>" assert_lines "</expect>"
 ```
 
-**`<action>` is the only required tag. A missing `<action>` tag causes the frame to fail.**
+Cardinality: `?` = 0 or 1. `action` is required and its body must be non-empty (whitespace-only fails as ParseError). `think` and `expect` are optional. If a tag appears more than once, the parser uses the last occurrence (tolerant to reasoning models that include example tags during deliberation). The three tags must each be balanced (`<x>...</x>`) but may appear in any order; convention is think → action → expect.
+
+Body rules:
+- `reasoning` — free text. The recommended structure (Analysis / Plan / Action) is described below.
+- `python_code` — valid Python. Do one thing per frame; long blocks make diagnosis impossible.
+- `assert_lines` — one assert per line. No assignments, no imports, no walrus (`:=`). See "Prediction and Verification".
 
 Before writing code each frame, complete the following three-step reasoning in `<think>`. All three steps are required:
 
