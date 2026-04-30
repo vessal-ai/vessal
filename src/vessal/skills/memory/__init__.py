@@ -1,4 +1,4 @@
 """memory — cross-session key-value memory Skill."""
-from .skill import Memory as Skill
+from .skill import Memory
 
-__all__ = ["Skill"]
+__all__ = ["Memory"]

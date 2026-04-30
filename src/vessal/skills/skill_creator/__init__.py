@@ -1,4 +1,4 @@
 """skill_creator — Skill scaffold generator."""
-from .skill import SkillCreator as Skill
+from .skill import SkillCreator
 
-__all__ = ["Skill"]
+__all__ = ["SkillCreator"]
