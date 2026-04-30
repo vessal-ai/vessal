@@ -9,7 +9,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from vessal.ark.shell.hull.event_loop import EventLoop
-from vessal.skills.system.skill import SystemSkill
+from vessal.skills.system.skill import System
 
 
 def _make_stub_cell(responses=None) -> MagicMock:
@@ -23,7 +23,7 @@ def _make_stub_cell(responses=None) -> MagicMock:
         def __init__(self):
             self.L = ns
 
-    system_skill = SystemSkill()
+    system_skill = System()
     system_skill._bind_kernel(_FakeKernel())
 
     call_count = [0]

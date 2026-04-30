@@ -7,7 +7,7 @@ Responsible for:
 - Single-primitive frame execution: `ping(pong, namespace) -> Ping` (spec §1.2)
 - Operation code execution (executor.py)
 - expect assertion evaluation (expect.py)
-- Signal collection (BaseSkill instances + SystemSkill + dict aggregation to L["signals"])
+- Signal collection (BaseSkill instances + System + dict aggregation to L["signals"])
 - Rendering namespace to Ping (render/renderer.py)
 
 Not responsible for:

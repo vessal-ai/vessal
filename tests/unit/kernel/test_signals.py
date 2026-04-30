@@ -21,11 +21,11 @@ class FakeSkill(BaseSkill):
 
 
 def test_update_signals_collects_system_skill():
-    """SystemSkill in G is always scanned and provides frame/context signal."""
+    """System in G is always scanned and provides frame/context signal."""
     k = minimal_kernel()
     k.ping(None, _ns(k))
     signals = k.L["signals"]
-    system_payload = signals.get(("SystemSkill", "_system", "G"), {})
+    system_payload = signals.get(("System", "_system", "G"), {})
     # system_vars always returns non-empty — check "frame" in payload
     assert "frame" in system_payload
 

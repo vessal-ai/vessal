@@ -476,11 +476,11 @@ class TestVenvActivation:
 
 class TestWake:
     def test_wake_default_empty(self, tmp_path):
-        """SystemSkill wake_reason is empty string after Hull initialization."""
-        from skills.system.skill import SystemSkill
+        """System wake_reason is empty string after Hull initialization."""
+        from skills.system.skill import System
         hull = _make_hull(tmp_path)
         system = hull._main_cell.G.get("_system")
-        assert isinstance(system, SystemSkill)
+        assert isinstance(system, System)
         assert system._wake_reason == ""
 
     def test_wake_set_before_frame_loop(self, tmp_path):

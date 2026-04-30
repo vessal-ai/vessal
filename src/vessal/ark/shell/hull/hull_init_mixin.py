@@ -387,7 +387,7 @@ trace = false  # disable to reduce IO
             BootSkillEntry(
                 var_name="_system",
                 import_path="skills.system.skill",  # avoids class_name collision with compaction
-                class_name="SystemSkill",
+                class_name="System",
             ),
             BootSkillEntry(
                 var_name="compaction",

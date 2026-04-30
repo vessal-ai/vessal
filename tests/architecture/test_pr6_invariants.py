@@ -33,16 +33,16 @@ def test_dead_handle_unresolved_ref_transient_exported() -> None:
 
 
 def test_system_skill_has_sleep_wake() -> None:
-    from vessal.skills.system.skill import SystemSkill
-    assert callable(SystemSkill.sleep)
-    assert callable(SystemSkill.wake)
+    from vessal.skills.system.skill import System
+    assert callable(System.sleep)
+    assert callable(System.wake)
 
 
 def test_system_skill_signal_update_does_not_read_dead_keys(tmp_path) -> None:
-    """SystemSkill.signal_update must source from authoritative places only."""
+    """System.signal_update must source from authoritative places only."""
     import inspect
-    from vessal.skills.system.skill import SystemSkill
-    src = inspect.getsource(SystemSkill.signal_update)
+    from vessal.skills.system.skill import System
+    src = inspect.getsource(System.signal_update)
     forbidden = ["_context_pct", "_budget_total", "_context_budget",
                  "_token_budget", "_frame_type", "_errors"]
     for sym in forbidden:

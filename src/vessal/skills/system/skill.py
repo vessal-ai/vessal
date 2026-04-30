@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SystemSkill(BaseSkill):
+class System(BaseSkill):
     """Built-in Skill carrying Kernel-side facts (frame number, sleep/wake,
     recent errors) into the per-frame signal stream."""
 
@@ -27,9 +27,9 @@ class SystemSkill(BaseSkill):
     def __init__(self) -> None:
         super().__init__()
         self._kernel: "Kernel | None" = None
-        self._sleeping: bool = False
+        self._sleeping: bool = True   # Idle until first wake — fixes the "UI shows Working before agent has done anything" sub-bug.
         self._wake_reason: str = ""
-        print("_system: SystemSkill — frame / sleep / wake / recent_errors")
+        print("_system: System — frame / sleep / wake / recent_errors")
 
     def _bind_kernel(self, kernel: "Kernel") -> None:
         self._kernel = kernel

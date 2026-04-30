@@ -6,7 +6,7 @@ from vessal.ark.shell.hull.cell.protocol import Action, Pong
 
 
 def _kernel(tmp_path):
-    boot = "from vessal.skills.system.skill import SystemSkill\n_system = SystemSkill()\n"
+    boot = "from vessal.skills.system.skill import System\n_system = System()\n"
     return Kernel(boot_script=boot, db_path=str(tmp_path / "fl.sqlite"))
 
 

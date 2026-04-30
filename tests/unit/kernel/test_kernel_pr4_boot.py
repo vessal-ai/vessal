@@ -85,8 +85,8 @@ def test_boot_frame_obs_stdout_captures_skill_init_prints(tmp_path: Path):
     (stdout,) = conn.execute(
         "SELECT obs_stdout FROM frame_content WHERE n = 1"
     ).fetchone()
-    # SystemSkill.__init__ prints a self-introduction (Task 7)
-    assert "SystemSkill" in stdout or "_system" in stdout
+    # System.__init__ prints a self-introduction (Task 7)
+    assert "System" in stdout or "_system" in stdout
 
 
 def test_cold_start_obs_diff_json_is_empty_list(tmp_path: Path):

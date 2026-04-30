@@ -6,15 +6,16 @@ from unittest.mock import MagicMock
 def _make_main_cell_mock():
     """Return a MagicMock that behaves like a Cell for EventLoop's _frame_loop."""
     from vessal.ark.shell.hull.cell.protocol import StepResult
-    from vessal.skills.system.skill import SystemSkill
+    from vessal.skills.system.skill import System
 
     class _FakeKernel:
         def __init__(self):
             self.L: dict = {"_frame": 0, "signals": {}}
 
     fk = _FakeKernel()
-    sys_skill = SystemSkill()
+    sys_skill = System()
     sys_skill._bind_kernel(fk)
+    sys_skill.wake()
 
     cell = MagicMock()
     cell.L = fk.L

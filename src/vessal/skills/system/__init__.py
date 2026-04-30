@@ -1,4 +1,3 @@
-"""system — built-in SystemSkill carrying Kernel signals."""
-from .skill import SystemSkill as Skill
-
-__all__ = ["Skill"]
+"""system — built-in System skill carrying Kernel signals."""
+from .skill import System
+__all__ = ["System"]
