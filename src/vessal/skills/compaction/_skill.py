@@ -1,4 +1,4 @@
-"""CompactionSkill class — see docs/architecture/cell/06-compaction.md §6.3."""
+"""Compaction class — see docs/architecture/cell/06-compaction.md §6.3."""
 
 from __future__ import annotations
 
@@ -23,14 +23,14 @@ def _truncate(value: str | None, n: int) -> str:
     return value if len(value) <= n else value[:n] + "..."
 
 
-class CompactionSkill(BaseSkill):
+class Compaction(BaseSkill):
     name = "compaction"
     description = "frame compactor"
 
     def __init__(self, main_db_path: str) -> None:
         super().__init__()
         self._main_db_path = main_db_path
-        print(f"[CompactionSkill] bound to {main_db_path}", flush=True)
+        print(f"[Compaction] bound to {main_db_path}", flush=True)
 
     def write_summary(
         self,
