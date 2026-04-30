@@ -229,13 +229,13 @@ The description tells you what the Skill can do; the guide tells you how. Both a
 **Discovering and loading new Skills:**
 
 ```python
-available = skills.list()        # [{name, description}, ...]
-print(skills.load("skill_name"))  # load into namespace
-print(skill_name.guide)           # mandatory: read the operations manual
+available = skill_manager.list()        # [{name, description}, ...]
+print(skill_manager.load("skill_name"))  # load into namespace
+print(skill_name.guide)                  # mandatory: read the operations manual
 ```
 
 ```python
-print(skills.unload("skill_name"))  # unload when done; free context space
+print(skill_manager.unload("skill_name"))  # unload when done; free context space
 ```
 
 **Rules:**
