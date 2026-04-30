@@ -274,13 +274,13 @@ diff format:
 + changed_var = new     # then shows new value (same -/+ semantics as git diff)
 ```
 
-**Auxiliary signals** — auxiliary information recalculated each frame, separated by `══════ signal_name ══════`:
-- ══════ Tasks ══════ — current task path, notes, sibling tasks, global statistics
-- ══════ Verification ══════ — `<expect>` assertion results from recent frames (shown when there are failures)
-- ══════ Namespace Directory ══════ — type, size, and key metrics for all user variables
-- ══════ Memory ══════ — cross-session key-value memory
-- ══════ Pinned ══════ — current values of pinned variables
-- ══════ System ══════ — frame number, context usage, frame type, wake reason
+**Signals (══════ signals ══════)** — auxiliary information recalculated each frame. Inside the `signals` block, each signal item is delimited by `── ClassName · var_name (scope) ──` (scope is `G` or `L`). Common signal items:
+- `── TaskSkill · task (G) ──` — current task path, notes, sibling tasks, global statistics
+- `── System · _system (G) ──` — frame number, sleep/wake state, recent errors
+- `── MemorySkill · memory (G) ──` — cross-session key-value memory
+- `── PinSkill · pinned (L) ──` — current values of pinned variables
+
+The exact set depends on which Skills are loaded and what each Skill writes to its `signal` attribute.
 
 
 ══════ System Prompt Structure ══════
