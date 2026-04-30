@@ -23,7 +23,7 @@ from typing import Any
 from vessal.ark.shell.hull.cell.core import Core
 from vessal.ark.shell.hull.cell.gate import ActionGate, StateGate
 from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import Ping, Pong, StepResult
+from vessal.ark.shell.hull.cell.protocol import Ping, Pong, StepResult, LLMConfig
 from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class Cell:
         boot_script: str | None = None,
         timeout: float = 60.0,
         core_max_retries: int = 3,
-        api_params: dict[str, object] | None = None,
+        default_llm_config: LLMConfig | None = None,
         action_gate: str = "auto",
         state_gate: str = "auto",
         *,
@@ -63,8 +63,10 @@ class Cell:
                 When None, a minimal script (only _system) is used as a safe default.
             timeout: Request timeout in seconds, passed through to Core.
             core_max_retries: Network-layer retry count, passed through to Core.
-            api_params: API parameter dict passed through to Core, forwarded as **kwargs to
-                chat.completions.create(). Default: {"temperature": 0.7, "max_tokens": 4096}.
+            default_llm_config: LLMConfig used for every core.step() call this Cell makes.
+                Resolved by Hull from .env + hull.toml; carries api_key, base_url,
+                model, and api_params. None is allowed only for unit tests that mock
+                Core entirely; production Hull always passes a value.
             action_gate: ActionGate initial mode, "auto" | "safe" | "human".
             state_gate: StateGate initial mode, "auto" | "safe" | "human".
             cell_name: Logical Cell name, e.g. "main" or "compaction". Used by callers
@@ -100,11 +102,8 @@ class Cell:
             ])
 
         self._kernel = Kernel(boot_script=boot_script, db_path=db_path, restore_path=restore_path)
-        self._core = Core(
-            timeout=timeout,
-            max_retries=core_max_retries,
-            api_params=api_params,
-        )
+        self._core = Core(timeout=timeout, max_retries=core_max_retries)
+        self._default_llm_config = default_llm_config
         self._action_gate = ActionGate(mode=action_gate)
         self._state_gate = StateGate(mode=state_gate)
         self._ping: Ping | None = None
@@ -114,7 +113,10 @@ class Cell:
 
     @property
     def max_tokens(self) -> int:
-        return self._core.max_tokens
+        if self._default_llm_config is None:
+            return 4096
+        ap = self._default_llm_config.api_params
+        return ap.get("max_tokens", ap.get("max_completion_tokens", 4096))
 
     @property
     def action_gate(self) -> str:
@@ -202,8 +204,14 @@ class Cell:
         frame_number = self._kernel.L["_frame"] + 1
 
         try:
+            assert self._default_llm_config is not None, (
+                "Cell.step() requires default_llm_config; only unit tests that mock Core may pass None."
+            )
             self._pong, usage = self._core.step(
-                self._ping, tracer, frame_number,
+                self._ping,
+                self._default_llm_config,
+                tracer=tracer,
+                frame=frame_number,
             )
         except Exception as e:
             return StepResult(protocol_error=str(e))
