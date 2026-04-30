@@ -114,14 +114,18 @@ class SkillManager(BaseSkill):
         """Download and install a skill from SkillHub into <project>/skills/<name>/."""
         from vessal.ark.shell.hull.hub.installer import install
         from vessal.ark.shell.hull.hub.resolver import resolve
+        from vessal.ark.shell.cli.skills_init_writer import add as _register
 
         target_dir = Path(__file__).resolve().parent.parent  # <project>/skills/
 
         try:
             resolved = resolve(name)
-            return install(resolved, target_dir)
+            result = install(resolved, target_dir)
         except RuntimeError as e:
             return f"download failed: {e}"
+
+        _register(target_dir, name)
+        return result
 
     def list_hub(self, page: int = 1) -> str:
         """List skills available on SkillHub with pagination."""
