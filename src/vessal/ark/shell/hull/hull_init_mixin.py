@@ -157,15 +157,19 @@ class HullInitMixin:
 
         boot_script = compose_boot_script(boot_entries or [])
 
-        api_params = core_cfg.get("api_params", {
-            "temperature": cell_cfg.get("temperature", 0.7),
-            "max_tokens": cell_cfg.get("max_tokens", 4096),
-        })
+        main_llm_config = self._resolve_llm_config(core_cfg, cell_cfg)
+        logger.info(
+            "core config: model=%s base_url=%s api_key=%s api_params=%s",
+            main_llm_config.model,
+            main_llm_config.base_url,
+            self._redact_api_key(main_llm_config.api_key),
+            main_llm_config.api_params,
+        )
         self._main_cell = Cell(
             boot_script=boot_script,
             timeout=core_cfg.get("timeout", 60.0),
             core_max_retries=core_cfg.get("max_retries", 3),
-            api_params=api_params,
+            default_llm_config=main_llm_config,
             cell_name=cell_name,
             data_dir=str(data_dir_abs),
             restore_path=restore_path,
@@ -197,11 +201,22 @@ class HullInitMixin:
             snaps = sorted(compaction_snapshots_dir.glob("*.pkl"))
             compaction_restore = str(snaps[-1]) if snaps else None
 
+        compaction_llm_config = self._resolve_llm_config(
+            core_cfg, cell_cfg, overrides=compaction_cfg
+        )
+        if compaction_llm_config != main_llm_config:
+            logger.info(
+                "compaction core config: model=%s base_url=%s api_key=%s api_params=%s",
+                compaction_llm_config.model,
+                compaction_llm_config.base_url,
+                self._redact_api_key(compaction_llm_config.api_key),
+                compaction_llm_config.api_params,
+            )
         self._compaction_cell = Cell(
             boot_script=compaction_boot_script,
             timeout=core_cfg.get("timeout", 60.0),
             core_max_retries=core_cfg.get("max_retries", 3),
-            api_params=compaction_cfg.get("api_params", api_params),
+            default_llm_config=compaction_llm_config,
             cell_name="compaction",
             data_dir=str(compaction_data_dir_abs),
             restore_path=compaction_restore,
@@ -379,6 +394,45 @@ trace = false  # disable to reduce IO
                 logger.info("Loaded custom gate: %s", gate_type)
             except Exception as e:
                 logger.warning("Failed to load gates/%s.py: %s", gate_type, e)
+
+    def _resolve_llm_config(
+        self,
+        core_cfg: dict,
+        cell_cfg: dict,
+        overrides: dict | None = None,
+    ) -> "LLMConfig":
+        """Build an LLMConfig from env + hull.toml. Hull-only concern.
+
+        Precedence: overrides (per-cell hull.toml section) > [core.api_params] > defaults.
+        api_key/base_url/model come from environment (loaded via load_dotenv earlier
+        in _init_config; that load is the only env-touching point in Vessal).
+        """
+        import os
+        from vessal.ark.shell.hull.cell.protocol import LLMConfig
+
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        base_url = os.environ.get("OPENAI_BASE_URL", "")
+        model = os.environ.get("OPENAI_MODEL", "")
+
+        overrides = overrides or {}
+        api_params = overrides.get("api_params") or core_cfg.get("api_params", {
+            "temperature": cell_cfg.get("temperature", 0.7),
+            "max_tokens": cell_cfg.get("max_tokens", 4096),
+        })
+
+        return LLMConfig(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            api_params=dict(api_params),
+        )
+
+    @staticmethod
+    def _redact_api_key(api_key: str) -> str:
+        """Show first 3 + last 1 chars, mask middle. 'sk-***c' style."""
+        if len(api_key) <= 8:
+            return "***"
+        return f"{api_key[:3]}***{api_key[-1]}"
 
     def _compaction_preset_entries(self, main_db_path: str):
         """Boot Skill entries for the compaction Cell — _system + Compaction."""

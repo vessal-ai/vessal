@@ -204,9 +204,6 @@ class Cell:
         frame_number = self._kernel.L["_frame"] + 1
 
         try:
-            assert self._default_llm_config is not None, (
-                "Cell.step() requires default_llm_config; only unit tests that mock Core may pass None."
-            )
             self._pong, usage = self._core.step(
                 self._ping,
                 self._default_llm_config,
