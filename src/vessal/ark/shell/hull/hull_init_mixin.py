@@ -101,7 +101,7 @@ class HullInitMixin:
         Runs BEFORE _init_cell so the boot script is ready for Cell construction.
         """
         from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
-        from vessal.ark.shell.hull.skill_loader import SkillLoader
+        from vessal.ark.shell.hull.skill_loader import SkillLoader, _camel
 
         self._skill_manager = SkillLoader()
 
@@ -112,8 +112,7 @@ class HullInitMixin:
             except Exception as e:
                 print(f"[error] skill '{skill_name}' failed to register: {e}")
                 continue
-            cls_name = "".join(p.capitalize() for p in skill_name.split("_") if p)
-            entries.append(BootSkillEntry(skill_name, cls_name))
+            entries.append(BootSkillEntry(skill_name, _camel(skill_name)))
         return entries
 
     def _init_cell(
