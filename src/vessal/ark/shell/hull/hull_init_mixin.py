@@ -105,7 +105,7 @@ class HullInitMixin:
 
         self._skill_manager = SkillLoader()
 
-        entries = [BootSkillEntry("_system", "skills.system", "System", "")]
+        entries = [BootSkillEntry("_system", "System")]
         for skill_name in hull_cfg.get("skills", []):
             try:
                 self._skill_manager.load(skill_name)  # validates + registers; class discarded
@@ -113,7 +113,7 @@ class HullInitMixin:
                 print(f"[error] skill '{skill_name}' failed to register: {e}")
                 continue
             cls_name = "".join(p.capitalize() for p in skill_name.split("_") if p)
-            entries.append(BootSkillEntry(skill_name, f"skills.{skill_name}", cls_name, ""))
+            entries.append(BootSkillEntry(skill_name, cls_name))
         return entries
 
     def _init_cell(
@@ -385,15 +385,6 @@ trace = false  # disable to reduce IO
         """Boot Skill entries for the compaction Cell — _system + Compaction."""
         from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
         return [
-            BootSkillEntry(
-                var_name="_system",
-                import_path="skills.system.skill",  # avoids class_name collision with compaction
-                class_name="System",
-            ),
-            BootSkillEntry(
-                var_name="compaction",
-                import_path="skills.compaction._skill",
-                class_name="Compaction",
-                kwargs_repr=f"main_db_path={main_db_path!r}",
-            ),
+            BootSkillEntry("_system", "System"),
+            BootSkillEntry("compaction", "Compaction", f"main_db_path={main_db_path!r}"),
         ]
