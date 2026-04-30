@@ -77,7 +77,7 @@ def test_executor_result_has_stderr_field():
 def test_kernel_does_not_hardcode_obs_stderr_empty():
     """Kernel must pass exec_result.stderr to Observation, not hardcode empty string."""
     REPO_ROOT = Path(__file__).resolve().parents[3]
-    src = (REPO_ROOT / "src/vessal/ark/shell/hull/cell/kernel/kernel.py").read_text()
+    src = (REPO_ROOT / "src/vessal/cell/kernel/kernel.py").read_text()
     tree = ast.parse(src)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
