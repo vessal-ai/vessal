@@ -7,8 +7,8 @@ import sys
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel import source_cache
-from vessal.ark.shell.hull.cell.kernel.frame_log.schema import DDL
+from vessal.cell.kernel import source_cache
+from vessal.cell.kernel.frame_log.schema import DDL
 
 
 @pytest.fixture

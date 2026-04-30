@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from vessal.ark.shell.hull.cell.protocol import Observation
+from vessal.cell.protocol import Observation
 
 
 def test_observation_shape() -> None:
@@ -12,21 +12,21 @@ def test_observation_shape() -> None:
 
 
 def test_no_kernel_sleep_method() -> None:
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.kernel import Kernel
     assert not hasattr(Kernel, "sleep")
 
 
 def test_kernel_l_init_minimal() -> None:
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.kernel import Kernel
     k = Kernel(boot_script="")
     assert set(k.L.keys()) == {"_frame", "signals"}
 
 
 def test_dead_handle_unresolved_ref_transient_exported() -> None:
-    from vessal.ark.shell.hull.cell.kernel import (
+    from vessal.cell.kernel import (
         DeadHandle, transient,
     )
-    from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
+    from vessal.cell.kernel.lenient import UnresolvedRef
     assert callable(transient)
     assert DeadHandle.__name__ == "DeadHandle"
     assert UnresolvedRef.__name__ == "UnresolvedRef"

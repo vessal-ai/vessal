@@ -56,7 +56,7 @@ def test_no_raw_http_server_in_production():
             continue
         violations.extend(_scan_file(py_file))
     assert not violations, (
-        "Production code must use vessal.ark.shell.http_server.Safe*HTTPServer "
+        "Production code must use vessal.shell.http_server.Safe*HTTPServer "
         "instead of raw http.server.HTTPServer/ThreadingHTTPServer. "
         "Violations:\n  " + "\n  ".join(violations)
     )

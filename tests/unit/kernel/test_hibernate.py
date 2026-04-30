@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
+from vessal.cell.kernel.dead_handle import DeadHandle
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.kernel.lenient import UnresolvedRef
 
 
 class GoodHttpSkill:

@@ -23,10 +23,10 @@ import time
 
 import openai
 
-from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
-from vessal.ark.shell.hull.cell.protocol import Ping, Pong, LLMConfig
-from vessal.ark.shell.hull.cell.core.retry import is_retryable_error, calculate_backoff_seconds
-from vessal.ark.shell.hull.cell.core.parser import ParseError, parse_response
+from vessal.cell._tracer_protocol import TracerLike
+from vessal.cell.protocol import Ping, Pong, LLMConfig
+from vessal.cell.core.retry import is_retryable_error, calculate_backoff_seconds
+from vessal.cell.core.parser import ParseError, parse_response
 
 # Module-specific logger for Core
 logger = logging.getLogger("vessal.cell.core")
@@ -65,7 +65,7 @@ class Core:
 
     @staticmethod
     def _build_messages(ping: "Ping") -> list[dict]:
-        from vessal.ark.shell.hull.cell.core.composer import compose
+        from vessal.cell.core.composer import compose
         return compose(ping)
 
     def step(

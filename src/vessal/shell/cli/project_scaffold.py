@@ -39,7 +39,7 @@ def write_project_scaffold(project_dir: Path, install_venv: bool = True) -> None
             )
             copied.append(child.name)
 
-    from vessal.ark.shell.cli.skills_init_writer import write_initial
+    from vessal.shell.cli.skills_init_writer import write_initial
     write_initial(skills_dir, copied)
 
     _write_hull_toml(project_dir, project_name)

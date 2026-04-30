@@ -10,11 +10,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from vessal.ark.shell.hull._compaction_trigger import should_compact
-from vessal.ark.util.logging import Tracer
+from vessal.hull._compaction_trigger import should_compact
+from vessal.util.logging import Tracer
 
 if TYPE_CHECKING:
-    from vessal.ark.shell.hull.cell import Cell
+    from vessal.cell import Cell
 
 logger = logging.getLogger(__name__)
 

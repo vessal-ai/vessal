@@ -4,7 +4,7 @@ import os
 
 
 def test_hull_runtime_mixin_no_compaction_methods():
-    from vessal.ark.shell.hull import hull_runtime_mixin
+    from vessal.hull import hull_runtime_mixin
     src = open(hull_runtime_mixin.__file__).read()
     assert "_drain_compaction_results" not in src
     assert "_try_shift_compaction" not in src
@@ -12,7 +12,7 @@ def test_hull_runtime_mixin_no_compaction_methods():
 
 
 def test_hull_no_compaction_thread_pool():
-    from vessal.ark.shell.hull import hull_init_mixin
+    from vessal.hull import hull_init_mixin
     src = open(hull_init_mixin.__file__).read()
     assert "_compaction_thread_pool" not in src
     assert "_compaction_result_queue" not in src

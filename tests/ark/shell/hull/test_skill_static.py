@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.hull_api import HullApi, ScopedHullApi, StaticResponse
-from vessal.ark.shell.hull.skill_static import StaticRouter
+from vessal.hull.hull_api import HullApi, ScopedHullApi, StaticResponse
+from vessal.hull.skill_static import StaticRouter
 
 
 @pytest.fixture

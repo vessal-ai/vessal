@@ -10,7 +10,7 @@ This module defines the return type of handle(), shared by all adapters.
 from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from vessal.ark.shell.hull.hull_api import StaticResponse
+    from vessal.hull.hull_api import StaticResponse
 
 # handle() return type: (status code, JSON dict or StaticResponse)
 HandleResult = tuple[int, Union[dict, "StaticResponse"]]

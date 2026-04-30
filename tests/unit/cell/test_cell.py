@@ -10,11 +10,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vessal.ark.shell.hull.cell import Cell
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell import Cell
+from vessal.cell.protocol import (
     Action, Ping, Pong, State, StepResult,
 )
-from vessal.ark.shell.hull.cell.core.parser import parse_response
+from vessal.cell.core.parser import parse_response
 
 
 # ============================================================
@@ -24,7 +24,7 @@ from vessal.ark.shell.hull.cell.core.parser import parse_response
 
 def _make_cell(**kwargs) -> Cell:
     """Create a Cell; remaining args are passed through."""
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+    with patch("vessal.cell.core.core.openai.OpenAI"):
         return Cell(**kwargs)
 
 
@@ -39,7 +39,7 @@ def _set_responses(cell: Cell, raw_texts: list) -> None:
     If a list element is an Exception instance, it is raised directly.
     If it is a str, parsing is attempted: success returns (Pong, {}), failure raises ParseError.
     """
-    from vessal.ark.shell.hull.cell.core.parser import ParseError as _ParseError
+    from vessal.cell.core.parser import ParseError as _ParseError
 
     def _build(item):
         if isinstance(item, Exception):
@@ -91,7 +91,7 @@ class TestConstructor:
 
     def test_api_params_forwarded_via_llm_config(self):
         """api_params forwarded via default_llm_config are accessible on the Cell."""
-        from vessal.ark.shell.hull.cell.protocol import LLMConfig
+        from vessal.cell.protocol import LLMConfig
         cfg = LLMConfig(api_key="k", base_url="u", model="m",
                         api_params={"temperature": 0.3, "max_tokens": 2048})
         cell = _make_cell(default_llm_config=cfg)
@@ -295,7 +295,7 @@ class TestCommitFrame:
         cell = _make_cell()
         _set_responses(cell, [_action_with_expect("x = 5", "assert x == 5")])
         cell.step()
-        from vessal.ark.shell.hull.cell.protocol import Verdict
+        from vessal.cell.protocol import Verdict
         assert isinstance(cell.L["verdict"], Verdict)
 
 

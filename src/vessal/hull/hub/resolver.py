@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from vessal.ark.shell.hull.hub.registry import Registry
+from vessal.hull.hub.registry import Registry
 
 
 @dataclass

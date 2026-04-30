@@ -1,5 +1,5 @@
 """Tests for ~/.vessal/recent.json read/write/dedup."""
-from vessal.ark.shell.tui.recent import RecentProjects
+from vessal.shell.tui.recent import RecentProjects
 
 
 def test_append_and_list(tmp_path, monkeypatch):

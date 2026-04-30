@@ -7,7 +7,7 @@ to whichever import comes last, and every var ends up pointing at the same class
 """
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
+from vessal.cell.kernel.boot import compose_boot_script, BootSkillEntry
 
 
 def test_boot_script_uses_unique_class_per_var():

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vessal.ark.shell.hull.cell.protocol import Pong, Action
+from vessal.cell.protocol import Pong, Action
 
 
 def _canned_main_pong():
@@ -39,8 +39,8 @@ def _write_minimal_project(path) -> None:
 
 
 def test_layer1_entry_lands_after_k_main_frames(tmp_path):
-    from vessal.ark.shell.hull import Hull
-    from vessal.ark.shell.hull._compaction_trigger import should_compact
+    from vessal.hull import Hull
+    from vessal.hull._compaction_trigger import should_compact
 
     _write_minimal_project(tmp_path)
     hull = Hull(project_dir=str(tmp_path))

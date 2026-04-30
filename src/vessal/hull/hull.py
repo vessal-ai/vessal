@@ -13,10 +13,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.hull.hull_init_mixin import HullInitMixin
-from vessal.ark.shell.hull.hull_skills_mixin import HullSkillsMixin
-from vessal.ark.shell.hull.hull_snapshot_mixin import HullSnapshotMixin
-from vessal.ark.shell.hull.hull_runtime_mixin import HullRuntimeMixin
+from vessal.hull.hull_init_mixin import HullInitMixin
+from vessal.hull.hull_skills_mixin import HullSkillsMixin
+from vessal.hull.hull_snapshot_mixin import HullSnapshotMixin
+from vessal.hull.hull_runtime_mixin import HullRuntimeMixin
 
 
 class Hull(HullInitMixin, HullSkillsMixin, HullSnapshotMixin, HullRuntimeMixin):

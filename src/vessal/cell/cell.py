@@ -20,11 +20,11 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from vessal.ark.shell.hull.cell.core import Core
-from vessal.ark.shell.hull.cell.gate import ActionGate, StateGate
-from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import Ping, Pong, StepResult, LLMConfig
-from vessal.ark.shell.hull.cell._tracer_protocol import TracerLike
+from vessal.cell.core import Core
+from vessal.cell.gate import ActionGate, StateGate
+from vessal.cell.kernel import Kernel
+from vessal.cell.protocol import Ping, Pong, StepResult, LLMConfig
+from vessal.cell._tracer_protocol import TracerLike
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class Cell:
                 frame_log is opened (back-compat for callers that do not yet pass it).
             restore_path: If not None, restore namespace from snapshot after boot.
         """
-        from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
+        from vessal.cell.kernel.boot import compose_boot_script, BootSkillEntry
         self.cell_name = cell_name
         self._data_dir = data_dir
 
@@ -215,7 +215,7 @@ class Cell:
 
         if self._data_dir is not None and usage:
             from datetime import datetime, timezone
-            from vessal.ark.shell.hull.cell.core.telemetry import append_usage
+            from vessal.cell.core.telemetry import append_usage
             append_usage(
                 Path(self._data_dir) / "cache_metrics.jsonl",
                 {"frame": frame_number, **usage,
@@ -254,7 +254,7 @@ class Cell:
             return wrapper
 
         def _wrap_state(user_fn):
-            from vessal.ark.shell.hull.cell.protocol import FrameStream as _FrameStream
+            from vessal.cell.protocol import FrameStream as _FrameStream
             def wrapper(value: _FrameStream) -> str | None:
                 allowed, reason = user_fn(value)
                 return None if allowed else reason

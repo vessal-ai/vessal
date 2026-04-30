@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.skill_loader import SkillLoader, _camel
+from vessal.hull.skill_loader import SkillLoader, _camel
 
 
 def _make_skill(skills_dir: Path, name: str, class_name: str | None = None, body: str = "") -> None:

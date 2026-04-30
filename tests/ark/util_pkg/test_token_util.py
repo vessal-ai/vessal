@@ -1,6 +1,6 @@
 """test_token_util.py — Unit tests for estimate_tokens."""
 
-from vessal.ark.util.token_util import estimate_tokens
+from vessal.util.token_util import estimate_tokens
 
 
 class TestEstimateTokens:

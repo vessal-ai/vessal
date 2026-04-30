@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 def test_signal_update_callable_from_non_construction_thread(tmp_path: Path):
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-    from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
+    from vessal.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.boot import compose_boot_script, BootSkillEntry
 
     db = tmp_path / "frame_log.sqlite"
     script = compose_boot_script([
@@ -32,8 +32,8 @@ def test_signal_update_callable_from_non_construction_thread(tmp_path: Path):
 
 
 def test_signal_update_no_db_does_not_crash(tmp_path: Path):
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-    from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
+    from vessal.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.boot import compose_boot_script, BootSkillEntry
 
     script = compose_boot_script([
         BootSkillEntry("_system", "System"),

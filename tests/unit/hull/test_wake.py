@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from vessal.ark.shell.hull.event_loop import EventLoop
+from vessal.hull.event_loop import EventLoop
 from vessal.skills.system.skill import System
 
 

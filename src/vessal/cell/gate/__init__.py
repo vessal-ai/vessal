@@ -10,7 +10,7 @@ Both gates support three modes:
 - "human": reserved for future human confirmation (currently equivalent to safe)
 """
 
-from vessal.ark.shell.hull.cell.gate.action_gate import ActionGate, ActionGateResult
-from vessal.ark.shell.hull.cell.gate.state_gate import StateGate, StateGateResult
+from vessal.cell.gate.action_gate import ActionGate, ActionGateResult
+from vessal.cell.gate.state_gate import StateGate, StateGateResult
 
 __all__ = ["ActionGate", "ActionGateResult", "StateGate", "StateGateResult"]

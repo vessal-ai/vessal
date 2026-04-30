@@ -1,7 +1,7 @@
 """executor stderr capture — spec §3.2 requires both stdout and stderr captured."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.kernel.executor import execute
+from vessal.cell.kernel.executor import execute
 
 
 def test_execute_captures_stderr():

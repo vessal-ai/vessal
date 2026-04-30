@@ -1,7 +1,7 @@
 """test_server_routes — chat/server.py start() mounts expected UI routes."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.hull_api import HullApi, ScopedHullApi
+from vessal.hull.hull_api import HullApi, ScopedHullApi
 from vessal.skills.chat import server as chat_server
 
 

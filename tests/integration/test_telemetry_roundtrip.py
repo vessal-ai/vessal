@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vessal.ark.shell.hull.cell.cell import Cell
-from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from vessal.cell.cell import Cell
+from vessal.cell.protocol import Action, Pong
 
 
 def _stub_pong(op: str = "x = 1"):
@@ -28,9 +28,9 @@ def _stub_usage(frame_index: int):
 @pytest.fixture
 def cell_with_data_dir(tmp_path):
     from unittest.mock import patch
-    from vessal.ark.shell.hull.cell.protocol import LLMConfig
+    from vessal.cell.protocol import LLMConfig
     cfg = LLMConfig(api_key="k", base_url="u", model="m", api_params={})
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+    with patch("vessal.cell.core.core.openai.OpenAI"):
         cell = Cell(data_dir=str(tmp_path), default_llm_config=cfg)
     return cell, tmp_path
 

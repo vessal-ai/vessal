@@ -1,6 +1,6 @@
 """Tests for replace_rules on ActionGate and StateGate."""
-from vessal.ark.shell.hull.cell.gate.action_gate import ActionGate
-from vessal.ark.shell.hull.cell.gate.state_gate import StateGate
+from vessal.cell.gate.action_gate import ActionGate
+from vessal.cell.gate.state_gate import StateGate
 
 
 def test_action_gate_replace_rules_clears_then_appends():

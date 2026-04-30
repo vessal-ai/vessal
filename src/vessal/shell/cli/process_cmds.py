@@ -6,7 +6,7 @@ import fcntl
 import sys
 from pathlib import Path
 
-from vessal.ark.shell.cli.process_utils import (
+from vessal.shell.cli.process_utils import (
     _is_project_running,
     _is_port_in_use,
     _read_lock_port,
@@ -82,7 +82,7 @@ def _start_foreground(args: argparse.Namespace) -> None:
     import subprocess
     import tomllib
 
-    from vessal.ark.shell.server import ShellServer
+    from vessal.shell.server import ShellServer
 
     project_dir = Path(args.dir).resolve()
     if not (project_dir / "hull.toml").exists():

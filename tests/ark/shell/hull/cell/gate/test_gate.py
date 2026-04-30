@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from vessal.ark.shell.hull.cell.gate import ActionGate, ActionGateResult, StateGate, StateGateResult
-from vessal.ark.shell.hull.cell.protocol import FrameStream
+from vessal.cell.gate import ActionGate, ActionGateResult, StateGate, StateGateResult
+from vessal.cell.protocol import FrameStream
 
 
 # ────────────────────────────────────────────── ActionGate

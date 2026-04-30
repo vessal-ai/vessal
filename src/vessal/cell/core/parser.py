@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from vessal.cell.protocol import Action, Pong
 
 _TAG_PATTERN = re.compile(
     r"<(action|think|expect)>(.*?)</\1>",

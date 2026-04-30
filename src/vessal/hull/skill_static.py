@@ -12,10 +12,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from vessal.ark.shell.hull.hull_api import StaticResponse
+from vessal.hull.hull_api import StaticResponse
 
 if TYPE_CHECKING:
-    from vessal.ark.shell.hull.hull_api import ScopedHullApi
+    from vessal.hull.hull_api import ScopedHullApi
 
 
 class StaticRouter:

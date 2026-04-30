@@ -12,7 +12,7 @@ import pytest
 
 @pytest.fixture
 def safe_classes():
-    from vessal.ark.shell.http_server import SafeHTTPServer, SafeThreadingHTTPServer
+    from vessal.shell.http_server import SafeHTTPServer, SafeThreadingHTTPServer
     return SafeHTTPServer, SafeThreadingHTTPServer
 
 

@@ -1,7 +1,7 @@
 """subprocess_mode.py — Hull subprocess carrier entry point.
 
 Spawned by ShellServer via:
-    python -m vessal.ark.shell.runtime.subprocess_mode --dir PROJECT_DIR --port INTERNAL_PORT
+    python -m vessal.shell.runtime.subprocess_mode --dir PROJECT_DIR --port INTERNAL_PORT
 
 Boot sequence:
     1. Create Hull
@@ -17,8 +17,8 @@ import asyncio
 import threading
 from pathlib import Path
 
-from vessal.ark.shell.http_server import SafeHTTPServer
-from vessal.ark.shell.runtime.hull_adapter import HullHttpHandlerBase
+from vessal.shell.http_server import SafeHTTPServer
+from vessal.shell.runtime.hull_adapter import HullHttpHandlerBase
 
 
 class SubprocessHullHandler(HullHttpHandlerBase):
@@ -33,7 +33,7 @@ def main() -> None:
 
     project_dir = Path(args.dir).resolve()
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
 
     hull = Hull(str(project_dir))
 

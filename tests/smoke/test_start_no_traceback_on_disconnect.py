@@ -35,7 +35,7 @@ def agent_project(tmp_path: Path):
     Writes a stub .env so openai.OpenAI() initialises without a real key.
     The test never makes an LLM call; it only verifies the HTTP layer.
     """
-    from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+    from vessal.shell.cli.project_scaffold import write_project_scaffold
 
     project = tmp_path / "agent"
     write_project_scaffold(project, install_venv=False)

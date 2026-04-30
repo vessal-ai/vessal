@@ -100,8 +100,8 @@ class HullInitMixin:
 
         Runs BEFORE _init_cell so the boot script is ready for Cell construction.
         """
-        from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
-        from vessal.ark.shell.hull.skill_loader import SkillLoader, _camel
+        from vessal.cell.kernel.boot import BootSkillEntry
+        from vessal.hull.skill_loader import SkillLoader, _camel
 
         self._skill_manager = SkillLoader()
 
@@ -131,9 +131,9 @@ class HullInitMixin:
         to compose_boot_script so Cell/Kernel can exec skill instantiation on boot.
         """
         import os
-        from vessal.ark.shell.hull.cell import Cell
-        from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script
-        from vessal.ark.util.logging import Tracer
+        from vessal.cell import Cell
+        from vessal.cell.kernel.boot import compose_boot_script
+        from vessal.util.logging import Tracer
 
         cells_cfg = cells_cfg or {}
         main_cfg = cells_cfg.get("main", {})
@@ -225,7 +225,7 @@ class HullInitMixin:
 
     def _init_skills(self, hull_cfg: dict) -> None:
         """Phase 3: route table, bind hull to G skills, start servers."""
-        from vessal.ark.shell.hull.hull_api import HullApi
+        from vessal.hull.hull_api import HullApi
 
         self._main_cell.L["_builtin_names"] = []
         self._main_cell.L["_data_dir"] = str(self._project_dir / "data")
@@ -272,7 +272,7 @@ class HullInitMixin:
 
     def _init_loop(self, gates_cfg: dict) -> None:
         """Phase 5: Gates, FrameHooks, EventLoop, wake injection."""
-        from vessal.ark.shell.hull.event_loop import EventLoop, FrameHooks
+        from vessal.hull.event_loop import EventLoop, FrameHooks
 
         if "state_gate" in gates_cfg:
             self._main_cell.state_gate = gates_cfg["state_gate"]
@@ -283,7 +283,7 @@ class HullInitMixin:
         self._rewrite_runtime_owned()
         self._main_cell.G["_system_prompt"] = self._prompt_builder.build(self._main_cell.G)
 
-        from vessal.ark.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
+        from vessal.util.compaction_prompts import COMPACTION_SYSTEM_PROMPT
         self._compaction_cell.G["_system_prompt"] = COMPACTION_SYSTEM_PROMPT
 
         hooks = FrameHooks(
@@ -408,7 +408,7 @@ trace = false  # disable to reduce IO
         in _init_config; that load is the only env-touching point in Vessal).
         """
         import os
-        from vessal.ark.shell.hull.cell.protocol import LLMConfig
+        from vessal.cell.protocol import LLMConfig
 
         api_key = os.environ.get("OPENAI_API_KEY", "")
         base_url = os.environ.get("OPENAI_BASE_URL", "")
@@ -436,7 +436,7 @@ trace = false  # disable to reduce IO
 
     def _compaction_preset_entries(self, main_db_path: str):
         """Boot Skill entries for the compaction Cell — _system + Compaction."""
-        from vessal.ark.shell.hull.cell.kernel.boot import BootSkillEntry
+        from vessal.cell.kernel.boot import BootSkillEntry
         return [
             BootSkillEntry("_system", "System"),
             BootSkillEntry("compaction", "Compaction", f"main_db_path={main_db_path!r}"),

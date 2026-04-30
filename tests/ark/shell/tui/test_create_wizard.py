@@ -1,7 +1,7 @@
 """test_create_wizard — unit tests for wizard finalize + env template logic."""
 from __future__ import annotations
 
-from vessal.ark.shell.tui.create_wizard import DEFAULT_ANSWERS, _build_env_content, finalize_answers
+from vessal.shell.tui.create_wizard import DEFAULT_ANSWERS, _build_env_content, finalize_answers
 
 
 def test_build_env_content_all_values_provided():
@@ -57,7 +57,7 @@ def test_finalize_fills_missing_with_defaults():
 
 
 def test_validate_project_name_rejects_existing_dir(tmp_path):
-    from vessal.ark.shell.tui.create_wizard import validate_project_name
+    from vessal.shell.tui.create_wizard import validate_project_name
     (tmp_path / "agent_test").mkdir()
     error = validate_project_name("agent_test", tmp_path)
     assert error is not None
@@ -66,12 +66,12 @@ def test_validate_project_name_rejects_existing_dir(tmp_path):
 
 
 def test_validate_project_name_accepts_unused_name(tmp_path):
-    from vessal.ark.shell.tui.create_wizard import validate_project_name
+    from vessal.shell.tui.create_wizard import validate_project_name
     assert validate_project_name("fresh-agent", tmp_path) is None
 
 
 def test_validate_project_name_rejects_empty(tmp_path):
-    from vessal.ark.shell.tui.create_wizard import validate_project_name
+    from vessal.shell.tui.create_wizard import validate_project_name
     error = validate_project_name("", tmp_path)
     assert error is not None
     assert "empty" in error.lower()

@@ -83,10 +83,10 @@ def test_cell_imports_no_hull_or_shell():
     """Cell does not import Hull or Shell."""
     violations = _scan_imports(
         str(_REPO_ROOT / "src/vessal/ark/shell/hull/cell"),
-        ["vessal.ark.shell.hull.hull", "vessal.ark.shell.hull.event_loop",
-         "vessal.ark.shell.hull.skill_loader",
-         "vessal.ark.shell.hull.skill",
-         "vessal.ark.shell.server", "vessal.ark.shell.cli",
+        ["vessal.hull.hull", "vessal.hull.event_loop",
+         "vessal.hull.skill_loader",
+         "vessal.hull.skill",
+         "vessal.shell.server", "vessal.shell.cli",
          "vessal.hull", "vessal.shell"],
     )
     assert violations == [], "Cell isolation violations:\n" + "\n".join(violations)
@@ -96,7 +96,7 @@ def test_cell_imports_no_util_logging():
     """Cell must not import ark.util.logging (TracerLike Protocol is the boundary)."""
     violations = _scan_imports(
         str(_REPO_ROOT / "src/vessal/ark/shell/hull/cell"),
-        ["vessal.ark.util.logging"],
+        ["vessal.util.logging"],
     )
     assert violations == [], "Cell must use TracerLike Protocol, not ark.util.logging directly:\n" + "\n".join(violations)
 
@@ -105,7 +105,7 @@ def test_hull_imports_no_shell():
     """Hull does not import Shell boundary code (server/cli)."""
     violations = _scan_imports(
         str(_REPO_ROOT / "src/vessal/ark/shell/hull"),
-        ["vessal.ark.shell.server", "vessal.ark.shell.cli", "vessal.shell"],
+        ["vessal.shell.server", "vessal.shell.cli", "vessal.shell"],
     )
     assert violations == [], "Hull isolation violations:\n" + "\n".join(violations)
 

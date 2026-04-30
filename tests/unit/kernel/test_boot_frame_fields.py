@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+from vessal.cell.kernel.kernel import Kernel
 
 
 def test_boot_frame_pong_expect_is_empty_string(tmp_path: Path):

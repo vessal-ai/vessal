@@ -21,11 +21,11 @@ import contextlib
 import io
 import logging
 
-from vessal.ark.shell.hull.cell.kernel.dead_handle import DeadHandle
-from vessal.ark.shell.hull.cell.kernel.executor import execute
-from vessal.ark.shell.hull.cell.kernel.expect import evaluate_expect
-from vessal.ark.shell.hull.cell.kernel.transient import is_transient_value
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.kernel.dead_handle import DeadHandle
+from vessal.cell.kernel.executor import execute
+from vessal.cell.kernel.expect import evaluate_expect
+from vessal.cell.kernel.transient import is_transient_value
+from vessal.cell.protocol import (
     FRAME_SCHEMA_VERSION,
     FrameRecord,
     FrameStream,
@@ -34,9 +34,9 @@ from vessal.ark.shell.hull.cell.protocol import (
     Pong,
     State,
 )
-from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
-from vessal.ark.shell.hull.cell.kernel import source_cache
-from vessal.ark.shell.hull.cell.kernel.lenient import LenientUnpickler
+from vessal.cell.kernel.frame_log import FrameLog, open_db
+from vessal.cell.kernel import source_cache
+from vessal.cell.kernel.lenient import LenientUnpickler
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ class Kernel:
         n = last + 1
         diff_json = self._compute_boot_diff_json(l_before_restore)
 
-        from vessal.ark.shell.hull.cell.kernel.frame_log.types import FrameWriteSpec
+        from vessal.cell.kernel.frame_log.types import FrameWriteSpec
         spec = FrameWriteSpec(
             n=n,
             pong_think="",
@@ -229,7 +229,7 @@ class Kernel:
             self._signal_scan()
 
         # ⑤ render frame_stream from SQLite + assemble Ping dataclass
-        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        from vessal.cell.kernel.frame_log.reader import render_frame_stream
         if self.frame_log is not None:
             fs = render_frame_stream(self.frame_log.conn)
         else:
@@ -249,7 +249,7 @@ class Kernel:
         import tempfile
 
         path = str(path)
-        from vessal.ark.shell.hull.cell.kernel.hibernate import call_hibernate, has_hibernate
+        from vessal.cell.kernel.hibernate import call_hibernate, has_hibernate
 
         to_dump: dict = {}
         for key, value in self.L.items():
@@ -295,8 +295,8 @@ class Kernel:
 
     def restore(self, path: str) -> None:
         """Restore L from file. sys.modules populated by boot script before this runs."""
-        from vessal.ark.shell.hull.cell.kernel.hibernate import call_wake, is_hibernated_tuple
-        from vessal.ark.shell.hull.cell.kernel.lenient import UnresolvedRef
+        from vessal.cell.kernel.hibernate import call_wake, is_hibernated_tuple
+        from vessal.cell.kernel.lenient import UnresolvedRef
 
         with open(path, "rb") as f:
             raw = f.read()
@@ -420,7 +420,7 @@ class Kernel:
         """
         import json as _json
         import traceback as _tb
-        from vessal.ark.shell.hull.cell.kernel.frame_log.types import ErrorOnSource, FrameWriteSpec, SignalRow
+        from vessal.cell.kernel.frame_log.types import ErrorOnSource, FrameWriteSpec, SignalRow
 
         obs = record.observation
         operation_error_text: str | None

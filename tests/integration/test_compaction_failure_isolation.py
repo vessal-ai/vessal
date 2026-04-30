@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from vessal.ark.shell.hull.cell.protocol import Pong, Action
+from vessal.cell.protocol import Pong, Action
 
 
 def _good_main_pong():
@@ -21,8 +21,8 @@ def _write_minimal_project(path) -> None:
 
 def test_main_cell_keeps_stepping_when_compaction_raises(tmp_path):
     import sqlite3
-    from vessal.ark.shell.hull import Hull
-    from vessal.ark.shell.hull._compaction_trigger import should_compact
+    from vessal.hull import Hull
+    from vessal.hull._compaction_trigger import should_compact
 
     _write_minimal_project(tmp_path)
     hull = Hull(project_dir=str(tmp_path))

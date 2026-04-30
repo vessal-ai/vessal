@@ -1,8 +1,8 @@
 """_system Skill: signal values come from SQLite and Skill slots, not from L keys."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.protocol import Action, Pong
 
 
 def _kernel(tmp_path):

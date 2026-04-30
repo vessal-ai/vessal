@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
+from vessal.cell.protocol import FRAME_SCHEMA_VERSION
 
 
 
@@ -29,7 +29,7 @@ def _make_hull_with_mock_cell(tmp_path):
         encoding="utf-8",
     )
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     hull = Hull(str(tmp_path))
     return hull
 

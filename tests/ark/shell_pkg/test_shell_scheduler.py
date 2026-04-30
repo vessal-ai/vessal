@@ -42,7 +42,7 @@ class TestHeartbeatSkillServer:
 
     def test_shell_server_is_pure_http(self):
         """ShellServer no longer has _scheduler_thread or heartbeat parameter."""
-        from vessal.ark.shell.server import ShellServer
+        from vessal.shell.server import ShellServer
         import inspect
         sig = inspect.signature(ShellServer.__init__)
         assert "heartbeat" not in sig.parameters

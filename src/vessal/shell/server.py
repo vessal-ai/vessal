@@ -9,9 +9,9 @@ import threading
 import time
 from pathlib import Path
 
-from vessal.ark.shell.events import EventBus
-from vessal.ark.shell.cli.hot_reload import HotReloader
-from vessal.ark.shell.http_server import SafeThreadingHTTPServer
+from vessal.shell.events import EventBus
+from vessal.shell.cli.hot_reload import HotReloader
+from vessal.shell.http_server import SafeThreadingHTTPServer
 
 _logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class _ProxyHandler(http.server.BaseHTTPRequestHandler):
         from pathlib import Path as _Path
         import vessal
 
-        root = _Path(vessal.__file__).resolve().parent / "console_spa"
+        root = _Path(vessal.__file__).resolve().parent / "console"
         if path in ("/console", "/console/"):
             rel = "index.html"
         else:
@@ -284,7 +284,7 @@ class ShellServer:
         self._frame_publisher.start()
 
         try:
-            from vessal.ark.shell.tui.recent import RecentProjects
+            from vessal.shell.tui.recent import RecentProjects
             RecentProjects().add(self._project_dir)
         except Exception:
             pass  # recent tracking is best-effort; never block startup
@@ -319,7 +319,7 @@ class ShellServer:
         cmd = [
             sys.executable,
             "-m",
-            "vessal.ark.shell.runtime.subprocess_mode",
+            "vessal.shell.runtime.subprocess_mode",
             "--dir",
             self._project_dir,
             "--port",

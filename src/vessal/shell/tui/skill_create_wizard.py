@@ -24,7 +24,7 @@ def validate_skill_name(name: str) -> str | None:
 
 def run_skill_create_wizard() -> SkillCreateChoices:
     """Run the skill-create wizard and return the user's choices."""
-    from vessal.ark.shell.tui.inline_prompt import ask_text, ask_yes_no
+    from vessal.shell.tui.inline_prompt import ask_text, ask_yes_no
 
     print("Vessal skill scaffold wizard (press Enter to accept defaults, Ctrl-C to cancel)")
     print()

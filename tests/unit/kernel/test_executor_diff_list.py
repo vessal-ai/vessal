@@ -1,7 +1,7 @@
 """executor _compute_diff returns list[{op,name,type}] per spec §3.4."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.kernel.executor import execute
+from vessal.cell.kernel.executor import execute
 
 
 def test_diff_new_var_is_plus_op_with_type():

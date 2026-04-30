@@ -11,7 +11,7 @@ Responsibilities:
 - Handle SIGTERM for graceful shutdown
 
 Usage:
-    python -m vessal.ark.shell.runtime.container_mode [--dir /app/agent] [--port 8420]
+    python -m vessal.shell.runtime.container_mode [--dir /app/agent] [--port 8420]
 
 Differences from subprocess_mode:
 - Binds 0.0.0.0 (container port), not 127.0.0.1 (internal port)
@@ -30,8 +30,8 @@ import sys
 import threading
 from pathlib import Path
 
-from vessal.ark.shell.http_server import SafeHTTPServer
-from vessal.ark.shell.runtime.hull_adapter import HullHttpHandlerBase
+from vessal.shell.http_server import SafeHTTPServer
+from vessal.shell.runtime.hull_adapter import HullHttpHandlerBase
 
 logger = logging.getLogger("vessal.container")
 
@@ -158,7 +158,7 @@ def main() -> None:
     if image_src.exists():
         sync_image_to_volume(image_src, project_dir)
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
 
     hull = Hull(str(project_dir))
 

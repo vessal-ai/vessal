@@ -9,14 +9,14 @@ from pathlib import Path
 CELL_ROOT = Path(__file__).resolve().parents[3] / "src/vessal/ark/shell/hull/cell"
 
 FORBIDDEN_IMPORTS = {
-    "vessal.ark.util.logging",      # A1 — use TracerLike Protocol instead
-    "vessal.ark.shell.hull",         # A2 — Cell must not know Hull modules outside cell/
+    "vessal.util.logging",      # A1 — use TracerLike Protocol instead
+    "vessal.hull",         # A2 — Cell must not know Hull modules outside cell/
 }
 
 # Prefixes that are allowed even though they start with a forbidden prefix.
-# Cell's own sub-packages live under vessal.ark.shell.hull.cell and are permitted.
+# Cell's own sub-packages live under vessal.cell and are permitted.
 ALLOWED_PREFIXES = {
-    "vessal.ark.shell.hull.cell",
+    "vessal.cell",
 }
 
 FORBIDDEN_PATTERNS = {
@@ -100,7 +100,7 @@ def test_kernel_does_not_import_render_module():
     """Spec §1.4: Kernel does not stringify."""
     import os
     import importlib
-    kernel_mod = importlib.import_module("vessal.ark.shell.hull.cell.kernel.kernel")
+    kernel_mod = importlib.import_module("vessal.cell.kernel.kernel")
     kernel_dir = os.path.dirname(kernel_mod.__file__)
     forbidden = {"render", "frame_stream", "compression_parser"}
     for root, dirs, files in os.walk(kernel_dir):
@@ -111,14 +111,14 @@ def test_kernel_does_not_import_render_module():
                 continue
             text = open(os.path.join(root, f)).read()
             for sym in forbidden:
-                bad = f"from vessal.ark.shell.hull.cell.kernel.{sym}"
+                bad = f"from vessal.cell.kernel.{sym}"
                 assert bad not in text, f"{f} imports forbidden {sym}"
 
 
 def test_kernel_does_not_compute_token_budget():
     """Spec §1.4: Kernel does not compute token budgets."""
     import inspect
-    from vessal.ark.shell.hull.cell.kernel import kernel
+    from vessal.cell.kernel import kernel
     src = inspect.getsource(kernel)
     forbidden = ["estimate_tokens", "_context_budget", "_token_budget", "_budget_total", "_context_pct"]
     for sym in forbidden:
@@ -128,7 +128,7 @@ def test_kernel_does_not_compute_token_budget():
 def test_ping_state_protocol_is_dataclass():
     """Spec §4.8: State.frame_stream is FrameStream dataclass, signals is dict."""
     import dataclasses
-    from vessal.ark.shell.hull.cell.protocol import State, FrameStream
+    from vessal.cell.protocol import State, FrameStream
     fields = {f.name: f.type for f in dataclasses.fields(State)}
     assert "frame_stream" in fields
     assert "signals" in fields

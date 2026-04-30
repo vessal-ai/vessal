@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.executor import ExecResult, execute, is_user_var
+from vessal.cell.kernel.executor import ExecResult, execute, is_user_var
 
 
 def _ns() -> dict:
@@ -276,7 +276,7 @@ class TestLinecacheRegistration:
 
 class TestExecuteThreeArg:
     def test_execute_writes_to_L_not_G(self):
-        from vessal.ark.shell.hull.cell.kernel.executor import execute
+        from vessal.cell.kernel.executor import execute
         G = {}
         L = {}
         result = execute("foo = 1", G, L, frame_number=1)
@@ -285,7 +285,7 @@ class TestExecuteThreeArg:
         assert result.error is None
 
     def test_execute_reads_g_via_legb_fallback(self):
-        from vessal.ark.shell.hull.cell.kernel.executor import execute
+        from vessal.cell.kernel.executor import execute
         G = {"helper": lambda: 7}
         L = {}
         execute("result = helper()", G, L, frame_number=2)

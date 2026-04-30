@@ -13,7 +13,7 @@
 
 import pytest
 
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.protocol import (
     Action,
     FrameRecord,
     FrameStream,

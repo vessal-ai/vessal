@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 from unittest.mock import MagicMock
 
-from vessal.ark.shell.runtime.hull_adapter import HullHttpHandlerBase
+from vessal.shell.runtime.hull_adapter import HullHttpHandlerBase
 
 
 def _make_handler(method: str, path: str, body: bytes = b"") -> tuple[HullHttpHandlerBase, MagicMock]:

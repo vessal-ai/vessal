@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from vessal.skills._base import BaseSkill
 
 if TYPE_CHECKING:
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.kernel import Kernel
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +58,8 @@ class System(BaseSkill):
             sig["wake_reason"] = self._wake_reason
 
         if self._kernel.db_path is not None:
-            from vessal.ark.shell.hull.cell.kernel.frame_log import open_read_only
-            from vessal.ark.shell.hull.cell.kernel.frame_log.reader import recent_errors
+            from vessal.cell.kernel.frame_log import open_read_only
+            from vessal.cell.kernel.frame_log.reader import recent_errors
             conn = open_read_only(self._kernel.db_path)
             try:
                 entries = recent_errors(conn, limit=3)

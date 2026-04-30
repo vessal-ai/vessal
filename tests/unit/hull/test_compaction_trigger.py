@@ -5,7 +5,7 @@
 def _seed(path, layer_counts):
     """layer_counts: dict[layer -> count]. Inserts that many disjoint entries on each layer."""
     import sqlite3
-    from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
+    from vessal.cell.kernel.frame_log.schema import open_db
     conn = open_db(path)
     n = 1
     for layer, count in sorted(layer_counts.items()):
@@ -16,14 +16,14 @@ def _seed(path, layer_counts):
 
 
 def test_no_compaction_when_layer0_below_k(tmp_path):
-    from vessal.ark.shell.hull._compaction_trigger import should_compact
+    from vessal.hull._compaction_trigger import should_compact
     db = str(tmp_path / "main.sqlite")
     _seed(db, {0: 3})
     assert should_compact(db, k=4) is False
 
 
 def test_compaction_when_layer0_at_k(tmp_path):
-    from vessal.ark.shell.hull._compaction_trigger import should_compact
+    from vessal.hull._compaction_trigger import should_compact
     db = str(tmp_path / "main.sqlite")
     _seed(db, {0: 4})
     assert should_compact(db, k=4) is True
@@ -32,8 +32,8 @@ def test_compaction_when_layer0_at_k(tmp_path):
 def test_compaction_when_higher_layer_at_k(tmp_path):
     """4 layer-1 entries, layer-0 fully covered → still triggers."""
     import sqlite3
-    from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
-    from vessal.ark.shell.hull._compaction_trigger import should_compact
+    from vessal.cell.kernel.frame_log.schema import open_db
+    from vessal.hull._compaction_trigger import should_compact
 
     db = str(tmp_path / "main.sqlite")
     conn = open_db(db)

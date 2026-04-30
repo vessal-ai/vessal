@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
+from vessal.cell.kernel.frame_log.schema import open_db
 
 
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:

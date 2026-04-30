@@ -4,8 +4,8 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
-from vessal.ark.shell.hull.cell.kernel.frame_log.types import (
+from vessal.cell.kernel.frame_log import FrameLog, open_db
+from vessal.cell.kernel.frame_log.types import (
     ErrorOnSource,
     FrameWriteSpec,
 )
@@ -84,12 +84,12 @@ def test_writer_writes_one_errors_row_per_expect_failure(tmp_path: Path) -> None
     """A FrameWriteSpec with N verdict_errors lays down N rows in errors table
     (source='expect'), and frame_content has no verdict_error_id column."""
     import sqlite3
-    from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
-    from vessal.ark.shell.hull.cell.kernel.frame_log.types import (
+    from vessal.cell.kernel.frame_log.schema import open_db
+    from vessal.cell.kernel.frame_log.types import (
         ErrorOnSource,
         FrameWriteSpec,
     )
-    from vessal.ark.shell.hull.cell.kernel.frame_log.writer import FrameLog
+    from vessal.cell.kernel.frame_log.writer import FrameLog
 
     db = open_db(str(tmp_path / "fl.sqlite"))
     log = FrameLog(db)

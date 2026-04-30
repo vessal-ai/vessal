@@ -84,7 +84,7 @@ class HullSkillsMixin:
             raise RuntimeError(f"skill '{name}' has server.py but no start() function")
         kwargs = dict(self._server_kwargs.get(name, {}))
         # Create a dedicated ScopedHullApi for each skill, auto-prefixing /skills/{name}/
-        from vessal.ark.shell.hull.hull_api import ScopedHullApi
+        from vessal.hull.hull_api import ScopedHullApi
         scoped_api = ScopedHullApi(self._hull_api, name)
         # Only pass the skill instance if server.start() declares a skill parameter
         import inspect

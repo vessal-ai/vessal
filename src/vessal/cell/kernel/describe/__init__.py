@@ -9,15 +9,15 @@ detail_level:
 
 Imported directly from describe/, not via a renderers/ subdirectory.
 """
-from vessal.ark.shell.hull.cell.kernel.describe.primitives import (
+from vessal.cell.kernel.describe.primitives import (
     render_int, render_float, render_bool, render_none, render_str,
 )
-from vessal.ark.shell.hull.cell.kernel.describe.collections import (
+from vessal.cell.kernel.describe.collections import (
     render_list, render_dict, render_tuple, render_set,
 )
-from vessal.ark.shell.hull.cell.kernel.describe.callables import render_function, render_class
-from vessal.ark.shell.hull.cell.kernel.describe.instances import render_io, render_instance
-from vessal.ark.shell.hull.cell.kernel.describe.binary import render_bytes, render_module
+from vessal.cell.kernel.describe.callables import render_function, render_class
+from vessal.cell.kernel.describe.instances import render_io, render_instance
+from vessal.cell.kernel.describe.binary import render_bytes, render_module
 
 import io
 import types

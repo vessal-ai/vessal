@@ -6,8 +6,8 @@
 
 import pytest
 
-from vessal.ark.shell.hull.cell.core.parser import parse_response, ParseError
-from vessal.ark.shell.hull.cell.protocol import Pong
+from vessal.cell.core.parser import parse_response, ParseError
+from vessal.cell.protocol import Pong
 
 
 # ─────────────────────────────────────────────

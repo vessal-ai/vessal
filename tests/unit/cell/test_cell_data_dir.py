@@ -6,12 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-from vessal.ark.shell.hull.cell import Cell
+from vessal.cell import Cell
 
 
 def _make_cell(**kwargs) -> Cell:
     """Construct Cell while stubbing the OpenAI client (no real network)."""
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+    with patch("vessal.cell.core.core.openai.OpenAI"):
         return Cell(**kwargs)
 
 

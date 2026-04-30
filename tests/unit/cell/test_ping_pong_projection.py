@@ -6,12 +6,12 @@
 
 from unittest.mock import MagicMock, patch
 
-from vessal.ark.shell.hull.cell import Cell
-from vessal.ark.shell.hull.cell.protocol import Action, Ping, Pong, State
+from vessal.cell import Cell
+from vessal.cell.protocol import Action, Ping, Pong, State
 
 
 def _make_cell(**kwargs) -> Cell:
-    with patch("vessal.ark.shell.hull.cell.core.core.openai.OpenAI"):
+    with patch("vessal.cell.core.core.openai.OpenAI"):
         return Cell(**kwargs)
 
 
@@ -33,7 +33,7 @@ def test_ping_is_from_previous_frame():
     the initial Ping (_last_ping after bootstrap), proving derivation from the committed
     frame rather than any pre-commit cache.
     """
-    import vessal.ark.shell.hull.cell.kernel.kernel as kernel_mod
+    import vessal.cell.kernel.kernel as kernel_mod
 
     cell = _make_cell()
     ns = {"globals": cell._kernel.G, "locals": cell._kernel.L}
@@ -64,7 +64,7 @@ def test_pong_committed_to_frame_stream():
     pong's operation matches the pong that was passed — proving _commit receives the
     correct Pong, not a stale pre-commit cache.
     """
-    import vessal.ark.shell.hull.cell.kernel.kernel as kernel_mod
+    import vessal.cell.kernel.kernel as kernel_mod
 
     cell = _make_cell()
     ns = {"globals": cell._kernel.G, "locals": cell._kernel.L}

@@ -11,13 +11,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from vessal.ark.shell.hull.cell import Cell
-    from vessal.ark.shell.hull.cell.core import Core
-    from vessal.ark.shell.hull.event_loop import EventLoop
-    from vessal.ark.shell.hull.hull_api import HullApi
-    from vessal.ark.shell.hull.hull_init_mixin import SystemPromptBuilder
-    from vessal.ark.shell.hull.skill_loader import SkillLoader
-    from vessal.ark.util.logging import Tracer
+    from vessal.cell import Cell
+    from vessal.cell.core import Core
+    from vessal.hull.event_loop import EventLoop
+    from vessal.hull.hull_api import HullApi
+    from vessal.hull.hull_init_mixin import SystemPromptBuilder
+    from vessal.hull.skill_loader import SkillLoader
+    from vessal.util.logging import Tracer
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +90,8 @@ class HullRuntimeMixin:
             Frames in the flat wire shape (kernel doc §4.3 frame_content columns),
             ordered oldest to newest.
         """
-        from vessal.ark.shell.hull.cell.kernel.frame_log import open_read_only
-        from vessal.ark.shell.hull.cell.kernel.frame_log.reader import render_frame_stream
+        from vessal.cell.kernel.frame_log import open_read_only
+        from vessal.cell.kernel.frame_log.reader import render_frame_stream
 
         if not self._main_db_path:
             return []

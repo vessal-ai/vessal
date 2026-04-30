@@ -9,7 +9,7 @@ Returns messages list in OpenAI chat-completion shape: [{"role": ..., "content":
 """
 from __future__ import annotations
 
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.protocol import (
     Entry, FrameContent, FrameStream, Ping, SummaryContent,
 )
 

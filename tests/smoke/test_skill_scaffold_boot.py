@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.cli.scaffold import write_skill_scaffold
+from vessal.shell.cli.scaffold import write_skill_scaffold
 
 _VESSAL_SKILLS_SRC = Path(__file__).resolve().parents[2] / "src" / "vessal" / "skills"
 
@@ -34,7 +34,7 @@ def hull_from_scaffold(tmp_path, monkeypatch):
     skill_pkg.mkdir(parents=True)
     write_skill_scaffold(skill_pkg, skill_name)
 
-    from vessal.ark.shell.cli.skills_init_writer import write_initial
+    from vessal.shell.cli.skills_init_writer import write_initial
     write_initial(skills_dir, ["system", "compaction", skill_name])
 
     (tmp_path / "hull.toml").write_text(
@@ -48,7 +48,7 @@ def hull_from_scaffold(tmp_path, monkeypatch):
         if mod == "skills" or mod.startswith("skills."):
             sys.modules.pop(mod, None)
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     hull = Hull(str(tmp_path))
     yield hull, skill_name
 

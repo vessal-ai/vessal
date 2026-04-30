@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vessal.ark.shell.errors import CliUserError
+from vessal.shell.errors import CliUserError
 
 
 def validate_project_name(name: str, cwd: Path) -> str | None:
@@ -62,7 +62,7 @@ def run(cwd: Path | None = None) -> int:
 
     Returns exit code (0 = success, non-zero = user aborted).
     """
-    from vessal.ark.shell.tui.inline_prompt import ask_text, ask_yes_no
+    from vessal.shell.tui.inline_prompt import ask_text, ask_yes_no
 
     cwd = (cwd or Path.cwd()).resolve()
     answers: dict = {}
@@ -97,7 +97,7 @@ def run(cwd: Path | None = None) -> int:
 
 def _scaffold(target: Path, answers: dict) -> None:
     """Create project directory + baseline files + wizard-specific .env."""
-    from vessal.ark.shell.cli.project_scaffold import write_project_scaffold
+    from vessal.shell.cli.project_scaffold import write_project_scaffold
 
     if target.exists():
         raise CliUserError(f"{target} already exists")

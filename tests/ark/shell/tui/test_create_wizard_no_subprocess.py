@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 def test_create_wizard_does_not_call_subprocess(tmp_path):
     """After refactor, `_scaffold` must call write_project_scaffold directly."""
-    from vessal.ark.shell.tui.create_wizard import _scaffold
+    from vessal.shell.tui.create_wizard import _scaffold
 
     target = tmp_path / "alpha"
     answers = {"name": "alpha", "api_key": "", "base_url": "", "model": "", "dockerize": False}

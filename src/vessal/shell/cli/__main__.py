@@ -4,8 +4,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from vessal.ark.shell.cli.process_cmds import _cmd_start, _cmd_stop, _cmd_status
-from vessal.ark.shell.cli.skill_cmds import (
+from vessal.shell.cli.process_cmds import _cmd_start, _cmd_stop, _cmd_status
+from vessal.shell.cli.skill_cmds import (
     _cmd_skill_create,
     _cmd_skill_check,
     _cmd_skill_install,

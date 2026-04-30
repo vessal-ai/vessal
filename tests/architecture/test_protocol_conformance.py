@@ -25,7 +25,7 @@ def _discover_dataclasses(module_path: str) -> list[tuple[str, type]]:
 
 def test_frame_record_dataclasses_are_frozen():
     """All dataclasses in protocol.py are frozen=True."""
-    classes = _discover_dataclasses("vessal.ark.shell.hull.cell.protocol")
+    classes = _discover_dataclasses("vessal.cell.protocol")
     assert len(classes) > 0, "No dataclasses found, check module path"
     not_frozen = []
     for name, cls in classes:
@@ -40,7 +40,7 @@ def _get_field_names(cls: type) -> set[str]:
 
 def test_pong_has_think_and_action():
     """Pong has think and action fields, does not directly expose operation/expect."""
-    from vessal.ark.shell.hull.cell.protocol import Pong, Action  # noqa: F401
+    from vessal.cell.protocol import Pong, Action  # noqa: F401
 
     fields = _get_field_names(Pong)
     assert "think" in fields, f"Pong missing think field, current fields: {fields}"
@@ -51,7 +51,7 @@ def test_pong_has_think_and_action():
 
 def test_action_has_operation_and_expect():
     """Action has operation and expect fields."""
-    from vessal.ark.shell.hull.cell.protocol import Action
+    from vessal.cell.protocol import Action
 
     fields = _get_field_names(Action)
     assert "operation" in fields, f"Action missing operation field, current fields: {fields}"
@@ -60,7 +60,7 @@ def test_action_has_operation_and_expect():
 
 def test_ping_has_system_prompt_and_state():
     """Ping has system_prompt and state fields, does not directly expose frame_stream/signals."""
-    from vessal.ark.shell.hull.cell.protocol import Ping, State  # noqa: F401
+    from vessal.cell.protocol import Ping, State  # noqa: F401
 
     fields = _get_field_names(Ping)
     assert "system_prompt" in fields, f"Ping missing system_prompt field, current fields: {fields}"
@@ -71,7 +71,7 @@ def test_ping_has_system_prompt_and_state():
 
 def test_state_has_frame_stream_and_signals():
     """State has frame_stream and signals fields."""
-    from vessal.ark.shell.hull.cell.protocol import State
+    from vessal.cell.protocol import State
 
     fields = _get_field_names(State)
     assert "frame_stream" in fields, f"State missing frame_stream field, current fields: {fields}"
@@ -80,14 +80,14 @@ def test_state_has_frame_stream_and_signals():
 
 def test_token_usage_not_in_protocol():
     """TokenUsage should not exist in the protocol module."""
-    import vessal.ark.shell.hull.cell.protocol as proto
+    import vessal.cell.protocol as proto
 
     assert not hasattr(proto, "TokenUsage"), "TokenUsage should not appear in the protocol module"
 
 
 def test_step_result_has_only_protocol_error():
     """StepResult has only the protocol_error field."""
-    from vessal.ark.shell.hull.cell.protocol import StepResult
+    from vessal.cell.protocol import StepResult
 
     fields = _get_field_names(StepResult)
     assert fields == {"protocol_error"}, (

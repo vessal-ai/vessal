@@ -1,5 +1,5 @@
-from vessal.ark.shell.hull.cell.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from vessal.cell.kernel import Kernel
+from vessal.cell.protocol import Action, Pong
 
 
 def _ns(k: Kernel) -> dict:
@@ -15,8 +15,8 @@ def _exec(k: Kernel, op: str, expect: str = "") -> None:
 
 def minimal_kernel(*, db_path: str | None = None, with_system: bool = True, restore_path: str | None = None):
     """Construct a Kernel with a minimal boot script — used by all PR 1/2/3 tests."""
-    from vessal.ark.shell.hull.cell.kernel.boot import compose_boot_script, BootSkillEntry
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.boot import compose_boot_script, BootSkillEntry
+    from vessal.cell.kernel.kernel import Kernel
     entries = []
     if with_system:
         entries.append(

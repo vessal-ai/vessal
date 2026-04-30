@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from vessal.ark.shell.hull.cell.gate.gate_base import _GateBase
+from vessal.cell.gate.gate_base import _GateBase
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ class ActionGate(_GateBase):
 
     def _load_builtin_rules(self) -> None:
         """Load the built-in safety rules."""
-        from vessal.ark.shell.hull.cell.gate.rules import BUILTIN_RULES
+        from vessal.cell.gate.rules import BUILTIN_RULES
 
         for rule_name, fn in BUILTIN_RULES:
             self._rules.append((rule_name, fn))  # type: ignore[arg-type]

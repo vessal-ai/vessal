@@ -4,8 +4,8 @@ from __future__ import annotations
 import pytest
 from pathlib import Path
 
-from vessal.ark.shell.hull.cell.kernel.frame_log import FrameLog, open_db
-from vessal.ark.shell.hull.cell.kernel.frame_log.types import (
+from vessal.cell.kernel.frame_log import FrameLog, open_db
+from vessal.cell.kernel.frame_log.types import (
     ErrorOnSource,
     FrameWriteSpec,
     SignalRow,

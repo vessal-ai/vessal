@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.protocol import (
     FRAME_SCHEMA_VERSION,
     Action,
     FrameRecord,
@@ -20,7 +20,7 @@ from vessal.ark.shell.hull.cell.protocol import (
     Pong,
     State,
 )
-from vessal.ark.util.logging.frame_logger import FrameLogger
+from vessal.util.logging.frame_logger import FrameLogger
 
 
 # ─────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import pytest
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.protocol import (
     Action, State, Pong, Ping, Observation, StepResult, FrameRecord,
     Verdict, VerdictFailure,
     FRAME_SCHEMA_VERSION,

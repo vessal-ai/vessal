@@ -1,5 +1,5 @@
 """test_ping_dataclass_state.py — State.frame_stream is FrameStream dataclass, signals is dict."""
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.protocol import (
     Entry, FrameContent, FrameStream, Ping, State,
 )
 

@@ -1,7 +1,7 @@
 """test_signals — Kernel signal system: BaseSkill.signal_update() scan."""
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+from vessal.cell.kernel.kernel import Kernel
 from vessal.skills._base import BaseSkill
 from tests.unit.kernel._ping_helpers import _ns, minimal_kernel
 

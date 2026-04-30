@@ -11,10 +11,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from vessal.ark.shell.http_server import SafeHTTPServer
+from vessal.shell.http_server import SafeHTTPServer
 
 # ── Hull-managed mode ──
-from vessal.ark.shell.hull.skill_static import StaticRouter
+from vessal.hull.skill_static import StaticRouter
 
 _hull_api = None
 _skill = None  # Chat skill instance reference
@@ -65,7 +65,7 @@ def stop() -> None:
 
 def _handle_index(_body):
     """GET / — chat UI page."""
-    from vessal.ark.shell.hull.hull_api import StaticResponse
+    from vessal.hull.hull_api import StaticResponse
     if _index_html is not None:
         return 200, StaticResponse(_index_html, "text/html; charset=utf-8")
     return 404, {"error": "index.html not found"}

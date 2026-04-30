@@ -27,7 +27,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from typing import Any
 
-from vessal.ark.shell.hull.cell.kernel import source_cache
+from vessal.cell.kernel import source_cache
 
 
 # Maximum length for bare expression repr. Truncated with "..." when exceeded.

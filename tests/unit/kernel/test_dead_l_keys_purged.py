@@ -47,13 +47,13 @@ def test_no_source_file_references_sleeping_and_errors_keys() -> None:
 
 
 def test_kernel_has_no_sleep_method() -> None:
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.kernel import Kernel
     k = Kernel(boot_script="")
     assert not hasattr(k, "sleep")
     assert "sleep" not in k.L
 
 
 def test_kernel_l_init_only_seeds_frame_and_signals() -> None:
-    from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
+    from vessal.cell.kernel.kernel import Kernel
     k = Kernel(boot_script="")
     assert set(k.L.keys()) == {"_frame", "signals"}

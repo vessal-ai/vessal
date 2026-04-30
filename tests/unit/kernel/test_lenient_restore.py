@@ -15,8 +15,8 @@ from pathlib import Path
 import cloudpickle
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel import Kernel, UnresolvedRef
-from vessal.ark.shell.hull.cell.kernel.lenient import LenientUnpickler
+from vessal.cell.kernel import Kernel, UnresolvedRef
+from vessal.cell.kernel.lenient import LenientUnpickler
 from tests.unit.kernel._ping_helpers import minimal_kernel
 
 

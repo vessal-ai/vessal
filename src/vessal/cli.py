@@ -122,7 +122,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    from vessal.ark.shell.errors import CliUserError
+    from vessal.shell.errors import CliUserError
 
     try:
         if args.command == "start":
@@ -142,7 +142,7 @@ def main() -> None:
         elif args.command == "upgrade":
             _cmd_upgrade(args)
         elif args.command == "create":
-            from vessal.ark.shell.tui.create_wizard import run as wizard_run
+            from vessal.shell.tui.create_wizard import run as wizard_run
             sys.exit(wizard_run(Path.cwd()))
         elif args.command == "skill":
             if args.skill_command == "create":
@@ -166,7 +166,7 @@ def main() -> None:
                 sys.exit(1)
         else:
             if args.command is None:
-                from vessal.ark.shell.tui.picker import run as picker_run
+                from vessal.shell.tui.picker import run as picker_run
                 sys.exit(picker_run(Path.cwd()))
             parser.print_help()
             sys.exit(1)
@@ -179,17 +179,17 @@ def main() -> None:
 
 def _cmd_start(args: argparse.Namespace) -> None:
     """Start the Agent server and Companion processes."""
-    from vessal.ark.shell.cli.process_cmds import _cmd_start as shell_start
+    from vessal.shell.cli.process_cmds import _cmd_start as shell_start
     shell_start(args)
 
 
 def _cmd_stop(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.process_cmds import _cmd_stop as shell_stop
+    from vessal.shell.cli.process_cmds import _cmd_stop as shell_stop
     shell_stop(args)
 
 
 def _cmd_status(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.process_cmds import _cmd_status as shell_status
+    from vessal.shell.cli.process_cmds import _cmd_status as shell_status
     shell_status(args)
 
 
@@ -206,7 +206,7 @@ def _cmd_once(args: argparse.Namespace) -> None:
         print(f"Error: {project_dir} is not a Vessal project (hull.toml not found).", file=sys.stderr)
         sys.exit(1)
 
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
     hull = Hull(str(project_dir))
 
     # Inject goal into the chat skill inbox (if loaded)
@@ -223,7 +223,7 @@ def _cmd_once(args: argparse.Namespace) -> None:
 
 def _cmd_build(args: argparse.Namespace) -> None:
     """Build an Agent Docker image."""
-    from vessal.ark.shell.runtime.container.build import build_image
+    from vessal.shell.runtime.container.build import build_image
 
     agent_dir = Path(args.agent_dir).resolve()
     if not (agent_dir / "hull.toml").exists():
@@ -235,7 +235,7 @@ def _cmd_build(args: argparse.Namespace) -> None:
 
 def _cmd_container_run(args: argparse.Namespace) -> None:
     """Start an Agent Docker container."""
-    from vessal.ark.shell.runtime.container.build import run_container
+    from vessal.shell.runtime.container.build import run_container
 
     env = {}
     for item in args.env:
@@ -250,49 +250,49 @@ def _cmd_container_run(args: argparse.Namespace) -> None:
 # ── Development tool implementations ──
 
 def _cmd_skill_create(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_create as shell_skill_create
+    from vessal.shell.cli.skill_cmds import _cmd_skill_create as shell_skill_create
     shell_skill_create(args)
 
 
 def _cmd_skill_check(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_check as shell_skill_check
+    from vessal.shell.cli.skill_cmds import _cmd_skill_check as shell_skill_check
     shell_skill_check(args)
 
 
 def _cmd_skill_install(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_install as shell_skill_install
+    from vessal.shell.cli.skill_cmds import _cmd_skill_install as shell_skill_install
     shell_skill_install(args)
 
 
 def _cmd_skill_uninstall(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_uninstall as shell_skill_uninstall
+    from vessal.shell.cli.skill_cmds import _cmd_skill_uninstall as shell_skill_uninstall
     shell_skill_uninstall(args)
 
 
 def _cmd_skill_update(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_update as shell_skill_update
+    from vessal.shell.cli.skill_cmds import _cmd_skill_update as shell_skill_update
     shell_skill_update(args)
 
 
 def _cmd_skill_search(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_search as shell_skill_search
+    from vessal.shell.cli.skill_cmds import _cmd_skill_search as shell_skill_search
     shell_skill_search(args)
 
 
 def _cmd_skill_list(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_list as shell_skill_list
+    from vessal.shell.cli.skill_cmds import _cmd_skill_list as shell_skill_list
     shell_skill_list(args)
 
 
 def _cmd_skill_publish(args: argparse.Namespace) -> None:
-    from vessal.ark.shell.cli.skill_cmds import _cmd_skill_publish as shell_skill_publish
+    from vessal.shell.cli.skill_cmds import _cmd_skill_publish as shell_skill_publish
     shell_skill_publish(args)
 
 
 def _cmd_check_update() -> None:
     """Check PyPI for a newer vessal version."""
     from importlib import metadata
-    from vessal.ark.shell.cli import upgrade
+    from vessal.shell.cli import upgrade
 
     current = metadata.version("vessal")
     try:
@@ -312,7 +312,7 @@ def _cmd_upgrade(args: argparse.Namespace) -> None:
     """Detect installer (uv / pipx / pip) and run the matching upgrade command."""
     import subprocess
     from importlib import metadata
-    from vessal.ark.shell.cli import upgrade
+    from vessal.shell.cli import upgrade
 
     current = metadata.version("vessal")
     try:

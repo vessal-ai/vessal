@@ -1,6 +1,6 @@
 import pytest
 from dataclasses import FrozenInstanceError
-from vessal.ark.shell.hull.cell.protocol import LLMConfig
+from vessal.cell.protocol import LLMConfig
 
 
 def test_llm_config_has_four_fields():

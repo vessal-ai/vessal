@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from vessal.ark.shell.hull.cell.kernel.kernel import Kernel
-from vessal.ark.shell.hull.cell.protocol import Action, Pong
+from vessal.cell.kernel.kernel import Kernel
+from vessal.cell.protocol import Action, Pong
 from tests.unit.kernel._ping_helpers import minimal_kernel
 
 
@@ -132,9 +132,9 @@ def test_systemskill_carries_frame():
 
 def test_old_skillbase_module_removed():
     with pytest.raises(ImportError):
-        import vessal.ark.shell.hull.skill  # noqa: F401
+        import vessal.hull.skill  # noqa: F401
 
 
 def test_no_BASE_SIGNALS_module():
     with pytest.raises(ImportError):
-        from vessal.ark.shell.hull.cell.kernel.render import signals as _signals  # noqa: F401
+        from vessal.cell.kernel.render import signals as _signals  # noqa: F401

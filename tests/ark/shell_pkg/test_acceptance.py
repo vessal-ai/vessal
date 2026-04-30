@@ -12,7 +12,7 @@ import pytest
 def test_criterion3_wizard_enter_six_is_under_30s():
     """Enter×6 path through create_wizard.finalize_answers is O(ms)."""
     import time
-    from vessal.ark.shell.tui.create_wizard import DEFAULT_ANSWERS, finalize_answers
+    from vessal.shell.tui.create_wizard import DEFAULT_ANSWERS, finalize_answers
     start = time.time()
     finalize_answers({})
     assert time.time() - start < 0.1
@@ -21,7 +21,7 @@ def test_criterion3_wizard_enter_six_is_under_30s():
 
 
 def test_criterion4_reload_soul_picks_up_change(tmp_path):
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
 
     (tmp_path / "hull.toml").write_text(
         '[agent]\nname = "x"\n[core]\ntimeout = 5\n[cell]\nmax_frames = 3\ncontext_budget = 4096\n'
@@ -40,7 +40,7 @@ def test_criterion4_reload_soul_picks_up_change(tmp_path):
 
 def test_criterion5_port_8420_fallback_to_8421(tmp_path, monkeypatch):
     import socket
-    from vessal.ark.shell.server import ShellServer
+    from vessal.shell.server import ShellServer
 
     (tmp_path / "hull.toml").write_text("[agent]\nname='x'\n")
     occupy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -63,7 +63,7 @@ def test_criterion6_agent_crash_publishes_red_banner_event(tmp_path):
     """Hull-monitor publishes agent_crash on subprocess exit with exit_code payload."""
     import time
     import threading
-    from vessal.ark.shell.events import EventBus
+    from vessal.shell.events import EventBus
 
     bus = EventBus()
     received = []

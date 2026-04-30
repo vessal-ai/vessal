@@ -1,7 +1,7 @@
 """test_server_routes — skill_manager/server.py mounts static UI assets and nothing else."""
 from __future__ import annotations
 
-from vessal.ark.shell.hull.hull_api import HullApi, ScopedHullApi
+from vessal.hull.hull_api import HullApi, ScopedHullApi
 from vessal.skills.skill_manager import server as skill_manager_server
 
 

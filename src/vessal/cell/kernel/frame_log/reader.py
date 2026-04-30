@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import sqlite3
 
-from vessal.ark.shell.hull.cell.protocol import (
+from vessal.cell.protocol import (
     Entry,
     FrameContent,
     FrameStream,

@@ -5,11 +5,11 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from vessal.ark.shell.hull.hub.registry import Registry
+from vessal.hull.hub.registry import Registry
 from vessal.skills._base import BaseSkill
 
 if TYPE_CHECKING:
-    from vessal.ark.shell.hull.hull import Hull
+    from vessal.hull.hull import Hull
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +112,9 @@ class SkillManager(BaseSkill):
 
     def download_skill(self, name: str) -> str:
         """Download and install a skill from SkillHub into <project>/skills/<name>/."""
-        from vessal.ark.shell.hull.hub.installer import install
-        from vessal.ark.shell.hull.hub.resolver import resolve
-        from vessal.ark.shell.cli.skills_init_writer import add as _register
+        from vessal.hull.hub.installer import install
+        from vessal.hull.hub.resolver import resolve
+        from vessal.shell.cli.skills_init_writer import add as _register
 
         target_dir = Path(__file__).resolve().parent.parent  # <project>/skills/
 

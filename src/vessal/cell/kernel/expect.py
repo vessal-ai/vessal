@@ -21,8 +21,8 @@ import ast
 import textwrap
 from typing import Any
 
-from vessal.ark.shell.hull.cell.protocol import Verdict, VerdictFailure
-from vessal.ark.shell.hull.cell.kernel import source_cache
+from vessal.cell.protocol import Verdict, VerdictFailure
+from vessal.cell.kernel import source_cache
 
 
 class ExpectValidationError(ValueError):

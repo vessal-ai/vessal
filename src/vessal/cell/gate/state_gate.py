@@ -14,8 +14,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from vessal.ark.shell.hull.cell.gate.gate_base import _GateBase
-from vessal.ark.shell.hull.cell.protocol import FrameStream
+from vessal.cell.gate.gate_base import _GateBase
+from vessal.cell.protocol import FrameStream
 
 logger = logging.getLogger(__name__)
 

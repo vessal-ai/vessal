@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.server import ShellServer
+from vessal.shell.server import ShellServer
 
 _VESSAL_SRC = str(Path(__file__).resolve().parents[4] / "src" / "vessal")
 

@@ -9,7 +9,7 @@ from typing import get_type_hints
 
 def test_observation_diff_annotated_as_list():
     """Observation.diff must be annotated as list[dict[str, str]], not str."""
-    from vessal.ark.shell.hull.cell.protocol import Observation
+    from vessal.cell.protocol import Observation
 
     hints = get_type_hints(Observation)
     diff_hint = hints["diff"]
@@ -23,7 +23,7 @@ def test_observation_diff_annotated_as_list():
 
 def test_observation_has_stderr_field():
     """Observation must have a stderr field."""
-    from vessal.ark.shell.hull.cell.protocol import Observation
+    from vessal.cell.protocol import Observation
 
     obs = Observation(stdout="", stderr="captured", diff=[], error=None)
     assert obs.stderr == "captured"
@@ -31,7 +31,7 @@ def test_observation_has_stderr_field():
 
 def test_frame_content_schema_has_no_verdict_error_id(tmp_path):
     """The frame_content table must not have a verdict_error_id column."""
-    from vessal.ark.shell.hull.cell.kernel.frame_log.schema import open_db
+    from vessal.cell.kernel.frame_log.schema import open_db
 
     conn = open_db(tmp_path / "test.db")
     cursor = conn.execute("PRAGMA table_info(frame_content)")
@@ -41,7 +41,7 @@ def test_frame_content_schema_has_no_verdict_error_id(tmp_path):
 
 def test_frame_write_spec_has_verdict_errors_list_field():
     """FrameWriteSpec must have verdict_errors as a list field (not verdict_error)."""
-    from vessal.ark.shell.hull.cell.kernel.frame_log.types import FrameWriteSpec
+    from vessal.cell.kernel.frame_log.types import FrameWriteSpec
 
     field_names = [f.name for f in dataclasses.fields(FrameWriteSpec)]
     assert "verdict_errors" in field_names
@@ -53,21 +53,21 @@ def test_frame_write_spec_has_verdict_errors_list_field():
 
 def test_dead_code_is_actually_deleted():
     """flatten_frame_dict must not exist in protocol module."""
-    import vessal.ark.shell.hull.cell.protocol as proto
+    import vessal.cell.protocol as proto
 
     assert not hasattr(proto, "flatten_frame_dict")
 
 
 def test_frame_schema_version_is_8():
     """FRAME_SCHEMA_VERSION must equal 8."""
-    from vessal.ark.shell.hull.cell.protocol import FRAME_SCHEMA_VERSION
+    from vessal.cell.protocol import FRAME_SCHEMA_VERSION
 
     assert FRAME_SCHEMA_VERSION == 8
 
 
 def test_executor_result_has_stderr_field():
     """ExecResult from executor must have a stderr field that captures stderr output."""
-    from vessal.ark.shell.hull.cell.kernel.executor import execute
+    from vessal.cell.kernel.executor import execute
 
     result = execute("import sys; sys.stderr.write('err')", {}, {}, 1)
     assert hasattr(result, "stderr")

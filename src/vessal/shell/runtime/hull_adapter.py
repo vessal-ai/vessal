@@ -52,7 +52,7 @@ class HullHttpHandlerBase(http.server.BaseHTTPRequestHandler):
 
     def _respond(self, data: object, status: int = 200) -> None:
         """Write data to the socket. data is either a dict (→ JSON) or a StaticResponse."""
-        from vessal.ark.shell.hull.hull_api import StaticResponse
+        from vessal.hull.hull_api import StaticResponse
 
         if isinstance(data, StaticResponse):
             body = data.content

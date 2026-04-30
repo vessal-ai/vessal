@@ -27,7 +27,7 @@ def run(cwd: Path | None = None) -> int:
     """Run the TUI picker. Returns an exit code suitable for sys.exit."""
     from prompt_toolkit.shortcuts import radiolist_dialog
 
-    from vessal.ark.shell.tui.recent import RecentProjects
+    from vessal.shell.tui.recent import RecentProjects
 
     cwd = (cwd or Path.cwd()).resolve()
     recent = RecentProjects().list()
@@ -68,7 +68,7 @@ def _dispatch(action: str, cwd: Path, recent: list[str]) -> int:
         webbrowser.open(url)
         return 0
     if action == "create":
-        from vessal.ark.shell.tui.create_wizard import run as wizard_run
+        from vessal.shell.tui.create_wizard import run as wizard_run
         return wizard_run(cwd)
     if action == "recent":
         from prompt_toolkit.shortcuts import radiolist_dialog as _r

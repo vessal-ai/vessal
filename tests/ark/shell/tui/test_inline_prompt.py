@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from vessal.ark.shell.tui import inline_prompt
+from vessal.shell.tui import inline_prompt
 
 
 @pytest.fixture

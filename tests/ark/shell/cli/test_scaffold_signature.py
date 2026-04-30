@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from vessal.ark.shell.cli.scaffold import write_skill_scaffold
+from vessal.shell.cli.scaffold import write_skill_scaffold
 
 
 def test_scaffolded_skill_accepts_ns(tmp_path):
