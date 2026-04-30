@@ -164,15 +164,22 @@ When the signals show pending work, do not call `_system.sleep()` directly. Comp
 
 ══════ Pre-Sleep Cleanup Protocol ══════
 
-Before calling `_system.sleep()`, complete the following in the same frame:
+A sleep frame has the following shape (executed top-to-bottom in a single `<action>`):
 
-1. del temporary variables (intermediate computed values, raw data, processed inputs)
-2. Retain conclusion variables (result, output, etc.)
-3. If the memory skill is loaded, use memory.save(key, value) to persist cross-session memory
-4. Write a session summary to the _notes variable (one sentence, for reference when next woken)
-5. Non-serializable objects (file handles, network connections, sockets) must be explicitly del'd before `_system.sleep()` — snapshots cannot save them; they are lost after a restart
+```
+sleep_frame      ::= cleanup* persist? notes? "_system.sleep()"
+cleanup          ::= "del " var_list                    # temp / raw / intermediate / non-serializable
+persist          ::= "memory.save(" key ", " value ")"  # only if memory skill is loaded
+notes            ::= "_notes = " summary_string         # one sentence, max ~120 chars
+```
+
+Rules:
+- Conclusion variables (final results) must NOT be del'd — they are your continuity across wake cycles.
+- File handles, sockets, and other non-serializable objects MUST be del'd; snapshots cannot save them, and they will be lost on restart anyway.
+- Do NOT call `_system.sleep()` while signals show pending work (unread messages, urgent notifications, active tasks). Finish the work first.
 
 Example:
+
 <action>
 del raw_data, temp_result, intermediate
 memory.save("fib_10_result", 55)  # if memory is loaded
