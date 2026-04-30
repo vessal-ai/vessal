@@ -105,14 +105,15 @@ class HullInitMixin:
 
         self._skill_manager = SkillLoader()
 
-        entries = [BootSkillEntry("_system", "skills.system", "Skill", "")]
+        entries = [BootSkillEntry("_system", "skills.system", "System", "")]
         for skill_name in hull_cfg.get("skills", []):
             try:
                 self._skill_manager.load(skill_name)  # validates + registers; class discarded
             except Exception as e:
                 print(f"[error] skill '{skill_name}' failed to register: {e}")
                 continue
-            entries.append(BootSkillEntry(skill_name, f"skills.{skill_name}", "Skill", ""))
+            cls_name = "".join(p.capitalize() for p in skill_name.split("_") if p)
+            entries.append(BootSkillEntry(skill_name, f"skills.{skill_name}", cls_name, ""))
         return entries
 
     def _init_cell(
