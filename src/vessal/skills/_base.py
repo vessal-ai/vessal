@@ -17,7 +17,6 @@ class BaseSkill(ABC):
         guide: str          — long-form manual (loaded from SKILL.md by Hull)
 
     Optional protocol methods:
-        _prompt()       — (condition, methodology) tuple injected into system prompt
         _bind_hull(h)   — called once after the Skill lands in the namespace
 
     Spec §6.1 strong constraints (enforcement deferred to PR 4 boot frame):
@@ -49,7 +48,3 @@ class BaseSkill(ABC):
     def signal_update(self) -> None:
         """Called once per ping by Kernel before render. Override to mutate self.signal."""
         pass
-
-    def _prompt(self) -> tuple[str, str] | None:
-        """Optional cognitive-protocol hook. Return (condition, methodology) or None."""
-        return None

@@ -88,7 +88,6 @@ def test_hull_loads_scaffolded_skill(hull_from_scaffold):
     instance = hull._main_cell.G[skill_name]
     instance.signal_update()
     assert isinstance(instance.signal, dict)
-    assert instance._prompt() is None or isinstance(instance._prompt(), tuple)
 
 
 def test_scaffolded_skill_accepts_ns_kwarg(tmp_path):
