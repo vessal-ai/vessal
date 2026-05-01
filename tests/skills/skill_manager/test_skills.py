@@ -82,7 +82,7 @@ def test_unload_clears_instance_and_stops_server(skills, hull):
     hull.unload_skill_from_manager.assert_called_once_with("chat")
 
 
-# ── signal / prompt ──
+# ── signal ──
 
 def test_signal_lists_available_with_load_markers(hull):
     hull.available_skills.return_value = [
