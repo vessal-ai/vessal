@@ -329,26 +329,3 @@ class TestNamespaceSync:
         t.remove("1")
         assert ns.get("_current_task_id") == "2"
 
-
-class TestPrompt:
-    def test_prompt_returns_tuple(self):
-        t = make_tasks()
-        result = t._prompt()
-        assert isinstance(result, tuple)
-        assert len(result) == 2
-
-    def test_prompt_mentions_sleep(self):
-        _, methodology = make_tasks()._prompt()
-        assert "sleep" in methodology
-
-    def test_prompt_no_method_names(self):
-        """_prompt() should not contain concrete method signatures (rule 4)."""
-        _, methodology = make_tasks()._prompt()
-        assert "tasks.add" not in methodology
-        assert "add_task" not in methodology
-        assert "tasks.done" not in methodology
-
-    def test_prompt_mentions_guide(self):
-        """_prompt() should remind Agent to check guide."""
-        _, methodology = make_tasks()._prompt()
-        assert "guide" in methodology

@@ -223,17 +223,3 @@ class Tasks(BaseSkill):
         text = "\n".join(lines)
         self.signal = {"tasks": text} if text else {}
 
-    # ── Prompt ──
-
-    def _prompt(self) -> tuple[str, str] | None:
-        """Cognitive protocol: guide the Agent to use the task system."""
-        return (
-            "receiving a work request or starting a multi-step operation",
-            "The task system is your work roadmap.\n"
-            "When given work, first create a root task describing the goal, then start.\n"
-            "If the goal is too large to do directly, break it into subtasks.\n"
-            "Always work on the current task only — the system auto-selects the first undone leaf.\n"
-            "Mark done when finished; the system advances to the next automatically.\n"
-            "When all tasks are complete, sleep.\n"
-            "Before first use, print(tasks.guide) to see available methods."
-        )
