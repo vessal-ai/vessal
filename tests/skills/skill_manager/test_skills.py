@@ -82,7 +82,7 @@ def test_unload_clears_instance_and_stops_server(skills, hull):
     hull.unload_skill_from_manager.assert_called_once_with("chat")
 
 
-# ── signal / prompt ──
+# ── signal ──
 
 def test_signal_lists_available_with_load_markers(hull):
     hull.available_skills.return_value = [
@@ -119,14 +119,6 @@ def test_signal_has_no_method_names(hull):
     body = s.signal["available"]
     for forbidden in ("load(", "unload(", "load_skill", "unload_skill"):
         assert forbidden not in body
-
-
-def test_prompt_is_valid_cognitive_protocol(skills):
-    result = skills._prompt()
-    assert isinstance(result, tuple) and len(result) == 2
-    condition, methodology = result
-    assert condition.strip() and methodology.strip()
-    assert "guide" in methodology
 
 
 # ── hub interactions ──

@@ -30,13 +30,6 @@ class SkillManager(BaseSkill):
         """Hull loader calls this exactly once after injection into ns."""
         self._hull = hull
 
-    def _prompt(self) -> tuple[str, str] | None:
-        return (
-            "using a loaded skill",
-            "Before using any skill for the first time, you must print(name.guide) to read the manual.\n"
-            "Call methods with the exact names and parameters from the manual; do not guess the interface.",
-        )
-
     def signal_update(self) -> None:
         if self._hull is None:
             self.signal = {}

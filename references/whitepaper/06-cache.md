@@ -170,8 +170,7 @@ Chapter 4 defined the structure of a Ping: `system_prompt + state(frame_stream +
 Ping
 ├── system_prompt (quasi-static)
 │   ├── kernel_protocol (system.md)     — fixed within session
-│   ├── SOUL (_soul)                     — fixed within session
-│   └── skill protocol (_prompt() return value) — depends on skill implementation
+│   └── SOUL (_soul)                     — fixed within session
 └── state (dynamic)
     ├── frame_stream                     — one record appended per frame
     └── signals (signal_update() dict aggregate) — rewritten each frame
@@ -251,8 +250,7 @@ Ping
 └── state
     ├── frame_stream (appended per frame)
     └── signals (rewritten per frame)
-        ├── signal_update() output for each BaseSkill instance
-        └── behavioral guidance from _prompt() for non-builtin skills
+        └── signal_update() output for each BaseSkill instance
 ```
 
 Under this structure, system_prompt does not change at any point during the session's lifetime. It is the absolute anchor of Prefix Cache — every frame's Ping prefix matches exactly from the very start of system_prompt. Combined with the append-based growth of frame_stream, the valid cache region extends from system_prompt all the way through the last frame record of the previous frame.
