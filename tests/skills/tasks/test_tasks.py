@@ -328,4 +328,3 @@ class TestNamespaceSync:
         t.add("two")
         t.remove("1")
         assert ns.get("_current_task_id") == "2"
-

@@ -222,4 +222,3 @@ class Tasks(BaseSkill):
         _render(None, 0)
         text = "\n".join(lines)
         self.signal = {"tasks": text} if text else {}
-
