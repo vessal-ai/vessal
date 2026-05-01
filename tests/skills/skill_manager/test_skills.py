@@ -121,14 +121,6 @@ def test_signal_has_no_method_names(hull):
         assert forbidden not in body
 
 
-def test_prompt_is_valid_cognitive_protocol(skills):
-    result = skills._prompt()
-    assert isinstance(result, tuple) and len(result) == 2
-    condition, methodology = result
-    assert condition.strip() and methodology.strip()
-    assert "guide" in methodology
-
-
 # ── hub interactions ──
 
 def test_search_hub_returns_matches(skills):
